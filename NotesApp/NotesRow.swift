@@ -8,10 +8,12 @@
 import SwiftUI
 
 struct NotesRow: View {
+    let note: Note
     var body: some View {
-        VStack {
+        VStack(alignment: .leading) {
             HStack{
-                Text("Test test")
+                Text(note.title)
+                    .font(.headline)
                 Spacer()
                 Image(systemName: "note.text")
                     .resizable()
@@ -22,7 +24,7 @@ struct NotesRow: View {
                     
             }
             .padding()
-            Text("testing abds abdjabd testing abds abdjabd testing abds abdjabd")
+            Text(note.content)
                 .font(.body)
                 .lineLimit(1)
                 .padding(.horizontal)
@@ -36,5 +38,5 @@ struct NotesRow: View {
 }
 
 #Preview {
-    NotesRow()
+    NotesRow(note: Note(title: "TEST", description: "TESTING ABCD  ", createdAt: Date()))
 }

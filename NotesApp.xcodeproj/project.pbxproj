@@ -15,6 +15,8 @@
 		96D9BDCE2C13E3B100726199 /* NotesAppUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96D9BDCD2C13E3B100726199 /* NotesAppUITests.swift */; };
 		96D9BDD02C13E3B100726199 /* NotesAppUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96D9BDCF2C13E3B100726199 /* NotesAppUITestsLaunchTests.swift */; };
 		96D9BDDD2C14EBA600726199 /* NotesRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96D9BDDC2C14EBA600726199 /* NotesRow.swift */; };
+		96D9BDDF2C16295900726199 /* Note.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96D9BDDE2C16295900726199 /* Note.swift */; };
+		96D9BDE12C1B55C900726199 /* NotesSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96D9BDE02C1B55C900726199 /* NotesSheet.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -46,6 +48,8 @@
 		96D9BDCD2C13E3B100726199 /* NotesAppUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesAppUITests.swift; sourceTree = "<group>"; };
 		96D9BDCF2C13E3B100726199 /* NotesAppUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesAppUITestsLaunchTests.swift; sourceTree = "<group>"; };
 		96D9BDDC2C14EBA600726199 /* NotesRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesRow.swift; sourceTree = "<group>"; };
+		96D9BDDE2C16295900726199 /* Note.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Note.swift; sourceTree = "<group>"; };
+		96D9BDE02C1B55C900726199 /* NotesSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesSheet.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -101,6 +105,8 @@
 				96D9BDB62C13E3B000726199 /* Assets.xcassets */,
 				96D9BDB82C13E3B000726199 /* Preview Content */,
 				96D9BDDC2C14EBA600726199 /* NotesRow.swift */,
+				96D9BDDE2C16295900726199 /* Note.swift */,
+				96D9BDE02C1B55C900726199 /* NotesSheet.swift */,
 			);
 			path = NotesApp;
 			sourceTree = "<group>";
@@ -262,7 +268,9 @@
 			files = (
 				96D9BDDD2C14EBA600726199 /* NotesRow.swift in Sources */,
 				96D9BDB52C13E3AC00726199 /* ContentView.swift in Sources */,
+				96D9BDE12C1B55C900726199 /* NotesSheet.swift in Sources */,
 				96D9BDB32C13E3AC00726199 /* NotesAppApp.swift in Sources */,
+				96D9BDDF2C16295900726199 /* Note.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
