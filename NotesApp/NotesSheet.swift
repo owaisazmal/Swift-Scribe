@@ -16,8 +16,9 @@ extension View{
 import SwiftUI
 
 struct NotesSheet: View {
-    @State private var title = ""
-    @State private var description = ""
+//    @State private var title = ""
+//    @State private var description = ""
+    @Bindable var note: Note
     @FocusState private var isDecriptionFocused: Bool
     @Environment(\.modelContext) var context
     @Environment(\.dismiss) private var dismiss
@@ -25,7 +26,7 @@ struct NotesSheet: View {
     var body: some View {
         NavigationStack {
             VStack{
-                TextField("Title", text: $title)
+                TextField("Title", text: $note.title)
                     .font(.headline)
                     .padding()
                     
@@ -33,7 +34,7 @@ struct NotesSheet: View {
                     .padding()
                 
                 ZStack(alignment: .topLeading) {
-                    TextEditor(text: $description)
+                    TextEditor(text: $note.content)
                         .padding(.horizontal)
                         .focused($isDecriptionFocused)
                     Text("Description")
@@ -41,7 +42,7 @@ struct NotesSheet: View {
                         .foregroundColor(.black)
                         .opacity(0.25)
                         .padding(.horizontal)
-                        .hidden(isDecriptionFocused)
+                        .hidden(isDecriptionFocused || !$note.wrappedValue.content.isEmpty)
                 }
             }
             .toolbar{
@@ -60,9 +61,9 @@ struct NotesSheet: View {
                 ToolbarItemGroup(placement: .topBarTrailing){
                     Button(action: {
                         //Save the note in the database using SwiftData
-                        if(!title.isEmpty && !description.isEmpty){
-                            context.insert(Note(title: title, description: description, createdAt: Date.now))
-                        
+                        if(!$note.title.wrappedValue.isEmpty && !$note.content.wrappedValue.isEmpty){
+//              context.insert(Note(title: title, description: description, createdAt: Date.now))
+                            context.insert(note)
                         //Dismiss the bottom sheet
                         dismiss()
                         }
@@ -87,5 +88,5 @@ struct NotesSheet: View {
 }
 
 #Preview {
-    NotesSheet()
+    NotesSheet(note: Note(title: "", description: "", createdAt: Date.now))
 }

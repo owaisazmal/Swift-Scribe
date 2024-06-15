@@ -11,6 +11,9 @@ import SwiftData
 struct ContentView: View {
     @State private var notes = Note.emptyList
     @State private var isShowingSheet = false
+    @State private var selectedNote: Note = Note(title: "", description: "")
+    @Environment(\.modelContext) var context
+    
     @Query(sort: \Note.title) var swiftDataNotes: [Note]
     
     var body: some View {
@@ -44,11 +47,24 @@ struct ContentView: View {
                             .padding())
                     ForEach(swiftDataNotes){note in
                         NotesRow(note: note)
+                            .onTapGesture {
+                                selectedNote = note
+                                isShowingSheet = true
+                            }
+                            .contextMenu {
+                                Button(action: {
+                                    context.delete(note)
+                                }){
+                                    Text("Delete")
+                                        .foregroundStyle(Color.red)
+                                    Image(systemName: "trash")
+                                }
+                            }
                     }
                 }
             }
             .sheet(isPresented: $isShowingSheet) {
-                NotesSheet()
+                NotesSheet(note: selectedNote)
                     .presentationDetents([.fraction(0.70), .large])
             }
             .background(Color.gray.opacity(0.2))
