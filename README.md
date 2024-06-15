@@ -15,23 +15,6 @@ Swift Scribe is a sleek, powerful, and intuitive text editor designed to elevate
 https://github.com/owaisazmal/Swift-Scribe/assets/87142612/57ce240e-9e6a-41ff-a661-e5f4302b065b
 
 
-
-## Installation
-To get started with Swift Scribe, follow these steps:
-
-1. Clone the repository:
-    ```sh
-    git clone https://github.com/yourusername/SwiftScribe.git
-    ```
-
-2. Open the project in Xcode:
-    ```sh
-    cd SwiftScribe
-    open SwiftScribe.xcodeproj
-    ```
-
-3. Build and run the project on your preferred device or simulator.
-
 ## Code Structure
 ### `ContentView.swift`
 The main view of the app. It contains:
