@@ -12,8 +12,7 @@ Swift Scribe is a sleek, powerful, and intuitive text editor designed to elevate
 ## Screenshots
 <img width="1595" alt="Screenshot 2024-06-15 at 3 54 28 PM" src="https://github.com/owaisazmal/Swift-Scribe/assets/87142612/ca4f3d3c-71f7-4ceb-9e29-504543427430">
 
-
-https://github.com/owaisazmal/Swift-Scribe/assets/87142612/09531bd6-888d-472c-8681-ce7ff83ed8ed
+https://github.com/owaisazmal/Swift-Scribe/assets/87142612/57ce240e-9e6a-41ff-a661-e5f4302b065b
 
 
 
