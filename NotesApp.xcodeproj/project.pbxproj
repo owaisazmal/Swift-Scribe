@@ -3,21 +3,8 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 77;
 	objects = {
-
-/* Begin PBXBuildFile section */
-		96D9BDB32C13E3AC00726199 /* NotesAppApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96D9BDB22C13E3AC00726199 /* NotesAppApp.swift */; };
-		96D9BDB52C13E3AC00726199 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96D9BDB42C13E3AC00726199 /* ContentView.swift */; };
-		96D9BDB72C13E3B000726199 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 96D9BDB62C13E3B000726199 /* Assets.xcassets */; };
-		96D9BDBA2C13E3B000726199 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 96D9BDB92C13E3B000726199 /* Preview Assets.xcassets */; };
-		96D9BDC42C13E3B100726199 /* NotesAppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96D9BDC32C13E3B100726199 /* NotesAppTests.swift */; };
-		96D9BDCE2C13E3B100726199 /* NotesAppUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96D9BDCD2C13E3B100726199 /* NotesAppUITests.swift */; };
-		96D9BDD02C13E3B100726199 /* NotesAppUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96D9BDCF2C13E3B100726199 /* NotesAppUITestsLaunchTests.swift */; };
-		96D9BDDD2C14EBA600726199 /* NotesRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96D9BDDC2C14EBA600726199 /* NotesRow.swift */; };
-		96D9BDDF2C16295900726199 /* Note.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96D9BDDE2C16295900726199 /* Note.swift */; };
-		96D9BDE12C1B55C900726199 /* NotesSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96D9BDE02C1B55C900726199 /* NotesSheet.swift */; };
-/* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
 		96D9BDC02C13E3B100726199 /* PBXContainerItemProxy */ = {
@@ -38,19 +25,27 @@
 
 /* Begin PBXFileReference section */
 		96D9BDAF2C13E3AC00726199 /* NotesApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NotesApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		96D9BDB22C13E3AC00726199 /* NotesAppApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesAppApp.swift; sourceTree = "<group>"; };
-		96D9BDB42C13E3AC00726199 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		96D9BDB62C13E3B000726199 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		96D9BDB92C13E3B000726199 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		96D9BDBF2C13E3B100726199 /* NotesAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NotesAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		96D9BDC32C13E3B100726199 /* NotesAppTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesAppTests.swift; sourceTree = "<group>"; };
 		96D9BDC92C13E3B100726199 /* NotesAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NotesAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		96D9BDCD2C13E3B100726199 /* NotesAppUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesAppUITests.swift; sourceTree = "<group>"; };
-		96D9BDCF2C13E3B100726199 /* NotesAppUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesAppUITestsLaunchTests.swift; sourceTree = "<group>"; };
-		96D9BDDC2C14EBA600726199 /* NotesRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesRow.swift; sourceTree = "<group>"; };
-		96D9BDDE2C16295900726199 /* Note.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Note.swift; sourceTree = "<group>"; };
-		96D9BDE02C1B55C900726199 /* NotesSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesSheet.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		96D9BDB12C13E3AC00726199 /* NotesApp */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = NotesApp;
+			sourceTree = "<group>";
+		};
+		96D9BDC22C13E3B100726199 /* NotesAppTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = NotesAppTests;
+			sourceTree = "<group>";
+		};
+		96D9BDCC2C13E3B100726199 /* NotesAppUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = NotesAppUITests;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		96D9BDAC2C13E3AC00726199 /* Frameworks */ = {
@@ -97,45 +92,6 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		96D9BDB12C13E3AC00726199 /* NotesApp */ = {
-			isa = PBXGroup;
-			children = (
-				96D9BDB22C13E3AC00726199 /* NotesAppApp.swift */,
-				96D9BDB42C13E3AC00726199 /* ContentView.swift */,
-				96D9BDB62C13E3B000726199 /* Assets.xcassets */,
-				96D9BDB82C13E3B000726199 /* Preview Content */,
-				96D9BDDC2C14EBA600726199 /* NotesRow.swift */,
-				96D9BDDE2C16295900726199 /* Note.swift */,
-				96D9BDE02C1B55C900726199 /* NotesSheet.swift */,
-			);
-			path = NotesApp;
-			sourceTree = "<group>";
-		};
-		96D9BDB82C13E3B000726199 /* Preview Content */ = {
-			isa = PBXGroup;
-			children = (
-				96D9BDB92C13E3B000726199 /* Preview Assets.xcassets */,
-			);
-			path = "Preview Content";
-			sourceTree = "<group>";
-		};
-		96D9BDC22C13E3B100726199 /* NotesAppTests */ = {
-			isa = PBXGroup;
-			children = (
-				96D9BDC32C13E3B100726199 /* NotesAppTests.swift */,
-			);
-			path = NotesAppTests;
-			sourceTree = "<group>";
-		};
-		96D9BDCC2C13E3B100726199 /* NotesAppUITests */ = {
-			isa = PBXGroup;
-			children = (
-				96D9BDCD2C13E3B100726199 /* NotesAppUITests.swift */,
-				96D9BDCF2C13E3B100726199 /* NotesAppUITestsLaunchTests.swift */,
-			);
-			path = NotesAppUITests;
-			sourceTree = "<group>";
-		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -150,6 +106,9 @@
 			buildRules = (
 			);
 			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				96D9BDB12C13E3AC00726199 /* NotesApp */,
 			);
 			name = NotesApp;
 			productName = NotesApp;
@@ -169,6 +128,9 @@
 			dependencies = (
 				96D9BDC12C13E3B100726199 /* PBXTargetDependency */,
 			);
+			fileSystemSynchronizedGroups = (
+				96D9BDC22C13E3B100726199 /* NotesAppTests */,
+			);
 			name = NotesAppTests;
 			productName = NotesAppTests;
 			productReference = 96D9BDBF2C13E3B100726199 /* NotesAppTests.xctest */;
@@ -186,6 +148,9 @@
 			);
 			dependencies = (
 				96D9BDCB2C13E3B100726199 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				96D9BDCC2C13E3B100726199 /* NotesAppUITests */,
 			);
 			name = NotesAppUITests;
 			productName = NotesAppUITests;
@@ -216,14 +181,14 @@
 				};
 			};
 			buildConfigurationList = 96D9BDAA2C13E3AC00726199 /* Build configuration list for PBXProject "NotesApp" */;
-			compatibilityVersion = "Xcode 14.0";
-			developmentRegion = en;
+						developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
 				Base,
 			);
 			mainGroup = 96D9BDA62C13E3AC00726199;
+			preferredProjectObjectVersion = 77;
 			productRefGroup = 96D9BDB02C13E3AC00726199 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -240,8 +205,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				96D9BDBA2C13E3B000726199 /* Preview Assets.xcassets in Resources */,
-				96D9BDB72C13E3B000726199 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -266,11 +229,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				96D9BDDD2C14EBA600726199 /* NotesRow.swift in Sources */,
-				96D9BDB52C13E3AC00726199 /* ContentView.swift in Sources */,
-				96D9BDE12C1B55C900726199 /* NotesSheet.swift in Sources */,
-				96D9BDB32C13E3AC00726199 /* NotesAppApp.swift in Sources */,
-				96D9BDDF2C16295900726199 /* Note.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -278,7 +236,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				96D9BDC42C13E3B100726199 /* NotesAppTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -286,8 +243,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				96D9BDD02C13E3B100726199 /* NotesAppUITestsLaunchTests.swift in Sources */,
-				96D9BDCE2C13E3B100726199 /* NotesAppUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -436,6 +391,10 @@
 				DEVELOPMENT_ASSET_PATHS = "\"NotesApp/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Swift Scribe";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Swift Scribe records audio alongside your notes when you tap the record button.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Swift Scribe adds photos you pick as pages in your notebooks.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -464,6 +423,10 @@
 				DEVELOPMENT_ASSET_PATHS = "\"NotesApp/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Swift Scribe";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Swift Scribe records audio alongside your notes when you tap the record button.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Swift Scribe adds photos you pick as pages in your notebooks.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
