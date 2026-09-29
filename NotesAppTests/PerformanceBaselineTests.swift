@@ -1,0 +1,597 @@
+import XCTest
+import PencilKit
+@testable import NotesApp
+
+// Opt-in: TEST_RUNNER_SCRIBE_PERF=1 xcodebuild test ... -only-testing:NotesAppTests/PerformanceBaselineTests
+@MainActor
+final class PerformanceBaselineTests: XCTestCase {
+    private static let typical = StressFixture(pages: 20, strokesPerPage: 400)
+    private static let heavy = StressFixture(pages: 100, strokesPerPage: 500)
+
+    private func requirePerfRun() throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["SCRIBE_PERF"] == "1", "Set SCRIBE_PERF=1 to run")
+    }
+
+    private func storedNotebook(_ fixture: StressFixture) -> Notebook {
+        let notebook = Notebook(title: "Stress", template: .narrowRuled, color: .white, size: .letter)
+        notebook.pages = fixture.pages
+        NotebookStore.save(fixture.drawing, for: notebook.id)
+        let id = notebook.id
+        addTeardownBlock { NotebookStore.deleteFiles(for: id) }
+        return notebook
+    }
+
+    private func hostWindow() throws -> UIWindow {
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let window = UIWindow(windowScene: scene)
+        window.frame = CGRect(x: 0, y: 0, width: 834, height: 1194)
+        window.rootViewController = UIViewController()
+        window.makeKeyAndVisible()
+        addTeardownBlock { @MainActor in window.isHidden = true }
+        return window
+    }
+
+    func testFixtureSizes() throws {
+        try requirePerfRun()
+        for (name, fixture) in [("typical", Self.typical), ("heavy", Self.heavy)] {
+            let bytes = fixture.drawing.dataRepresentation().count
+            let points = fixture.drawing.strokes.reduce(0) { $0 + $1.path.count }
+            print("PERF fixture \(name): pages=\(fixture.pages.count) strokes=\(fixture.drawing.strokes.count) points=\(points) bytes=\(bytes)")
+        }
+    }
+
+    func testLoadDrawingHeavy() throws {
+        try requirePerfRun()
+        let id = storedNotebook(Self.heavy).id
+        measure { _ = NotebookStore.loadDrawing(for: id) }
+    }
+
+    func testSerializeDrawingHeavy() throws {
+        try requirePerfRun()
+        let drawing = Self.heavy.drawing
+        measure { _ = drawing.dataRepresentation() }
+    }
+
+    func testAutosaveTypical() throws {
+        try requirePerfRun()
+        let model = EditorModel(notebook: storedNotebook(Self.typical))
+        measure {
+            model.drawingDidChange(Self.typical.drawing)
+            model.save()
+        }
+    }
+
+    func testAutosaveHeavy() throws {
+        try requirePerfRun()
+        let model = EditorModel(notebook: storedNotebook(Self.heavy))
+        measure {
+            model.drawingDidChange(Self.heavy.drawing)
+            model.save()
+        }
+    }
+
+    func testCoverThumbnailHeavy() throws {
+        try requirePerfRun()
+        let fixture = Self.heavy
+        let frame = NotebookLayout(pages: fixture.pages).frames[0]
+        measure {
+            _ = PaperRenderer.renderPage(fixture.pages[0], frame: frame, drawing: fixture.drawing,
+                                         notebookID: UUID(), width: 360)
+        }
+    }
+
+    func testNavigatorThumbnailHeavy() throws {
+        try requirePerfRun()
+        let model = EditorModel(notebook: storedNotebook(Self.heavy))
+        measure { _ = model.pageThumbnail(at: 50, width: 280) }
+    }
+
+    func testInsertPageAtStartTypical() throws {
+        try requirePerfRun()
+        measureInsertPageAtStart(Self.typical)
+    }
+
+    func testInsertPageAtStartHeavy() throws {
+        try requirePerfRun()
+        measureInsertPageAtStart(Self.heavy)
+    }
+
+    private func measureInsertPageAtStart(_ fixture: StressFixture) {
+        measure {
+            var entries = fixture.pages.map { (page: $0, source: Optional($0.id)) }
+            entries.insert((page: .template(.blank, color: .white, size: .letter), source: nil), at: 0)
+            _ = PageRemapper.remap(drawing: fixture.drawing, oldPages: fixture.pages, newPages: entries)
+        }
+    }
+
+    func testCanvasDrawingGetterTypical() throws {
+        try requirePerfRun()
+        try measureDrawingGetter(Self.typical)
+    }
+
+    func testCanvasDrawingGetterHeavy() throws {
+        try requirePerfRun()
+        try measureDrawingGetter(Self.heavy)
+    }
+
+    private func measureDrawingGetter(_ fixture: StressFixture) throws {
+        let window = try hostWindow()
+        let canvas = PKCanvasView(frame: window.bounds)
+        window.rootViewController?.view.addSubview(canvas)
+        canvas.drawing = fixture.drawing
+        measure { _ = canvas.drawing }
+    }
+
+    func testOpenNotebookSyncHeavy() throws {
+        try requirePerfRun()
+        let notebook = storedNotebook(Self.heavy)
+        let window = try hostWindow()
+        measure(metrics: [XCTClockMetric(), XCTMemoryMetric()]) {
+            let model = EditorModel(notebook: notebook)
+            let controller = NotebookCanvasViewController(model: model)
+            model.canvas = controller
+            window.rootViewController = controller
+            controller.view.layoutIfNeeded()
+            window.rootViewController = UIViewController()
+        }
+    }
+
+    func testOpenLongPDFNotebookSync() throws {
+        try requirePerfRun()
+        let notebook = Notebook(title: "Textbook", template: .blank, color: .white, size: .letter)
+        let id = notebook.id
+        addTeardownBlock { NotebookStore.deleteFiles(for: id) }
+        notebook.pages = try NotebookImporter.pdfPages(from: StressFixture.makePDF(pageCount: 300), notebookID: id)
+        let window = try hostWindow()
+        measure(metrics: [XCTClockMetric(), XCTMemoryMetric()]) {
+            let model = EditorModel(notebook: notebook)
+            let controller = NotebookCanvasViewController(model: model)
+            model.canvas = controller
+            window.rootViewController = controller
+            controller.view.layoutIfNeeded()
+            window.rootViewController = UIViewController()
+        }
+    }
+
+    func testFirstRenderHeavy() throws {
+        try requirePerfRun()
+        let window = try hostWindow()
+        let options = XCTMeasureOptions()
+        options.invocationOptions = [.manuallyStop]
+        measure(metrics: [XCTClockMetric()], options: options) {
+            let canvas = PKCanvasView(frame: window.bounds)
+            let probe = RenderProbe()
+            let rendered = expectation(description: "rendered")
+            probe.onFinish = { rendered.fulfill() }
+            canvas.delegate = probe
+            window.rootViewController?.view.addSubview(canvas)
+            canvas.drawing = Self.heavy.drawing
+            wait(for: [rendered], timeout: 15)
+            stopMeasuring()
+            canvas.removeFromSuperview()
+        }
+    }
+
+    func testExportPDFTypical() throws {
+        try requirePerfRun()
+        let fixture = Self.typical
+        var size = 0
+        measure {
+            let url = try? PDFExporter.export(title: "Stress", pages: fixture.pages, drawing: fixture.drawing, notebookID: UUID())
+            size = (try? url?.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+        }
+        print("PERF export typical bytes=\(size)")
+    }
+
+    func testHandwritingIndexThreePages() throws {
+        try requirePerfRun()
+        let notebook = storedNotebook(StressFixture(pages: 3, strokesPerPage: 400))
+        let pages = notebook.pages
+        let id = notebook.id
+        let options = XCTMeasureOptions()
+        options.iterationCount = 3
+        measure(options: options) { _ = SearchIndexer.recognizeText(notebookID: id, pages: pages) }
+    }
+
+    // MARK: - v2 (package storage, per-page canvases)
+
+    private func report(_ name: String, _ values: [Double], unit: String = "ms") {
+        let sorted = values.sorted()
+        let median = sorted.isEmpty ? 0 : sorted[sorted.count / 2]
+        print("PERF v2 \(name): median=\(String(format: "%.3f", median))\(unit) max=\(String(format: "%.3f", sorted.last ?? 0))\(unit) n=\(values.count)")
+    }
+
+    private func spin(_ seconds: TimeInterval) {
+        RunLoop.main.run(until: Date().addingTimeInterval(seconds))
+    }
+
+    private func v2Root() -> StorageRoot {
+        let url = FileManager.default.temporaryDirectory.appending(path: "perf-v2-\(UUID().uuidString)", directoryHint: .isDirectory)
+        addTeardownBlock { try? FileManager.default.removeItem(at: url) }
+        return StorageRoot(url: url)
+    }
+
+    private func openV2(_ id: UUID, root: StorageRoot, window: UIWindow) async throws -> (NotebookDocument, PageStackController, TimeInterval) {
+        let document = try await NotebookDocument.open(id, root: root)
+        document.saveDelay = .seconds(600)
+        let session = EditorSession(document: document)
+        let controller = PageStackController(session: session)
+        session.canvas = controller
+        var firstInk: TimeInterval = -1
+        let rendered = expectation(description: "first ink")
+        controller.onFirstInk = { firstInk = $0; rendered.fulfill() }
+        window.rootViewController = controller
+        controller.view.layoutIfNeeded()
+        await fulfillment(of: [rendered], timeout: 15)
+        spin(0.2)
+        return (document, controller, firstInk)
+    }
+
+    private func stage(_ stroke: PKStroke, on canvas: PKCanvasView) -> () -> Void {
+        let delegate = canvas.delegate
+        canvas.delegate = nil
+        var drawing = canvas.drawing
+        drawing.strokes.append(stroke)
+        canvas.drawing = drawing
+        canvas.delegate = delegate
+        return { delegate?.canvasViewDrawingDidChange?(canvas) }
+    }
+
+    private func measureV2StrokeEnd(pages: Int, label: String) async throws {
+        let root = v2Root()
+        let id = try await V2StressFixture.write(pages: pages, strokes: { $0 == 0 ? 1000 : 500 }, root: root)
+        let (document, controller, _) = try await openV2(id, root: root, window: try hostWindow())
+        let canvas = try XCTUnwrap(controller.canvas(forPage: 0))
+        var samples: [Double] = []
+        for i in 0..<30 {
+            let handler = stage(V2StressFixture.probe(at: CGPoint(x: 80, y: 60 + CGFloat(i % 10) * 4)), on: canvas)
+            let start = CACurrentMediaTime()
+            handler()
+            samples.append((CACurrentMediaTime() - start) * 1000)
+        }
+        report("stroke end, 1,000-stroke page, \(label)", Array(samples.dropFirst(5)))
+        XCTAssertEqual(document.loadedInk(document.pages[0].id)?.strokes.count, 1030)
+    }
+
+    func testV2StrokeEndHeavyNotebook() async throws {
+        try requirePerfRun()
+        try await measureV2StrokeEnd(pages: 100, label: "100-page notebook")
+    }
+
+    func testV2StrokeEndSmallNotebook() async throws {
+        try requirePerfRun()
+        try await measureV2StrokeEnd(pages: 10, label: "10-page notebook")
+    }
+
+    func testV2AutosaveSnapshotHeavy() async throws {
+        try requirePerfRun()
+        let root = v2Root()
+        let id = try await V2StressFixture.write(pages: 100, strokes: { _ in 500 }, root: root)
+        let (document, controller, _) = try await openV2(id, root: root, window: try hostWindow())
+        var samples: [Double] = []
+        var written = 0
+        for i in 0..<10 {
+            if let canvas = controller.canvas(forPage: 0) { stage(V2StressFixture.probe(at: CGPoint(x: 90, y: 70 + CGFloat(i) * 5)), on: canvas)() }
+            let start = CACurrentMediaTime()
+            let pending = document.makePendingSave()
+            samples.append((CACurrentMediaTime() - start) * 1000)
+            written = pending.snapshot.ink.count
+            _ = await document.save()
+        }
+        report("autosave main-thread snapshot (heavy)", samples)
+        XCTAssertEqual(written, 1)
+        XCTAssertFalse(document.hasUnsavedChanges)
+    }
+
+    func testV2PageOperationsHeavy() async throws {
+        try requirePerfRun()
+        let root = v2Root()
+        let id = try await V2StressFixture.write(pages: 100, strokes: { _ in 500 }, root: root)
+        let (document, _, _) = try await openV2(id, root: root, window: try hostWindow())
+        document.undoManager.groupsByEvent = false
+        var insert: [Double] = [], move: [Double] = [], delete: [Double] = [], undo: [Double] = []
+        func timed(_ bucket: inout [Double], _ action: () -> Void) {
+            document.undoManager.beginUndoGrouping()
+            let start = CACurrentMediaTime()
+            action()
+            bucket.append((CACurrentMediaTime() - start) * 1000)
+            document.undoManager.endUndoGrouping()
+            spin(0.03)
+        }
+        for _ in 0..<8 {
+            timed(&insert) { document.insertPages([document.manifest.defaults.newPage()], at: 0) }
+            timed(&move) { document.movePage(from: 0, to: 50) }
+            timed(&delete) { document.removePages([document.pages[50].id]) }
+        }
+        for _ in 0..<6 {
+            let start = CACurrentMediaTime()
+            document.undoManager.undo()
+            undo.append((CACurrentMediaTime() - start) * 1000)
+            spin(0.03)
+        }
+        report("insert page at start, incl. relayout (heavy)", insert)
+        report("move page 0 to 50, incl. relayout (heavy)", move)
+        report("delete page, incl. relayout (heavy)", delete)
+        report("undo a page operation (heavy)", undo)
+        XCTAssertEqual(document.pages.count, 100)
+    }
+
+    private func measureV2Open(_ make: (StorageRoot) async throws -> UUID, label: String) async throws {
+        let root = v2Root()
+        let id = try await make(root)
+        let window = try hostWindow()
+        var sync: [Double] = [], firstInk: [Double] = []
+        for _ in 0..<6 {
+            let start = CACurrentMediaTime()
+            let document = try await NotebookDocument.open(id, root: root)
+            let session = EditorSession(document: document)
+            let controller = PageStackController(session: session)
+            session.canvas = controller
+            let rendered = expectation(description: "first ink")
+            var inkAt: CFTimeInterval = 0
+            controller.onFirstInk = { _ in inkAt = CACurrentMediaTime(); rendered.fulfill() }
+            let blockStart = CACurrentMediaTime()
+            window.rootViewController = controller
+            controller.view.layoutIfNeeded()
+            sync.append((CACurrentMediaTime() - blockStart) * 1000)
+            await fulfillment(of: [rendered], timeout: 15)
+            firstInk.append((inkAt - start) * 1000)
+            window.rootViewController = UIViewController()
+            spin(0.2)
+        }
+        report("open \(label): longest synchronous main-thread block", Array(sync.dropFirst()))
+        report("open \(label): to first ink", Array(firstInk.dropFirst()))
+    }
+
+    func testV2OpenHeavy() async throws {
+        try requirePerfRun()
+        try await measureV2Open({ try await V2StressFixture.write(pages: 100, strokes: { _ in 500 }, root: $0) }, label: "heavy")
+    }
+
+    func testV2OpenLongPDF() async throws {
+        try requirePerfRun()
+        try await measureV2Open({ try await V2StressFixture.writePDF(pages: 300, root: $0) }, label: "300-page PDF")
+    }
+
+    private func scrollThrough(_ controller: PageStackController, steps: Int, fraction: CGFloat) -> (peak: Double, live: Int) {
+        var peak = 0.0, live = 0
+        for _ in 0..<steps {
+            controller.scrollBy(viewportFraction: fraction)
+            spin(0.03)
+            peak = max(peak, V2StressFixture.footprintMB())
+            live = max(live, controller.liveCanvasCount)
+        }
+        return (peak, live)
+    }
+
+    func testV2MemoryScrollingLongPDF() async throws {
+        try requirePerfRun()
+        let root = v2Root()
+        let id = try await V2StressFixture.writePDF(pages: 300, root: root)
+        let baseline = V2StressFixture.footprintMB()
+        let (_, controller, _) = try await openV2(id, root: root, window: try hostWindow())
+        let scroll = scrollThrough(controller, steps: 600, fraction: 0.6)
+        print("PERF v2 memory, scrolling a 300-page PDF: baseline=\(Int(baseline))MB peak=\(Int(scroll.peak))MB liveCanvases<=\(scroll.live) reached page \(controller.currentPage + 1)")
+        controller.scrollToPage(150)
+        controller.setZoom(5)
+        spin(0.8)
+        let zoomed = scrollThrough(controller, steps: 60, fraction: 0.5)
+        print("PERF v2 memory, 300-page PDF at 5x: peak=\(Int(zoomed.peak))MB liveCanvases<=\(zoomed.live)")
+        XCTAssertGreaterThan(controller.currentPage, 150)
+    }
+
+    func testV2MemoryScrollingHeavyInk() async throws {
+        try requirePerfRun()
+        let root = v2Root()
+        let id = try await V2StressFixture.write(pages: 100, strokes: { _ in 500 }, root: root)
+        let baseline = V2StressFixture.footprintMB()
+        let (_, controller, _) = try await openV2(id, root: root, window: try hostWindow())
+        let scroll = scrollThrough(controller, steps: 200, fraction: 0.6)
+        print("PERF v2 memory, scrolling heavy ink: baseline=\(Int(baseline))MB peak=\(Int(scroll.peak))MB liveCanvases<=\(scroll.live)")
+        controller.setZoom(5)
+        spin(0.8)
+        let zoomed = scrollThrough(controller, steps: 40, fraction: 0.5)
+        print("PERF v2 memory, heavy ink at 5x: peak=\(Int(zoomed.peak))MB liveCanvases<=\(zoomed.live)")
+    }
+
+    func testV2ExportKeepsMainThreadFree() async throws {
+        try requirePerfRun()
+        let root = v2Root()
+        let id = try await V2StressFixture.write(pages: 20, strokes: { _ in 400 }, root: root)
+        let document = try await NotebookDocument.open(id, root: root)
+        var longest: CFTimeInterval = 0
+        var last = CACurrentMediaTime()
+        let timer = Timer.scheduledTimer(withTimeInterval: 0.002, repeats: true) { _ in
+            let now = CACurrentMediaTime()
+            longest = max(longest, now - last)
+            last = now
+        }
+        let start = CACurrentMediaTime()
+        let job = ExportJob(document: document)
+        while case .running = job.state { spin(0.01) }
+        timer.invalidate()
+        guard case .finished(let url) = job.state else { return XCTFail("export failed: \(job.state)") }
+        let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+        print("PERF v2 export 20 pages: total=\(Int((CACurrentMediaTime() - start) * 1000))ms longestMainThreadGap=\(String(format: "%.1f", longest * 1000))ms bytes=\(size)")
+    }
+
+    func testV2CoverRender() throws {
+        try requirePerfRun()
+        for style in CoverStyle.allCases {
+            let request = CoverRequest(notebookID: UUID(), spec: CoverSpec(style: style, cloth: .moss, inks: (.teal, .pink), seed: 9),
+                                       title: "Cell Biology", meta: "24 pages", width: 176, scale: 2, dark: false, highContrast: false,
+                                       firstPage: nil, firstPageKey: nil, firstPageIsPDF: false)
+            var samples: [Double] = []
+            for _ in 0..<10 {
+                let start = CACurrentMediaTime()
+                _ = CoverRenderer.render(request)
+                samples.append((CACurrentMediaTime() - start) * 1000)
+            }
+            report("cover render \(style.rawValue), off main in the app", samples)
+        }
+    }
+
+    func testV2HandwritingIndexIsIncremental() async throws {
+        try requirePerfRun()
+        let root = v2Root()
+        let id = try await V2StressFixture.write(pages: 3, strokes: { _ in 400 }, root: root)
+        let package = NotebookPackage(root: root, id: id)
+        let pages = try await package.readManifest().manifest.pages
+        var start = CACurrentMediaTime()
+        _ = await HandwritingIndexer.shared.index(HandwritingIndexer.Job(package: package, pages: pages))
+        let first = CACurrentMediaTime() - start
+        start = CACurrentMediaTime()
+        _ = await HandwritingIndexer.shared.index(HandwritingIndexer.Job(package: package, pages: pages))
+        let second = CACurrentMediaTime() - start
+        print("PERF v2 OCR 3 pages: first=\(Int(first * 1000))ms unchanged re-run=\(String(format: "%.1f", second * 1000))ms (background)")
+    }
+}
+
+private final class RenderProbe: NSObject, PKCanvasViewDelegate {
+    var onFinish: (() -> Void)?
+
+    func canvasViewDidFinishRendering(_ canvasView: PKCanvasView) {
+        onFinish?()
+        onFinish = nil
+    }
+}
+
+struct StressFixture {
+    let pages: [PageSpec]
+    let drawing: PKDrawing
+
+    init(pages count: Int, strokesPerPage: Int, seed: UInt64 = 7) {
+        var rng = SplitMix64(state: seed)
+        let pages = (0..<count).map { _ in PageSpec.template(.narrowRuled, color: .white, size: .letter) }
+        let layout = NotebookLayout(pages: pages)
+        let created = Date(timeIntervalSince1970: 1_790_000_000)
+        var strokes: [PKStroke] = []
+        strokes.reserveCapacity(count * strokesPerPage)
+
+        for frame in layout.frames {
+            var x = frame.minX + 110
+            var baseline = frame.minY + 120
+            for _ in 0..<strokesPerPage {
+                let width = CGFloat.random(in: 6...22, using: &rng)
+                if x + width > frame.maxX - 30 {
+                    x = frame.minX + 110
+                    baseline += 28
+                    if baseline > frame.maxY - 30 { baseline = frame.minY + 120 }
+                }
+                let pointCount = Int.random(in: 16...32, using: &rng)
+                let height = CGFloat.random(in: 8...18, using: &rng)
+                let phase = CGFloat.random(in: 0...(.pi), using: &rng)
+                let points = (0..<pointCount).map { i -> PKStrokePoint in
+                    let t = CGFloat(i) / CGFloat(pointCount - 1)
+                    let location = CGPoint(x: x + width * t, y: baseline - 4 - height * abs(sin(phase + t * 3 * .pi)))
+                    return PKStrokePoint(location: location, timeOffset: TimeInterval(t) * 0.3,
+                                         size: CGSize(width: 2.6, height: 2.6), opacity: 1,
+                                         force: 0.6 + 0.4 * t, azimuth: 0, altitude: .pi / 3)
+                }
+                let ink = PKInk(.pen, color: .black)
+                strokes.append(PKStroke(ink: ink, path: PKStrokePath(controlPoints: points, creationDate: created)))
+                x += width + CGFloat.random(in: 3...12, using: &rng)
+            }
+        }
+        self.pages = pages
+        self.drawing = PKDrawing(strokes: strokes)
+    }
+
+    static func makePDF(pageCount: Int) throws -> URL {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).pdf")
+        let bounds = CGRect(origin: .zero, size: PageSize.letter.points)
+        try UIGraphicsPDFRenderer(bounds: bounds).writePDF(to: url) { context in
+            for index in 0..<pageCount {
+                context.beginPage()
+                ("Chapter \(index + 1)" as NSString).draw(at: CGPoint(x: 72, y: 72),
+                                                         withAttributes: [.font: UIFont.systemFont(ofSize: 28)])
+            }
+        }
+        return url
+    }
+}
+
+struct SplitMix64: RandomNumberGenerator {
+    var state: UInt64
+
+    mutating func next() -> UInt64 {
+        state &+= 0x9E37_79B9_7F4A_7C15
+        var z = state
+        z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
+        z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
+        return z ^ (z >> 31)
+    }
+}
+
+/// v2 fixtures: packages with page-local ink, shaped like the v1 StressFixture.
+enum V2StressFixture {
+    static func handwriting(count: Int, pageSize: CGSize, rng: inout SplitMix64) -> [PKStroke] {
+        let k = pageSize.width / 800
+        let created = Date(timeIntervalSince1970: 1_790_000_000)
+        let left = 110 * k, right = pageSize.width - 30 * k, top = 120 * k
+        var x = left, baseline = top
+        var result: [PKStroke] = []
+        result.reserveCapacity(count)
+        for _ in 0..<count {
+            let width = CGFloat.random(in: 6...22, using: &rng) * k
+            if x + width > right {
+                x = left
+                baseline += 28 * k
+                if baseline > pageSize.height - 30 * k { baseline = top }
+            }
+            let pointCount = Int.random(in: 16...32, using: &rng)
+            let height = CGFloat.random(in: 8...18, using: &rng) * k
+            let phase = CGFloat.random(in: 0...(.pi), using: &rng)
+            let points = (0..<pointCount).map { i -> PKStrokePoint in
+                let t = CGFloat(i) / CGFloat(pointCount - 1)
+                return PKStrokePoint(location: CGPoint(x: x + width * t, y: baseline - 4 * k - height * abs(sin(phase + t * 3 * .pi))),
+                                     timeOffset: TimeInterval(t) * 0.3, size: CGSize(width: 2.6 * k, height: 2.6 * k), opacity: 1,
+                                     force: 0.6 + 0.4 * t, azimuth: 0, altitude: .pi / 3)
+            }
+            result.append(PKStroke(ink: PKInk(.pen, color: .black), path: PKStrokePath(controlPoints: points, creationDate: created)))
+            x += width + CGFloat.random(in: 3...12, using: &rng) * k
+        }
+        return result
+    }
+
+    static func write(pages count: Int, strokes: (Int) -> Int, root: StorageRoot) async throws -> UUID {
+        var rng = SplitMix64(state: 7)
+        let pages = (0..<count).map { _ in NotebookPage.template(.narrowRuled, color: .white, size: .letter) }
+        var ink: [UUID: PKDrawing] = [:]
+        for (index, page) in pages.enumerated() {
+            ink[page.id] = PKDrawing(strokes: handwriting(count: strokes(index), pageSize: page.size, rng: &rng))
+        }
+        let manifest = NotebookManifest(title: "Stress", defaults: PageDefaults(template: .narrowRuled, paperColor: .white, pageSize: .letter), pages: pages)
+        let package = NotebookPackage(root: root, id: manifest.id)
+        try await package.create(manifest)
+        _ = try await package.write(SaveSnapshot(manifest: manifest, ink: ink))
+        return manifest.id
+    }
+
+    static func writePDF(pages count: Int, root: StorageRoot) async throws -> UUID {
+        let id = UUID()
+        let package = NotebookPackage(root: root, id: id)
+        let file = try await package.importAsset(from: StressFixture.makePDF(pageCount: count), ext: "pdf")
+        let pages = try PDFImport.pages(at: package.assetURL(file), file: file)
+        try await package.create(NotebookManifest(id: id, title: "Textbook", defaults: PageDefaults(template: .blank, paperColor: .white, pageSize: .letter), pages: pages))
+        return id
+    }
+
+    static func probe(at origin: CGPoint) -> PKStroke {
+        let points = (0..<24).map { i -> PKStrokePoint in
+            let t = CGFloat(i) / 23
+            return PKStrokePoint(location: CGPoint(x: origin.x + 60 * t, y: origin.y + 6 * sin(t * 6)), timeOffset: TimeInterval(t) * 0.2,
+                                 size: CGSize(width: 2, height: 2), opacity: 1, force: 1, azimuth: 0, altitude: .pi / 2)
+        }
+        return PKStroke(ink: PKInk(.pen, color: .systemBlue), path: PKStrokePath(controlPoints: points, creationDate: .now))
+    }
+
+    static func footprintMB() -> Double {
+        var info = task_vm_info_data_t()
+        var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<integer_t>.size)
+        let result = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count) }
+        }
+        return result == KERN_SUCCESS ? Double(info.phys_footprint) / 1_048_576 : -1
+    }
+}
