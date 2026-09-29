@@ -27,8 +27,8 @@ struct NotebookCoverItem: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: Space.x2) {
+        VStack(alignment: .leading, spacing: Space.x2) {
+            Button(action: action) {
                 RecordCover(record: record, width: CoverWidth.shelf)
                     .overlay(alignment: .topTrailing) {
                         if record.isFavorite {
@@ -41,17 +41,19 @@ struct NotebookCoverItem: View {
                     .animation(Motion.adaptive(Motion.ribbon, reduceMotion: reduceMotion), value: record.isFavorite)
                     .overlay { if isSelected { StitchedSelection() } }
                     .zoomSource(id: record.id, in: zoomNamespace)
-                meta
+                    .contentShape(Rectangle())
             }
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+            .hoverEffect(.lift)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(record.accessibilityDescription)
+            .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+            .accessibilityHint(isSelecting ? Text("Selects or deselects this notebook") : Text("Opens the notebook"))
+            .accessibilityIdentifier("notebook.\(record.title)")
+            meta
+                .accessibilityHidden(true)
+                .onTapGesture(perform: action)
         }
-        .buttonStyle(.plain)
-        .hoverEffect(.lift)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(record.accessibilityDescription)
-        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
-        .accessibilityHint(isSelecting ? Text("Selects or deselects this notebook") : Text("Opens the notebook"))
-        .accessibilityIdentifier("notebook.\(record.title)")
     }
 
     private var meta: some View {
@@ -62,7 +64,7 @@ struct NotebookCoverItem: View {
                 Text(record.metaLine)
             }
         }
-        .font(.footnote.monospacedDigit())
+        .font(.footnote.weight(.medium).monospacedDigit())
         .foregroundStyle(Color.inkSecondary)
         .lineLimit(1)
     }

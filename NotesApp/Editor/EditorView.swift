@@ -330,7 +330,8 @@ private struct EditorContent: View {
         do {
             let url = try result.get()
             let file = try await document.package.importAsset(from: url, ext: "pdf")
-            let pages = try PDFImport.pages(at: document.package.assetURL(file), file: file)
+            let assetURL = document.package.assetURL(file)
+            let pages = try await Task.detached(priority: .userInitiated) { try PDFImport.pages(at: assetURL, file: file) }.value
             document.insertPages(pages, at: session.currentPage + 1, actionName: String(localized: "Insert PDF"))
             session.go(to: session.currentPage + 1)
         } catch {

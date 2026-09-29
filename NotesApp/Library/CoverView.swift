@@ -69,15 +69,11 @@ struct CoverView: View {
 
 struct FavoriteRibbon: View {
     var body: some View {
-        UnevenRoundedRectangle(cornerRadii: .init())
+        RibbonShape()
             .fill(Color.tomato)
-            .frame(width: 13, height: 40)
-            .mask {
-                Path { path in
-                    path.addLines([CGPoint(x: 0, y: 0), CGPoint(x: 13, y: 0), CGPoint(x: 13, y: 40), CGPoint(x: 6.5, y: 32), CGPoint(x: 0, y: 40)])
-                    path.closeSubpath()
-                }
-            }
+            .overlay { RibbonShape().stroke(Color.labelCream, lineWidth: 1.5) }
+            .frame(width: 14, height: 42)
+            .shadow(color: .black.opacity(0.2), radius: 0.5, y: 0.5)
             .accessibilityHidden(true)
     }
 }

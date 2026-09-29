@@ -27,7 +27,7 @@ struct CoverRequest: Sendable, Hashable {
 
 /// Draws covers with Core Graphics. Pure and thread-safe: every cover is a function of its request.
 enum CoverRenderer {
-    static let version = 2
+    static let version = 3
 
     static func render(_ request: CoverRequest, firstPage: CGImage? = nil) -> UIImage {
         let size = request.size
@@ -89,7 +89,7 @@ enum CoverRenderer {
         ])
         let meta = NSAttributedString(string: request.meta.uppercased(), attributes: [
             .font: metaFont, .kern: w * 0.004,
-            .foregroundColor: UIColor(hex: request.highContrast ? 0x444A59 : (request.dark ? 0x505665 : 0x5A6070)),
+            .foregroundColor: UIColor(hex: 0x444A59),
         ])
         let textWidth = labelWidth - padding * 2
         let titleHeight = min(title.boundingRect(with: CGSize(width: textWidth, height: .greatestFiniteMagnitude),
