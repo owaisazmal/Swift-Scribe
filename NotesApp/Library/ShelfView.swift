@@ -15,12 +15,14 @@ struct ShelfView: View {
     let onCreate: () -> Void
 
     @Environment(LibraryStore.self) private var store
+    @Environment(\.modelContext) private var context
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Query private var records: [NotebookRecord]
     @Query(sort: \FolderRecord.sortIndex) private var folders: [FolderRecord]
     @AppStorage("librarySort") private var sort: LibrarySortOrder = .opened
     @AppStorage("libraryGrouping") private var grouping: LibraryGrouping = .recency
     @State private var searchText = ""
+    @State private var matches: Set<UUID>?
     @State private var isSelecting = false
     @State private var selection: Set<UUID> = []
     @State private var importingPDF = false
@@ -52,11 +54,27 @@ struct ShelfView: View {
             case .folder(let id): !record.isTrashed && record.folder?.id == id
             }
         }
-        let query = searchText.trimmingCharacters(in: .whitespaces)
-        let searched = query.isEmpty ? scoped : scoped.filter {
-            $0.title.localizedStandardContains(query) || $0.searchText.localizedStandardContains(query)
-        }
+        let searched = matches.map { found in scoped.filter { found.contains($0.id) } } ?? scoped
         return searched.sorted(by: sort)
+    }
+
+    /// Matches titles and handwriting on a background context, a moment after typing stops, so neither the
+    /// keystroke nor a library full of PDF text ever scans on the main thread.
+    private func runSearch() async {
+        let query = searchText.trimmingCharacters(in: .whitespaces)
+        guard !query.isEmpty else { matches = nil; return }
+        try? await Task.sleep(for: .milliseconds(250))
+        guard !Task.isCancelled else { return }
+        let container = context.container
+        let found = await Task.detached(priority: .userInitiated) { () -> Set<UUID> in
+            let background = ModelContext(container)
+            let descriptor = FetchDescriptor<NotebookRecord>(predicate: #Predicate {
+                $0.title.localizedStandardContains(query) || $0.searchText.localizedStandardContains(query)
+            })
+            return Set(((try? background.fetch(descriptor)) ?? []).map(\.id))
+        }.value
+        guard !Task.isCancelled else { return }
+        matches = found
     }
 
     var body: some View {
@@ -96,6 +114,7 @@ struct ShelfView: View {
             Text(errorMessage ?? store.lastError ?? "")
         }
         .onChange(of: scope) { _, _ in endSelection() }
+        .task(id: "\(records.count)|\(searchText)") { await runSearch() }
     }
 
     // MARK: Shelves
@@ -161,8 +180,10 @@ struct ShelfView: View {
                     }
                 }
                 .accessibilityLabel(record.accessibilityDescription)
+                .accessibilityHint(record.accessibilityHint(isSelecting: isSelecting))
                 .accessibilityIdentifier("notebook.\(record.title)")
                 .accessibilityAddTraits(selection.contains(record.id) ? .isSelected : [])
+                .accessibilityActions { if !isSelecting { trashActions(for: record) } }
                 .contextMenu { if !isSelecting { menu(for: record) } }
                 .listRowBackground(Color.surface)
             }
@@ -192,18 +213,36 @@ struct ShelfView: View {
         }
         let calendar = Calendar.current
         let now = Date.now
-        var buckets: [(key: String, title: String, records: [NotebookRecord])] = []
+        let week = calendar.dateInterval(of: .weekOfYear, for: now)
+        let month = calendar.dateInterval(of: .month, for: now)
+        var buckets: [(key: String, date: Date, records: [NotebookRecord])] = []
+        var positions: [String: Int] = [:]
         for record in visible {
             let date = sort.date(of: record)
-            let (key, title): (String, String) = {
-                if calendar.isDate(date, equalTo: now, toGranularity: .weekOfYear) { return ("week", String(localized: "This week")) }
-                if calendar.isDate(date, equalTo: now, toGranularity: .month) { return ("month", String(localized: "Earlier this month")) }
-                let month = calendar.dateComponents([.year, .month], from: date)
-                return ("\(month.year ?? 0)-\(month.month ?? 0)", date.formatted(.dateTime.month(.wide).year()))
-            }()
-            if let index = buckets.firstIndex(where: { $0.key == key }) { buckets[index].records.append(record) } else { buckets.append((key, title, [record])) }
+            let key: String
+            if week?.contains(date) == true {
+                key = "week"
+            } else if month?.contains(date) == true {
+                key = "month"
+            } else {
+                let parts = calendar.dateComponents([.year, .month], from: date)
+                key = "\(parts.year ?? 0)-\(parts.month ?? 0)"
+            }
+            if let index = positions[key] {
+                buckets[index].records.append(record)
+            } else {
+                positions[key] = buckets.count
+                buckets.append((key, date, [record]))
+            }
         }
-        return buckets.map { Shelf(id: $0.key, title: $0.title, records: $0.records) }
+        return buckets.map { bucket in
+            let title = switch bucket.key {
+            case "week": String(localized: "This week")
+            case "month": String(localized: "Earlier this month")
+            default: bucket.date.formatted(.dateTime.month(.wide).year())
+            }
+            return Shelf(id: bucket.key, title: title, records: bucket.records)
+        }
     }
 
     // MARK: Selection
@@ -282,10 +321,21 @@ struct ShelfView: View {
     }
 
     @ViewBuilder
+    private func trashActions(for record: NotebookRecord) -> some View {
+        if record.isTrashed {
+            Button("Restore") { store.restore([record]) }
+            Button("Delete Permanently") { store.deletePermanently([record]) }
+        }
+    }
+
+    @ViewBuilder
     private func menu(for record: NotebookRecord) -> some View {
         if record.isTrashed {
             Button { store.restore([record]) } label: { Label("Restore", systemImage: "arrow.uturn.backward") }
             Button(role: .destructive) { store.deletePermanently([record]) } label: { Label("Delete Permanently", systemImage: "trash") }
+        } else if record.isReadOnly {
+            Button { onOpen(record) } label: { Label("Open", systemImage: "book") }
+            Text("Made with a newer version of Swift Scribe, so it can only be read here.")
         } else {
             Button { onOpen(record) } label: { Label("Open", systemImage: "book") }
             Button { renameText = record.title; renaming = record } label: { Label("Rename", systemImage: "pencil") }
@@ -345,10 +395,13 @@ extension LibrarySortOrder {
 }
 
 extension Array where Element == NotebookRecord {
+    /// Reads each record's sort key once, rather than twice per comparison.
     func sorted(by order: LibrarySortOrder) -> [NotebookRecord] {
         switch order {
-        case .title: sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
-        default: sorted { order.date(of: $0) > order.date(of: $1) }
+        case .title:
+            map { ($0, $0.title) }.sorted { $0.1.localizedStandardCompare($1.1) == .orderedAscending }.map(\.0)
+        default:
+            map { ($0, order.date(of: $0)) }.sorted { $0.1 > $1.1 }.map(\.0)
         }
     }
 }

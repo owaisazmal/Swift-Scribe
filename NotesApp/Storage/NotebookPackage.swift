@@ -2,16 +2,25 @@ import Foundation
 import PencilKit
 import CryptoKit
 
-enum PackageError: Error, Equatable {
+enum PackageError: LocalizedError, Equatable {
     case missing
     case unreadable
     case readOnly
+
+    var errorDescription: String? {
+        switch self {
+        case .missing: String(localized: "The notebook's files couldn't be found.")
+        case .unreadable: String(localized: "The notebook's files couldn't be read.")
+        case .readOnly: String(localized: "This notebook was saved by a newer version of Swift Scribe and can't be changed here.")
+        }
+    }
 }
 
 enum InkLoad: Sendable {
     case empty
     case ink(PKDrawing, hash: String)
     case quarantined(file: String)
+    case cancelled
 }
 
 struct ManifestLoad: Sendable {
@@ -55,8 +64,8 @@ actor NotebookPackage {
     nonisolated func inkURL(_ pageID: UUID) -> URL { inkDirectory.appending(path: "\(pageID.uuidString).pkdrawing") }
     nonisolated func assetURL(_ file: String) -> URL { assetsDirectory.appending(path: file) }
     nonisolated func textURL(_ pageID: UUID) -> URL { textDirectory.appending(path: "\(pageID.uuidString).txt") }
-    nonisolated func thumbURL(_ pageID: UUID, hash: String?) -> URL {
-        thumbsDirectory.appending(path: "\(pageID.uuidString)-\(hash?.prefix(12) ?? "blank").png")
+    nonisolated func thumbURL(_ pageID: UUID, key: String) -> URL {
+        thumbsDirectory.appending(path: "\(pageID.uuidString)-\(key).png")
     }
 
     // MARK: Create
@@ -101,7 +110,7 @@ actor NotebookPackage {
             }
             load.quarantined = quarantined
             recoverOrphans(into: &load, manifestDate: modificationDate(of: source) ?? .distantPast)
-        } else if FileManager.default.fileExists(atPath: inkDirectory.path(percentEncoded: false)) {
+        } else if !quarantined.isEmpty || !inkFiles().isEmpty {
             load = ManifestLoad(manifest: rebuiltManifest(), warnings: ["the manifest was missing or unreadable; rebuilt from ink files"])
             load.quarantined = quarantined
             load.needsSave = true
@@ -137,10 +146,13 @@ actor NotebookPackage {
         load.needsSave = true
     }
 
-    private func rebuiltManifest() -> NotebookManifest {
+    private func inkFiles() -> [URL] {
         let files = (try? FileManager.default.contentsOfDirectory(at: inkDirectory, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
-        let pages = files
-            .filter { $0.pathExtension == "pkdrawing" }
+        return files.filter { $0.pathExtension == "pkdrawing" }
+    }
+
+    private func rebuiltManifest() -> NotebookManifest {
+        let pages = inkFiles()
             .compactMap { file -> (UUID, Date)? in
                 UUID(uuidString: file.deletingPathExtension().lastPathComponent).map { ($0, modificationDate(of: file) ?? .distantPast) }
             }
@@ -155,18 +167,28 @@ actor NotebookPackage {
                                         defaults: PageDefaults(template: .blank, paperColor: .white, pageSize: .letter),
                                         pages: pages.isEmpty ? [.template(.blank, color: .white, size: .letter)] : pages)
         manifest.createdAt = creationDate(of: url)
+        manifest.extra[Self.rebuiltKey] = .bool(true)
         return manifest
     }
 
-    func readInk(_ pageID: UUID) -> InkLoad {
+    /// Marks a manifest rebuilt from ink alone, whose assets may still be listed only in a quarantined copy.
+    static let rebuiltKey = "rebuiltFromInk"
+
+    /// Reads and decodes off the actor, so page loads run in parallel at their task's priority instead of
+    /// queueing behind each other and behind saves. Only setting a damaged file aside goes through the actor.
+    nonisolated func readInk(_ pageID: UUID) async -> InkLoad {
+        if Task.isCancelled { return .cancelled }
+        guard let data = try? Data(contentsOf: inkURL(pageID)) else { return .empty }
+        if let drawing = try? Self.decodeInk(data) { return .ink(drawing, hash: Self.hash(data)) }
+        return await quarantineInk(pageID)
+    }
+
+    private func quarantineInk(_ pageID: UUID) -> InkLoad {
         let file = inkURL(pageID)
         guard let data = try? Data(contentsOf: file) else { return .empty }
-        do {
-            return .ink(try Self.decodeInk(data), hash: Self.hash(data))
-        } catch {
-            guard let moved = try? Quarantine.move(file) else { return .quarantined(file: file.lastPathComponent) }
-            return .quarantined(file: "ink/\(moved.lastPathComponent)")
-        }
+        if let drawing = try? Self.decodeInk(data) { return .ink(drawing, hash: Self.hash(data)) }
+        guard let moved = try? Quarantine.move(file) else { return .quarantined(file: file.lastPathComponent) }
+        return .quarantined(file: "ink/\(moved.lastPathComponent)")
     }
 
     func readText(_ pageID: UUID) -> String? {
@@ -223,13 +245,21 @@ actor NotebookPackage {
     }
 
     func writeText(_ text: String, pageID: UUID) throws {
-        try makeDirectories()
+        try makeDirectoryInExistingPackage(textDirectory)
         try Data(text.utf8).write(to: textURL(pageID), options: .atomic)
     }
 
-    func writeThumbnail(_ png: Data, pageID: UUID, hash: String?) throws {
-        try makeDirectories()
-        try png.write(to: thumbURL(pageID, hash: hash), options: .atomic)
+    func writeThumbnail(_ png: Data, pageID: UUID, key: String) throws {
+        try makeDirectoryInExistingPackage(thumbsDirectory)
+        try png.write(to: thumbURL(pageID, key: key), options: .atomic)
+    }
+
+    /// Background jobs (OCR, thumbnails) must never bring back a package that was deleted while they ran.
+    private func makeDirectoryInExistingPackage(_ directory: URL) throws {
+        let fileManager = FileManager.default
+        guard fileManager.fileExists(atPath: manifestURL.path(percentEncoded: false)) else { throw PackageError.missing }
+        guard !fileManager.fileExists(atPath: directory.path(percentEncoded: false)) else { return }
+        try fileManager.createDirectory(at: directory, withIntermediateDirectories: false)
     }
 
     // MARK: Assets
@@ -258,12 +288,21 @@ actor NotebookPackage {
 
     /// Removes ink, text, thumbnails and assets that the saved manifest no longer references.
     /// Only call once the manifest is on disk and no undo history can bring those pages back.
+    /// Nothing but stale thumbnails is removed while a damaged manifest is set aside or the manifest was
+    /// rebuilt, since the files may be all that's left of what the damaged copy listed.
     func collectGarbage(keeping manifest: NotebookManifest) {
         let fileManager = FileManager.default
+        let currentThumbs = Set(manifest.pages.map { thumbURL($0.id, key: $0.thumbnailKey).lastPathComponent })
+        for file in (try? fileManager.contentsOfDirectory(at: thumbsDirectory, includingPropertiesForKeys: nil)) ?? []
+        where !currentThumbs.contains(file.lastPathComponent) {
+            try? fileManager.removeItem(at: file)
+        }
+        guard manifest.extra[Self.rebuiltKey] == nil, !hasQuarantinedManifest() else { return }
+
         let manifestDate = modificationDate(of: manifestURL) ?? .distantPast
         var keep = Set(manifest.pages.map(\.id.uuidString))
         for opaque in manifest.opaquePages { if let id = opaque.raw["id"]?.stringValue { keep.insert(id.uppercased()) } }
-        for directory in [inkDirectory, textDirectory, thumbsDirectory] {
+        for directory in [inkDirectory, textDirectory] {
             for file in (try? fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? [] {
                 guard !file.lastPathComponent.contains(".corrupt") else { continue }
                 let pageID = String(file.deletingPathExtension().lastPathComponent.prefix(36)).uppercased()
@@ -272,17 +311,27 @@ actor NotebookPackage {
                 try? fileManager.removeItem(at: file)
             }
         }
-        var assets = Set(manifest.pages.compactMap(\.background.assetFile) + manifest.recordings.map(\.file))
-        for opaque in manifest.opaquePages { if let file = opaque.raw["background"]?["file"]?.stringValue { assets.insert(file) } }
-        for raw in manifest.opaqueRecordings { if let file = raw["file"]?.stringValue { assets.insert(file) } }
-        for file in (try? fileManager.contentsOfDirectory(at: assetsDirectory, includingPropertiesForKeys: nil)) ?? []
-        where !assets.contains(file.lastPathComponent) && (modificationDate(of: file) ?? .distantFuture) <= manifestDate {
+        let referenced = Self.strings(in: ManifestCodec.encodeValue(manifest))
+        for file in (try? fileManager.contentsOfDirectory(at: assetsDirectory, includingPropertiesForKeys: nil)) ?? [] {
+            let name = file.lastPathComponent
+            guard !referenced.contains(name), !referenced.contains("assets/\(name)"),
+                  (modificationDate(of: file) ?? .distantFuture) <= manifestDate else { continue }
             try? fileManager.removeItem(at: file)
         }
-        let currentThumbs = Set(manifest.pages.map { thumbURL($0.id, hash: $0.inkHash).lastPathComponent })
-        for file in (try? fileManager.contentsOfDirectory(at: thumbsDirectory, includingPropertiesForKeys: nil)) ?? []
-        where !currentThumbs.contains(file.lastPathComponent) {
-            try? fileManager.removeItem(at: file)
+    }
+
+    private func hasQuarantinedManifest() -> Bool {
+        let files = (try? FileManager.default.contentsOfDirectory(atPath: url.path(percentEncoded: false))) ?? []
+        return files.contains { $0.hasPrefix("manifest") && $0.contains(".corrupt") }
+    }
+
+    /// Every string anywhere in the manifest, so an asset named by a field this version can't read is still kept.
+    private static func strings(in value: JSONValue) -> Set<String> {
+        switch value {
+        case .string(let string): [string]
+        case .array(let values): values.reduce(into: []) { $0.formUnion(strings(in: $1)) }
+        case .object(let object): object.values.reduce(into: []) { $0.formUnion(strings(in: $1)) }
+        case .null, .bool, .number: []
         }
     }
 

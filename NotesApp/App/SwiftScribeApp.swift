@@ -5,11 +5,7 @@ import SwiftData
 struct SwiftScribeApp: App {
     var body: some Scene {
         WindowGroup {
-            if LaunchOptions.usesV2 {
-                ScribeRoot()
-            } else {
-                LegacyRoot()
-            }
+            ScribeRoot()
         }
     }
 }
@@ -36,24 +32,19 @@ struct ScribeRoot: View {
         .environment(app)
         .environment(app.library)
         .modelContainer(app.container)
-        .task { await app.start() }
+        .task {
+            #if DEBUG
+            if LaunchOptions.arguments.contains("-framePacing") { FramePacingWindow.install() }
+            #endif
+            await app.start()
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase != .active { app.flushOpenDocuments() }
         }
-    }
-}
-
-struct LegacyRoot: View {
-    private static let container: ModelContainer = {
-        do {
-            let configuration = ModelConfiguration("SwiftScribe", schema: Schema([Notebook.self, Folder.self]))
-            return try ModelContainer(for: Notebook.self, Folder.self, configurations: configuration)
-        } catch {
-            fatalError("Could not open the notebook library: \(error)")
+        .alert("Some notebooks weren't moved", isPresented: $app.showsMigrationProblem) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("\(app.migrationProblem ?? "") Your original notebooks are untouched, and Swift Scribe will try again the next time it opens.")
         }
-    }()
-
-    var body: some View {
-        LibraryView().modelContainer(Self.container)
     }
 }

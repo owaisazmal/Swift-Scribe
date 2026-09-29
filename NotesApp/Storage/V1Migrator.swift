@@ -7,16 +7,20 @@ struct MigrationReport: Sendable, Equatable {
     var migrated: [UUID] = []
     var alreadyMigrated: [UUID] = []
     var failed: [UUID: String] = [:]
+    var titles: [UUID: String] = [:]
+    /// Set when the v1 database exists but couldn't be read. Nothing is migrated or archived then,
+    /// and the next launch tries again.
+    var storeError: String?
     var warnings: [String] = []
     var backupURL: URL?
 
-    var isComplete: Bool { failed.isEmpty }
+    var isComplete: Bool { failed.isEmpty && storeError == nil }
 }
 
 /// Moves v1 notebooks (one SwiftData store plus `Notebooks/<id>/drawing.pkdrawing`) into v2 packages.
 /// Each notebook is built in a staging folder and renamed into place, so a crash leaves nothing half-written;
-/// finished notebooks are skipped on the next run. The v1 files are moved to `Backups/` only after every
-/// notebook has migrated, and are never modified.
+/// finished notebooks, including ones deleted since, are skipped on the next run. The v1 files are moved to
+/// `Backups/` only after every notebook has migrated, and are never modified.
 struct V1Migrator: Sendable {
     let root: StorageRoot
     private let log = Logger(subsystem: "com.owais.NotesApp", category: "migration")
@@ -53,8 +57,18 @@ struct V1Migrator: Sendable {
     func run() async -> MigrationReport {
         var report = MigrationReport()
         guard isNeeded else { return report }
-        let (notebooks, folders, readWarnings) = readV1()
+        let v1: (notebooks: [V1Notebook], folders: [V1Folder], warnings: [String])
+        do {
+            v1 = try readV1()
+        } catch {
+            report.storeError = error.localizedDescription
+            log.error("v1 store unreadable: \(error.localizedDescription)")
+            writeLog(report)
+            return report
+        }
+        let (notebooks, folders, readWarnings) = v1
         report.warnings += readWarnings
+        let finishedEarlier = loggedAsMigrated()
 
         var folderFile = FolderFile.read(root)
         for (index, folder) in folders.enumerated() where !folderFile.folders.contains(where: { $0.id == folder.id }) {
@@ -65,7 +79,7 @@ struct V1Migrator: Sendable {
         do { try folderFile.write(root) } catch { report.warnings.append("folders couldn't be written: \(error.localizedDescription)") }
 
         for notebook in notebooks {
-            if isMigrated(notebook.id) {
+            if isMigrated(notebook.id) || finishedEarlier.contains(notebook.id) {
                 report.alreadyMigrated.append(notebook.id)
                 continue
             }
@@ -75,6 +89,7 @@ struct V1Migrator: Sendable {
                 report.warnings += warnings.map { "\(notebook.title): \($0)" }
             } catch {
                 report.failed[notebook.id] = error.localizedDescription
+                report.titles[notebook.id] = notebook.title
                 log.error("migration failed for \(notebook.id): \(error.localizedDescription)")
             }
         }
@@ -94,34 +109,44 @@ struct V1Migrator: Sendable {
         return manifest.migratedFrom == "v1"
     }
 
+    /// Notebooks an earlier run finished. They stay finished even after the user deletes them.
+    func loggedAsMigrated() -> Set<UUID> {
+        let log = (try? Data(contentsOf: root.migrationLog)).flatMap { try? JSONValue.parse($0) }
+        var ids = Set<UUID>()
+        for run in log?["runs"]?.arrayValue ?? [] {
+            for (key, status) in run["notebooks"]?.objectValue ?? [:] where status == .string("migrated") {
+                if let id = UUID(uuidString: key) { ids.insert(id) }
+            }
+        }
+        return ids
+    }
+
     // MARK: Reading v1
 
-    func readV1() -> ([V1Notebook], [V1Folder], [String]) {
+    /// Throws when the v1 database exists but can't be read: without it, titles, page lists and library state
+    /// are unknown, so nothing is migrated from the drawings alone.
+    func readV1() throws -> ([V1Notebook], [V1Folder], [String]) {
         var warnings: [String] = []
         var notebooks: [V1Notebook] = []
         var folders: [V1Folder] = []
         let fileManager = FileManager.default
 
         if fileManager.fileExists(atPath: root.v1Store.path(percentEncoded: false)) {
-            do {
-                let copy = try copyStore()
-                defer { try? fileManager.removeItem(at: copy.deletingLastPathComponent()) }
-                let schema = Schema(versionedSchema: LegacyV1Schema.self)
-                let container = try ModelContainer(for: schema, configurations: ModelConfiguration(schema: schema, url: copy))
-                let context = ModelContext(container)
-                for folder in try context.fetch(FetchDescriptor<LegacyV1Schema.Folder>()) {
-                    folders.append(V1Folder(id: folder.id, name: folder.name, colorRaw: folder.colorRaw, createdAt: folder.createdAt))
-                }
-                for notebook in try context.fetch(FetchDescriptor<LegacyV1Schema.Notebook>()) {
-                    notebooks.append(V1Notebook(
-                        id: notebook.id, title: notebook.title, createdAt: notebook.createdAt, modifiedAt: notebook.modifiedAt,
-                        isFavorite: notebook.isFavorite, deletedAt: notebook.deletedAt, folderID: notebook.folder?.id,
-                        pagesData: notebook.pagesData, recordingsData: notebook.recordingsData, searchText: notebook.searchText,
-                        defaults: PageDefaults(templateRaw: notebook.defaultTemplateRaw, paperColorRaw: notebook.defaultColorRaw,
-                                               pageSizeRaw: notebook.defaultSizeRaw, extra: [:])))
-                }
-            } catch {
-                warnings.append("the v1 library database couldn't be read (\(error.localizedDescription)); notebooks were recovered from their files")
+            let copy = try copyStore()
+            defer { try? fileManager.removeItem(at: copy.deletingLastPathComponent()) }
+            let schema = Schema(versionedSchema: LegacyV1Schema.self)
+            let container = try ModelContainer(for: schema, configurations: ModelConfiguration(schema: schema, url: copy))
+            let context = ModelContext(container)
+            for folder in try context.fetch(FetchDescriptor<LegacyV1Schema.Folder>()) {
+                folders.append(V1Folder(id: folder.id, name: folder.name, colorRaw: folder.colorRaw, createdAt: folder.createdAt))
+            }
+            for notebook in try context.fetch(FetchDescriptor<LegacyV1Schema.Notebook>()) {
+                notebooks.append(V1Notebook(
+                    id: notebook.id, title: notebook.title, createdAt: notebook.createdAt, modifiedAt: notebook.modifiedAt,
+                    isFavorite: notebook.isFavorite, deletedAt: notebook.deletedAt, folderID: notebook.folder?.id,
+                    pagesData: notebook.pagesData, recordingsData: notebook.recordingsData, searchText: notebook.searchText,
+                    defaults: PageDefaults(templateRaw: notebook.defaultTemplateRaw, paperColorRaw: notebook.defaultColorRaw,
+                                           pageSizeRaw: notebook.defaultSizeRaw, extra: [:])))
             }
         }
 
@@ -264,6 +289,7 @@ struct V1Migrator: Sendable {
         for id in report.migrated { notebooks[id.uuidString] = .string("migrated") }
         for id in report.alreadyMigrated { notebooks[id.uuidString] = .string("already migrated") }
         for (id, error) in report.failed { notebooks[id.uuidString] = .string("failed: \(error)") }
+        if let storeError = report.storeError { notebooks["store"] = .string("unreadable: \(storeError)") }
         var previous = (try? Data(contentsOf: root.migrationLog)).flatMap { try? JSONValue.parse($0) }?.objectValue ?? [:]
         var runs = previous["runs"]?.arrayValue ?? []
         runs.append(.object([

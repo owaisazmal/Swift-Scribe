@@ -27,7 +27,9 @@ enum LibraryIndexSchemaV1: VersionedSchema {
         var coverSeed: Int = 0
         var firstPageID: UUID?
         var firstPageInkHash: String?
+        var firstPageThumbKey: String?
         var firstPageIsPDF: Bool = false
+        var isReadOnly: Bool = false
         var issueCount: Int = 0
         var indexedAt: Date = Date.distantPast
 
@@ -66,24 +68,38 @@ extension NotebookRecord {
                   seed: UInt32(clamping: coverSeed))
     }
 
-    func apply(_ manifest: NotebookManifest, issues: Int) {
-        title = manifest.title
-        createdAt = manifest.createdAt
-        modifiedAt = manifest.modifiedAt
-        lastOpenedAt = manifest.library.lastOpenedAt
-        pageCount = manifest.pages.count
-        currentPage = min(manifest.library.currentPage, max(manifest.pages.count - 1, 0))
-        isFavorite = manifest.library.isFavorite
-        deletedAt = manifest.library.deletedAt
-        coverStyleRaw = manifest.cover.styleRaw
-        clothRaw = manifest.cover.clothRaw
-        inksRaw = manifest.cover.inksRaw.joined(separator: ",")
-        coverSeed = Int(manifest.cover.seed)
-        firstPageID = manifest.pages.first?.id
-        firstPageInkHash = manifest.pages.first?.inkHash
-        firstPageIsPDF = if case .pdf = manifest.pages.first?.background { true } else { false }
-        issueCount = issues
-        indexedAt = .now
+    /// Copies the indexed fields, assigning only those that differ so unchanged records don't invalidate
+    /// the library's queries. Returns whether anything changed.
+    @discardableResult
+    func apply(_ manifest: NotebookManifest, issues: Int) -> Bool {
+        let first = manifest.pages.first
+        var changed = false
+        func set<T: Equatable>(_ keyPath: ReferenceWritableKeyPath<NotebookRecord, T>, _ value: T) {
+            guard self[keyPath: keyPath] != value else { return }
+            self[keyPath: keyPath] = value
+            changed = true
+        }
+        set(\.title, manifest.title)
+        set(\.createdAt, manifest.createdAt)
+        set(\.modifiedAt, manifest.modifiedAt)
+        set(\.lastOpenedAt, manifest.library.lastOpenedAt)
+        set(\.pageCount, manifest.pages.count)
+        set(\.currentPage, min(manifest.library.currentPage, max(manifest.pages.count - 1, 0)))
+        set(\.isFavorite, manifest.library.isFavorite)
+        set(\.deletedAt, manifest.library.deletedAt)
+        set(\.coverStyleRaw, manifest.cover.styleRaw)
+        set(\.clothRaw, manifest.cover.clothRaw)
+        set(\.inksRaw, manifest.cover.inksRaw.joined(separator: ","))
+        set(\.coverSeed, Int(manifest.cover.seed))
+        set(\.firstPageID, first?.id)
+        set(\.firstPageInkHash, first?.inkHash)
+        set(\.firstPageThumbKey, first?.thumbnailKey)
+        let firstIsPDF: Bool = if case .pdf = first?.background { true } else { false }
+        set(\.firstPageIsPDF, firstIsPDF)
+        set(\.isReadOnly, manifest.isNewerThanSupported)
+        set(\.issueCount, issues)
+        if changed { indexedAt = .now }
+        return changed
     }
 }
 

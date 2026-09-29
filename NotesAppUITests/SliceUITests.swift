@@ -1,6 +1,7 @@
 import XCTest
 
 /// The Phase 2 vertical slice: launch, library, new notebook, write, autosave, back, relaunch, and a migrated v1 notebook.
+@MainActor
 final class SliceUITests: XCTestCase {
     private let root = "slice"
 
@@ -22,14 +23,16 @@ final class SliceUITests: XCTestCase {
         add(attachment)
     }
 
-    /// Runs the audit. Contrast issues on the system Liquid Glass navigation bar are logged instead of failing:
-    /// the audit can't measure text on glass (the flagged "Select" measured 7.7:1 in the rendered screenshot).
+    /// Runs the audit. Contrast and Dynamic Type issues on the system Liquid Glass navigation bar are logged instead
+    /// of failing: the audit can't measure text on glass (the flagged "Select" measured 7.7:1 in the rendered screenshot),
+    /// and system bars cap their text size by design and offer the Large Content Viewer instead.
     @available(iOS 17.0, *)
     private func audit(_ app: XCUIApplication, _ types: XCUIAccessibilityAuditType) throws {
-        let barMaxY = app.navigationBars.allElementsBoundByIndex.map(\.frame.maxY).max() ?? 0
+        let barMaxY = app.navigationBars.allElementsBoundByIndex.map { $0.frame.maxY }.max() ?? 0
         try app.performAccessibilityAudit(for: types) { issue in
-            if issue.auditType == .contrast, let element = issue.element, element.frame.maxY <= barMaxY + 1 {
-                print("AUDIT ignored contrast on system bar element: \(element.label)")
+            print("AUDIT issue: \(issue.compactDescription) | element: \(issue.element.map { String($0.elementType.rawValue) } ?? "-") '\(issue.element?.label ?? "nil")' \(issue.element?.frame ?? .zero)")
+            if issue.auditType == .contrast || issue.auditType == .dynamicType, let element = issue.element, element.frame.maxY <= barMaxY + 1 {
+                print("AUDIT ignored \(issue.auditType == .contrast ? "contrast" : "dynamic type") on system bar element: \(element.label)")
                 return true
             }
             return false
@@ -104,6 +107,26 @@ final class SliceUITests: XCTestCase {
         XCTAssertEqual(strokeCount(migratedPage), 2, "migrated ink lands on its own page")
         XCTAssertTrue(app.buttons["editor.ribbon"].label.contains("of 3"), app.buttons["editor.ribbon"].label)
         attach(app, "migrated-notebook")
+    }
+
+    /// Runs only on an iPhone destination: every cover swatch in New Notebook must be on screen, not clipped off a narrow sheet.
+    func testNewNotebookSwatchesFitOnIPhone() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone, "iPhone layout check")
+        let app = launch(reset: true)
+        let new = app.buttons["New"].firstMatch
+        if !new.waitForExistence(timeout: 10) { app.cells.firstMatch.tap() }
+        XCTAssertTrue(new.waitForExistence(timeout: 10), "the shelf and its New button")
+        new.tap()
+        XCTAssertTrue(app.textFields["Title"].waitForExistence(timeout: 10))
+        if app.buttons["Continue"].waitForExistence(timeout: 2) { app.buttons["Continue"].tap() }
+        app.buttons["Cloth"].firstMatch.tap()
+        let screen = app.windows.firstMatch.frame
+        for name in ["Oxblood", "Tomato", "Mustard", "Moss", "Jade", "Cobalt", "Navy", "Slate", "Rose", "Oat"] {
+            let swatch = app.buttons[name].firstMatch
+            XCTAssertTrue(swatch.exists, name)
+            XCTAssertTrue(screen.contains(swatch.frame), "\(name) at \(swatch.frame) is outside \(screen)")
+        }
+        attach(app, "new-notebook-iphone")
     }
 
     func testDarkModeAndLargestTextScreenshots() throws {

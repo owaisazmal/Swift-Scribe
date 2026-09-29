@@ -15,6 +15,8 @@ enum NotebookExporter {
         var package: NotebookPackage
     }
 
+    /// Streams pages to disk one at a time: each page's ink is read, drawn and released before the next,
+    /// so memory stays flat however long the notebook is.
     static func export(_ input: Input, progress: @escaping @Sendable (Double) async -> Void) async throws -> URL {
         let interval = signposter.beginInterval("Export", "\(input.pages.count) pages")
         defer { signposter.endInterval("Export", interval) }
@@ -23,46 +25,46 @@ enum NotebookExporter {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let url = directory.appending(path: "\(name.isEmpty ? "Untitled" : name).pdf")
-
-        var inks: [PKDrawing] = []
-        for (index, page) in input.pages.enumerated() {
-            try Task.checkCancellation()
-            if let ink = input.inMemoryInk[page.id] {
-                inks.append(ink)
-            } else if case .ink(let drawing, _) = await input.package.readInk(page.id) {
-                inks.append(drawing)
-            } else {
-                inks.append(PKDrawing())
-            }
-            await progress(Double(index + 1) / Double(input.pages.count) * 0.2)
-        }
+        try Task.checkCancellation()
 
         let format = UIGraphicsPDFRendererFormat()
         format.documentInfo = [kCGPDFContextTitle as String: input.title, kCGPDFContextCreator as String: "Swift Scribe"]
         let renderer = UIGraphicsPDFRenderer(bounds: CGRect(origin: .zero, size: input.pages.first?.size ?? PageSize.letter.points), format: format)
         let assets = input.package.assetsDirectory
-        let data = renderer.pdfData { context in
+        let count = Double(max(input.pages.count, 1))
+        try renderer.writePDF(to: url) { context in
             for (index, page) in input.pages.enumerated() {
                 if Task.isCancelled { return }
-                let bounds = CGRect(origin: .zero, size: page.size)
-                context.beginPage(withBounds: bounds, pageInfo: [:])
-                PageRenderer.drawBackground(page, assets: assets, in: context.cgContext, size: page.size)
-                let ink = inks[index]
-                if !ink.strokes.isEmpty {
-                    var image: UIImage?
-                    UITraitCollection(userInterfaceStyle: .light).performAsCurrent {
-                        image = ink.image(from: bounds, scale: 3)
+                autoreleasepool {
+                    let bounds = CGRect(origin: .zero, size: page.size)
+                    context.beginPage(withBounds: bounds, pageInfo: [:])
+                    PageRenderer.drawBackground(page, assets: assets, in: context.cgContext, size: page.size)
+                    let ink = input.inMemoryInk[page.id] ?? savedInk(page, in: input.package)
+                    if !ink.strokes.isEmpty {
+                        var image: UIImage?
+                        UITraitCollection(userInterfaceStyle: .light).performAsCurrent {
+                            image = ink.image(from: bounds, scale: 3)
+                        }
+                        image?.draw(in: bounds)
                     }
-                    image?.draw(in: bounds)
                 }
-                let fraction = 0.2 + 0.8 * Double(index + 1) / Double(input.pages.count)
+                let fraction = Double(index + 1) / count
                 Task { await progress(fraction) }
             }
         }
-        try Task.checkCancellation()
-        try data.write(to: url, options: .atomic)
+        if Task.isCancelled {
+            try? FileManager.default.removeItem(at: directory)
+            throw CancellationError()
+        }
         await progress(1)
         return url
+    }
+
+    /// Reads a page's saved ink directly: writes are atomic, so reading outside the package actor is safe.
+    /// A file that can't be decoded exports as a blank page; the editor sets it aside when the page is opened.
+    private static func savedInk(_ page: NotebookPage, in package: NotebookPackage) -> PKDrawing {
+        guard let data = try? Data(contentsOf: package.inkURL(page.id)) else { return PKDrawing() }
+        return (try? NotebookPackage.decodeInk(data)) ?? PKDrawing()
     }
 }
 
@@ -81,13 +83,14 @@ final class ExportJob: Identifiable {
         for page in document.pages { if let ink = document.loadedInk(page.id) { inMemory[page.id] = ink } }
         let input = NotebookExporter.Input(title: document.title, pages: document.pages, inMemoryInk: inMemory, package: document.package)
         task = Task { [weak self] in
+            let work = Task.detached(priority: .userInitiated) {
+                try await NotebookExporter.export(input) { value in
+                    await MainActor.run { self?.progress = max(self?.progress ?? 0, value) }
+                }
+            }
             do {
-                let url = try await Task.detached(priority: .userInitiated) {
-                    try await NotebookExporter.export(input) { value in
-                        await MainActor.run { self?.progress = max(self?.progress ?? 0, value) }
-                    }
-                }.value
-                self?.state = .finished(url)
+                let url = try await withTaskCancellationHandler { try await work.value } onCancel: { work.cancel() }
+                if self?.state == .running { self?.state = .finished(url) }
             } catch is CancellationError {
                 self?.state = .cancelled
             } catch {
@@ -139,6 +142,7 @@ struct ExportSheet: View {
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
         }
         .presentationDetents([.medium])
+        .onDisappear { if job.state == .running { job.cancel() } }
     }
 
     private func print(_ url: URL) {

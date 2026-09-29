@@ -2,6 +2,7 @@ import XCTest
 import SwiftUI
 @testable import NotesApp
 
+@MainActor
 final class DesignTokenTests: XCTestCase {
     private func luminance(_ color: UIColor) -> CGFloat {
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
@@ -36,6 +37,14 @@ final class DesignTokenTests: XCTestCase {
             }
         }
         print("CONTRAST\n" + report.joined(separator: "\n"))
+    }
+
+    /// The editor's page ribbon draws its text straight on the notebook's cloth.
+    func testRibbonTextReachesAAOnEveryCloth() {
+        for cloth in ClothColor.allCases {
+            let ratio = contrast(UIColor(cloth.onCloth), cloth.uiColor)
+            XCTAssertGreaterThanOrEqual(ratio, 4.5, "\(cloth.rawValue): \(String(format: "%.2f", ratio))")
+        }
     }
 
     func testIncreaseContrastStrengthensSecondaryText() {

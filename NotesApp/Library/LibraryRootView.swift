@@ -32,13 +32,17 @@ struct LibraryRootView: View {
                 LibrarySidebar(scope: $scope, showingSettings: $showingSettings)
             } detail: {
                 NavigationStack {
-                    ShelfView(scope: scope ?? .all, zoomNamespace: zoom, onOpen: openNotebook, onCreate: { creating = true })
+                    ShelfView(scope: scope ?? .all, zoomNamespace: zoom, onOpen: { openNotebook($0.id) }, onCreate: { creating = true })
                 }
             }
             .tint(Color.accentColor)
+            .accessibilityHidden(editorCoversLibrary)
+            .disabled(editorCoversLibrary)
 
             if !usesZoom, let open {
                 EditorScreen(notebookID: open.id, sceneID: sceneID) { self.open = nil }
+                    .id(open.id)
+                    .accessibilityAddTraits(.isModal)
                     .transition(.opacity)
                     .zIndex(1)
             }
@@ -57,15 +61,15 @@ struct LibraryRootView: View {
             ScribeSettingsView()
         }
         .background(SceneReader { sceneID = $0 })
-        .keyboardShortcut(for: { creating = true })
+        .keyboardShortcut(for: { creating = true }, enabled: open == nil)
     }
 
-    private func openNotebook(_ record: NotebookRecord) {
-        store.noteOpened(record)
-        openNotebook(record.id)
-    }
+    /// Without the zoom transition the editor is drawn over the library, which then must not be reachable.
+    private var editorCoversLibrary: Bool { !usesZoom && open != nil }
 
+    /// Only one editor per window: while one is open, the library can't switch it to another notebook.
     private func openNotebook(_ id: UUID) {
+        guard open == nil else { return }
         if DocumentRegistry.shared.activateExistingEditor(for: id, from: sceneID) { return }
         open = OpenNotebook(id: id)
     }
@@ -81,13 +85,15 @@ extension View {
         }
     }
 
-    /// ⌘N: new notebook, from anywhere in the library.
-    func keyboardShortcut(for newNotebook: @escaping () -> Void) -> some View {
+    /// ⌘N: new notebook, from anywhere in the library. Off while an editor is open, which has its own ⌘N.
+    func keyboardShortcut(for newNotebook: @escaping () -> Void, enabled: Bool) -> some View {
         background {
-            Button("New Notebook", action: newNotebook)
-                .keyboardShortcut("n", modifiers: .command)
-                .hidden()
-                .accessibilityHidden(true)
+            if enabled {
+                Button("New Notebook", action: newNotebook)
+                    .keyboardShortcut("n", modifiers: .command)
+                    .hidden()
+                    .accessibilityHidden(true)
+            }
         }
     }
 }

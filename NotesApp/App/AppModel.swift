@@ -15,6 +15,7 @@ final class AppModel {
     let library: LibraryStore
     private(set) var phase: Phase = .starting
     private(set) var migrationReport: MigrationReport?
+    var showsMigrationProblem = false
     @ObservationIgnored private let indexWasRecovered: Bool
     @ObservationIgnored private var started = false
     @ObservationIgnored private let signposter = OSSignposter(subsystem: "com.owais.NotesApp", category: "app")
@@ -33,16 +34,37 @@ final class AppModel {
         started = true
         let interval = signposter.beginInterval("Launch")
         if LaunchOptions.seedV1Fixture { await LaunchOptions.seedV1(into: root) }
+        #if DEBUG
+        if let count = LaunchOptions.value("-seedLibrary").flatMap(Int.init) { await LibrarySeed.write(count: count, root: root) }
+        if LaunchOptions.arguments.contains("-seedLongPDF") { await LibrarySeed.writeLongPDF(root: root) }
+        #endif
+        let root = root
+        Task.detached(priority: .utility) { LibraryStore.sweepDeleted(root: root) }
         let migrator = V1Migrator(root: root)
         if migrator.isNeeded {
             phase = .migrating
-            migrationReport = await Task.detached(priority: .userInitiated) { await migrator.run() }.value
+            let report = await Task.detached(priority: .userInitiated) { await migrator.run() }.value
+            migrationReport = report
+            showsMigrationProblem = !report.isComplete
         }
         await LibraryIndex.refresh(root: root, context: container.mainContext,
                                    full: indexWasRecovered || !(migrationReport?.migrated.isEmpty ?? true))
         library.purgeExpiredTrash()
         phase = .ready
+        Task.detached(priority: .background) { CoverCache.shared.sweepDisk() }
         signposter.endInterval("Launch", interval)
+    }
+
+    /// What went wrong moving v1 notebooks, in words for the alert and Settings. Nil when nothing did.
+    var migrationProblem: String? {
+        guard let report = migrationReport, !report.isComplete else { return nil }
+        if let storeError = report.storeError {
+            return String(localized: "Swift Scribe couldn't read your notebook library (\(storeError)), so nothing was moved yet.")
+        }
+        let titles = report.failed.keys.map { report.titles[$0] ?? String(localized: "Untitled") }.sorted()
+        return titles.count == 1
+            ? String(localized: "“\(titles[0])” couldn't be moved to the new format yet.")
+            : String(localized: "\(titles.count) notebooks couldn't be moved to the new format yet: \(titles.formatted(.list(type: .and))).")
     }
 
     /// Finishes pending writes for every open notebook, with background time if the app is leaving the foreground.
@@ -79,7 +101,6 @@ enum LaunchOptions {
     }()
 
     static var seedV1Fixture: Bool { arguments.contains("-seedV1Fixture") }
-    static var usesV2: Bool { arguments.contains("-scribeV2") || arguments.contains("-storageRoot") }
 
     /// Writes a small v1 library (store plus drawings) so the migration can be exercised end to end in UI tests.
     static func seedV1(into root: StorageRoot) async {

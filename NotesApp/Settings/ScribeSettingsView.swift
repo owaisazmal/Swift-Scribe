@@ -3,6 +3,7 @@ import SwiftUI
 struct ScribeSettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(LibraryStore.self) private var store
+    @Environment(AppModel.self) private var app
     @AppStorage(SettingsKey.drawingInput) private var drawingInput: DrawingInput = .system
     @AppStorage(SettingsKey.defaultTemplate) private var template: PaperTemplate = .narrowRuled
     @AppStorage(SettingsKey.defaultPaperColor) private var color: PaperColor = .white
@@ -33,6 +34,16 @@ struct ScribeSettingsView: View {
                     }
                     Picker("Page Size", selection: $size) {
                         ForEach(PageSize.allCases) { Text($0.displayName).tag($0) }
+                    }
+                }
+
+                if let problem = app.migrationProblem {
+                    Section {
+                        Text(problem)
+                    } header: {
+                        Text("Moving to the New Format")
+                    } footer: {
+                        Text("Your original notebooks are untouched. Swift Scribe tries again each time it opens.")
                     }
                 }
 

@@ -260,7 +260,7 @@ final class MigrationTests: XCTestCase {
         let fixture = V1LibraryFixture(root: temporaryRoot(self))
         try fixture.write()
         let migrator = V1Migrator(root: fixture.root)
-        let (notebooks, _, _) = migrator.readV1()
+        let (notebooks, _, _) = try migrator.readV1()
         // First run died after finishing Syllabus and while Cell Biology was half-written.
         _ = try migrator.migrate(try XCTUnwrap(notebooks.first { $0.id == fixture.syllabus }))
         let staging = fixture.root.library.appending(path: "\(fixture.cellBiology.uuidString).migrating", directoryHint: .isDirectory)
@@ -276,6 +276,41 @@ final class MigrationTests: XCTestCase {
         let count = await ink(package, manifest.pages[1]).strokes.count
         XCTAssertEqual(count, 3)
         XCTAssertNotNil(report.backupURL)
+    }
+
+    func testUnreadableV1StoreIsRetriedNotArchived() async throws {
+        let fixture = V1LibraryFixture(root: temporaryRoot(self))
+        try fixture.write()
+        try Data("not a database".utf8).write(to: fixture.root.v1Store)
+        for suffix in ["-wal", "-shm"] {
+            try? FileManager.default.removeItem(at: fixture.root.url.appending(path: "SwiftScribe.store\(suffix)"))
+        }
+        let report = await V1Migrator(root: fixture.root).run()
+        XCTAssertNotNil(report.storeError)
+        XCTAssertFalse(report.isComplete)
+        XCTAssertTrue(fixture.root.packageIDs().isEmpty, "nothing is rebuilt from drawings alone")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fixture.root.v1Notebooks.path(percentEncoded: false)), "v1 files stay in place")
+        XCTAssertTrue(V1Migrator(root: fixture.root).isNeeded, "the next launch tries again")
+    }
+
+    func testDeletedMigratedNotebookDoesNotComeBack() async throws {
+        let fixture = V1LibraryFixture(root: temporaryRoot(self))
+        try fixture.write()
+        try FileManager.default.createDirectory(at: fixture.root.library.appending(path: "\(fixture.lostPages.uuidString).scribe"),
+                                                withIntermediateDirectories: true)
+        let first = await V1Migrator(root: fixture.root).run()
+        XCTAssertNotNil(first.failed[fixture.lostPages], "a clash with an existing package fails that notebook")
+        XCTAssertEqual(first.titles[fixture.lostPages], "Lost Pages")
+        XCTAssertFalse(first.isComplete)
+
+        try FileManager.default.removeItem(at: fixture.root.package(fixture.cellBiology))
+        try FileManager.default.removeItem(at: fixture.root.package(fixture.lostPages))
+        let second = await V1Migrator(root: fixture.root).run()
+        XCTAssertTrue(second.alreadyMigrated.contains(fixture.cellBiology), "the log remembers it")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.root.package(fixture.cellBiology).path(percentEncoded: false)),
+                       "a migrated notebook the user deleted stays deleted")
+        XCTAssertTrue(second.migrated.contains(fixture.lostPages), "the one that failed is retried")
+        XCTAssertTrue(second.isComplete)
     }
 
     func testIndexIsRebuiltFromManifests() async throws {

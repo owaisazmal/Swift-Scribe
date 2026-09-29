@@ -25,11 +25,14 @@ enum CoverWidth {
 
 struct CoverView: View {
     let request: CoverRequest
+    /// False for the live preview, whose every keystroke would otherwise fill the caches.
+    var persist = true
     var prepareFirstPage: (@MainActor () async -> Void)?
     @State private var image: UIImage?
 
-    init(request: CoverRequest, prepareFirstPage: (@MainActor () async -> Void)? = nil) {
+    init(request: CoverRequest, persist: Bool = true, prepareFirstPage: (@MainActor () async -> Void)? = nil) {
         self.request = request
+        self.persist = persist
         self.prepareFirstPage = prepareFirstPage
         _image = State(initialValue: CoverCache.shared.cached(request.key))
     }
@@ -48,12 +51,16 @@ struct CoverView: View {
                                               bottomTrailingRadius: Radius.coverEdge, topTrailingRadius: Radius.coverEdge))
             .shadow(color: .black.opacity(0.18), radius: 1.5, y: 1)
             .task(id: request.key) {
-                guard image == nil || CoverCache.shared.cached(request.key) == nil else { return }
+                if let hit = CoverCache.shared.cached(request.key) { image = hit; return }
+                if !persist {
+                    try? await Task.sleep(for: .milliseconds(120))
+                    guard !Task.isCancelled else { return }
+                }
                 if request.spec.style == .firstPage, let file = request.firstPage,
                    !FileManager.default.fileExists(atPath: file.path(percentEncoded: false)) {
                     await prepareFirstPage?()
                 }
-                image = await CoverCache.shared.image(for: request)
+                if let rendered = await CoverCache.shared.image(for: request, persist: persist) { image = rendered }
             }
             .accessibilityHidden(true)
     }
@@ -82,25 +89,36 @@ extension NotebookRecord {
     @MainActor
     func coverRequest(width: CGFloat, scale: CGFloat, colorScheme: ColorScheme, contrast: ColorSchemeContrast, root: StorageRoot) -> CoverRequest {
         let package = NotebookPackage(root: root, id: id)
-        let thumb = firstPageID.map { package.thumbURL($0, hash: firstPageInkHash) }
+        let thumbKey = firstPageThumbKey ?? "none"
+        let thumb = firstPageID.map { package.thumbURL($0, key: thumbKey) }
         return CoverRequest(notebookID: id, spec: cover, title: title.isEmpty ? String(localized: "Untitled") : title,
-                            meta: folder?.name ?? String(localized: "\(pageCount) pages"), width: width, scale: scale,
+                            meta: folder?.name ?? pageCountText, width: width, scale: scale,
                             dark: colorScheme == .dark, highContrast: contrast == .increased, firstPage: thumb,
-                            firstPageKey: coverStyle == .firstPage ? "\(firstPageID?.uuidString ?? "")-\(firstPageInkHash ?? "")" : nil,
+                            firstPageKey: coverStyle == .firstPage ? "\(firstPageID?.uuidString ?? "")-\(thumbKey)" : nil,
                             firstPageIsPDF: firstPageIsPDF)
     }
 
+    var pageCountText: String {
+        pageCount == 1 ? String(localized: "1 page") : String(localized: "\(pageCount) pages")
+    }
+
     var metaLine: String {
-        let pages = pageCount == 1 ? String(localized: "1 page") : String(localized: "\(pageCount) pages")
-        return "\(pages) · \(modifiedAt.formatted(.relative(presentation: .named)))"
+        "\(pageCountText) · \(modifiedAt.formatted(.relative(presentation: .named)))"
+    }
+
+    func accessibilityHint(isSelecting: Bool) -> String {
+        if isSelecting { return String(localized: "Selects or deselects this notebook") }
+        if isTrashed { return String(localized: "Deleted. Use actions to restore it or delete it permanently.") }
+        return String(localized: "Opens the notebook")
     }
 
     var accessibilityDescription: String {
         var parts = [title.isEmpty ? String(localized: "Untitled") : title, String(localized: "notebook"),
-                     pageCount == 1 ? String(localized: "1 page") : String(localized: "\(pageCount) pages"),
+                     pageCountText,
                      String(localized: "edited \(modifiedAt.formatted(.relative(presentation: .named)))")]
         if isFavorite { parts.append(String(localized: "favourite")) }
         if let folder { parts.append(String(localized: "in \(folder.name)")) }
+        if isReadOnly { parts.append(String(localized: "read-only")) }
         if issueCount > 0 { parts.append(String(localized: "has files that couldn't be read")) }
         return parts.joined(separator: ", ")
     }
