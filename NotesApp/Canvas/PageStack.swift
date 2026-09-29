@@ -57,12 +57,15 @@ final class PageCanvasView: PKCanvasView {
     var pageID: UUID?
     var isLoaded = false
     weak var undoProxy: UndoManager?
+    /// Counted lazily, only when an assistive technology asks, and reset whenever the drawing changes.
+    var strokeCount: Int?
 
     override var undoManager: UndoManager? { undoProxy ?? super.undoManager }
 
     override var accessibilityValue: String? {
         get {
-            let count = drawing.strokes.count
+            let count = strokeCount ?? drawing.strokes.count
+            strokeCount = count
             return count == 0 ? String(localized: "Empty") : count == 1 ? String(localized: "1 stroke") : String(localized: "\(count) strokes")
         }
         set {}
@@ -107,7 +110,8 @@ final class PageBackgroundChunk: UIView {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    override func draw(_ rect: CGRect) {
+    /// CATiledLayer draws on background threads.
+    nonisolated override func draw(_ rect: CGRect) {
         guard let ctx = UIGraphicsGetCurrentContext() else { return }
         ctx.translateBy(x: -region.minX * unit, y: -region.minY * unit)
         PageRenderer.drawBackground(page, assets: assets, in: ctx, size: CGSize(width: page.size.width * unit, height: page.size.height * unit))
@@ -253,6 +257,21 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
 
     private var effectiveScale: CGFloat { bakedScale * scrollView.zoomScale }
 
+    /// What a slot is drawn from. Ink hashes change on every save and never need a slot rebuilt.
+    private struct SlotKey {
+        let id: UUID
+        let background: PageBackground
+        let paperColorRaw: String
+        let size: CGSize
+
+        init(_ page: NotebookPage) {
+            id = page.id
+            background = page.background
+            paperColorRaw = page.paperColorRaw
+            size = page.size
+        }
+    }
+
     private func bake(zoom newZoom: CGFloat) {
         zoom = min(max(newZoom, minimumZoom), maximumZoom)
         bakedScale = zoom * fitScale
@@ -304,8 +323,13 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
 
     private func index(of id: UUID) -> Int? { pages.firstIndex { $0.id == id } }
 
+    /// The page under a line 30% down the viewport, or the last page once the scroll can't go further,
+    /// so a short last page can still become current.
     var currentPage: Int {
         guard effectiveScale > 0, !pages.isEmpty else { return 0 }
+        let inset = scrollView.adjustedContentInset
+        let maxY = scrollView.contentSize.height + inset.bottom - scrollView.bounds.height
+        if maxY > -inset.top + 1, scrollView.contentOffset.y >= maxY - 1 { return pages.count - 1 }
         return layout.pageIndex(atY: (scrollView.contentOffset.y + scrollView.adjustedContentInset.top + scrollView.bounds.height * 0.3) / effectiveScale)
     }
 
@@ -352,11 +376,9 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
                 let slot = slots[page.id] ?? makeSlot(page, at: index)
                 if slot.canvas == nil { attachCanvas(page, to: slot) }
             }
+            document.pinInk(keep)
             let prefetch = max(0, visible.lowerBound - 3)...min(count - 1, visible.upperBound + 3)
-            for index in prefetch where document.loadedInk(pages[index].id) == nil {
-                let id = pages[index].id
-                Task { _ = await document.ink(id) }
-            }
+            document.prefetchInk(pages[prefetch].map(\.id))
         }
         for index in canvasWindow ?? window {
             guard let slot = slots[pages[index].id] else { continue }
@@ -445,8 +467,15 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         return canvas
     }
 
+    /// Observers only hear about later picker changes, so a new or reused canvas starts from the picker's current tool.
+    private func syncTool(_ canvas: PageCanvasView) {
+        canvas.tool = toolPicker.selectedTool
+        canvas.isRulerActive = toolPicker.isRulerActive
+    }
+
     private func attachCanvas(_ page: NotebookPage, to slot: PageSlotView) {
         let canvas = pool.popLast() ?? makeCanvas()
+        syncTool(canvas)
         canvas.pageID = page.id
         let number = (index(of: page.id) ?? 0) + 1
         canvas.accessibilityLabel = String(localized: "Page \(number), handwriting")
@@ -472,6 +501,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     private func show(_ ink: PKDrawing, in canvas: PageCanvasView) {
         isApplyingDrawing = true
         canvas.drawing = ink
+        canvas.strokeCount = nil
         isApplyingDrawing = false
         canvas.isLoaded = true
         setDrawingEnabled(!document.isReadOnly, canvas)
@@ -524,17 +554,12 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
 
     // MARK: PKCanvasViewDelegate
 
+    /// The stroke-end path. Ink past the page edge is kept but never shown: the slot clips it, and every
+    /// renderer draws only the page rectangle.
     func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
-        guard !isApplyingDrawing, let canvas = canvasView as? PageCanvasView, canvas.isLoaded, let id = canvas.pageID,
-              let page = pages.first(where: { $0.id == id }) else { return }
-        var drawing = canvas.drawing
-        if let confined = Self.confine(drawing, to: page.size) {
-            drawing = confined
-            isApplyingDrawing = true
-            canvas.drawing = confined
-            isApplyingDrawing = false
-        }
-        document.canvasDidChangeInk(id, to: drawing)
+        guard !isApplyingDrawing, let canvas = canvasView as? PageCanvasView, canvas.isLoaded, let id = canvas.pageID else { return }
+        canvas.strokeCount = nil
+        document.canvasDidChangeInk(id, to: canvas.drawing)
     }
 
     func canvasViewDidFinishRendering(_ canvasView: PKCanvasView) {
@@ -550,16 +575,6 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         onFirstInk?(CACurrentMediaTime() - openedAt)
     }
 
-    /// Keeps ink on its page: a new stroke that runs past the edge gets a mask at the page bounds.
-    static func confine(_ drawing: PKDrawing, to size: CGSize) -> PKDrawing? {
-        let page = CGRect(origin: .zero, size: size)
-        guard !drawing.bounds.isNull, !page.contains(drawing.bounds) else { return nil }
-        var strokes = drawing.strokes
-        guard let last = strokes.last, last.mask == nil, !page.contains(last.renderBounds) else { return nil }
-        strokes[strokes.count - 1].mask = UIBezierPath(rect: page.applying(last.transform.inverted()))
-        return PKDrawing(strokes: strokes)
-    }
-
     // MARK: InkObserver
 
     func document(_ document: NotebookDocument, didReplaceInkOf pageID: UUID) {
@@ -571,13 +586,31 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
 
     private func pagesDidChange() {
         let updated = document.pages
-        guard updated != pages else { return }
+        let updatedKeys = updated.map(SlotKey.init), currentKeys = pages.map(SlotKey.init)
+        guard updatedKeys.elementsEqual(currentKeys, by: Self.sameSlot) else {
+            relayout(updated, changed: Self.changedIDs(updatedKeys, currentKeys))
+            return
+        }
+        pages = updated
+    }
+
+    private static func sameSlot(_ a: SlotKey, _ b: SlotKey) -> Bool {
+        a.id == b.id && a.background == b.background && a.paperColorRaw == b.paperColorRaw && a.size == b.size
+    }
+
+    private static func changedIDs(_ updated: [SlotKey], _ current: [SlotKey]) -> Set<UUID> {
+        let before = Dictionary(current.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var changed = Set(current.map(\.id)).subtracting(updated.map(\.id))
+        for key in updated where before[key.id].map({ !sameSlot($0, key) }) ?? true { changed.insert(key.id) }
+        return changed
+    }
+
+    private func relayout(_ updated: [NotebookPage], changed: Set<UUID>) {
         let anchorID = pages.indices.contains(currentPage) ? pages[currentPage].id : nil
         let anchorOffset = anchorID.flatMap { id in index(of: id).map { scrollView.contentOffset.y - layout.frames[$0].minY * effectiveScale } }
-        let changed = Set(updated.map { $0 }).symmetricDifference(Set(pages)).map(\.id)
         pages = updated
         layout = PageStackLayout(pages: pages)
-        for id in Set(changed) where slots[id] != nil { removeSlot(id) }
+        for id in changed where slots[id] != nil { removeSlot(id) }
         for (id, slot) in slots {
             guard let index = index(of: id) else { removeSlot(id); continue }
             position(slot, at: index)

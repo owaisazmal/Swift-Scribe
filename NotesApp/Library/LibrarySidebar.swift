@@ -52,22 +52,35 @@ struct LibrarySidebar: View {
     @Binding var scope: LibraryScope?
     @Binding var showingSettings: Bool
     @Environment(LibraryStore.self) private var store
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Query(sort: \FolderRecord.sortIndex) private var folders: [FolderRecord]
     @Query(filter: #Predicate<NotebookRecord> { $0.deletedAt == nil }) private var notebooks: [NotebookRecord]
     @State private var editingFolder: FolderRecord?
     @State private var creatingFolder = false
     @State private var folderName = ""
 
+    /// One pass over the notebooks for every count, instead of one per folder.
+    private var counts: (favorites: Int, byFolder: [UUID: Int]) {
+        var favorites = 0
+        var byFolder: [UUID: Int] = [:]
+        for notebook in notebooks {
+            if notebook.isFavorite { favorites += 1 }
+            if let id = notebook.folder?.id { byFolder[id, default: 0] += 1 }
+        }
+        return (favorites, byFolder)
+    }
+
     var body: some View {
+        let counts = counts
         List(selection: $scope) {
             Section {
                 row(String(localized: "All notebooks"), icon: "books.vertical", count: notebooks.count).tag(LibraryScope.all)
-                row(String(localized: "Favourites"), icon: "star", count: notebooks.filter(\.isFavorite).count).tag(LibraryScope.favorites)
+                row(String(localized: "Favourites"), icon: "star", count: counts.favorites).tag(LibraryScope.favorites)
                 row(String(localized: "Recently deleted"), icon: "trash", count: nil).tag(LibraryScope.trash)
             }
             Section {
                 ForEach(folders) { folder in
-                    folderRow(folder)
+                    folderRow(folder, count: counts.byFolder[folder.id] ?? 0)
                         .tag(LibraryScope.folder(folder.id))
                         .dropDestination(for: NotebookReference.self) { items, _ in
                             let ids = Set(items.map(\.id))
@@ -78,7 +91,11 @@ struct LibrarySidebar: View {
                         .contextMenu { folderMenu(folder) }
                 }
                 Button { folderName = ""; creatingFolder = true } label: {
-                    Label("New Folder", systemImage: "folder.badge.plus")
+                    if dynamicTypeSize.isAccessibilitySize {
+                        Text("New Folder")
+                    } else {
+                        Label("New Folder", systemImage: "folder.badge.plus")
+                    }
                 }
             } header: {
                 Text("Shelves").metaStyle(.footnote)
@@ -111,27 +128,32 @@ struct LibrarySidebar: View {
 
     private func row(_ title: String, icon: String, count: Int?) -> some View {
         HStack {
-            Label(title, systemImage: icon)
+            if dynamicTypeSize.isAccessibilitySize {
+                Text(title)
+            } else {
+                Label(title, systemImage: icon)
+            }
             Spacer()
-            if let count, count > 0 {
+            if let count, count > 0, !dynamicTypeSize.isAccessibilitySize {
                 Text(count, format: .number).font(.subheadline.monospacedDigit()).foregroundStyle(.primary.opacity(0.8))
             }
         }
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(count.map { $0 > 0 ? "\(title), \($0)" : title } ?? title)
     }
 
-    private func folderRow(_ folder: FolderRecord) -> some View {
-        let count = notebooks.filter { $0.folder?.id == folder.id }.count
-        return HStack(spacing: Space.x3) {
+    private func folderRow(_ folder: FolderRecord, count: Int) -> some View {
+        HStack(spacing: Space.x3) {
             SpineChip(cloth: folder.cloth)
-            Text(folder.name).lineLimit(1)
+            Text(folder.name).lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
             Spacer()
-            if count > 0 {
+            if count > 0, !dynamicTypeSize.isAccessibilitySize {
                 Text(count, format: .number).font(.subheadline.monospacedDigit()).foregroundStyle(.primary.opacity(0.8))
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(folder.name), folder, \(count) notebooks")
+        .accessibilityLabel(count == 1 ? String(localized: "\(folder.name), folder, 1 notebook")
+                                       : String(localized: "\(folder.name), folder, \(count) notebooks"))
     }
 
     @ViewBuilder

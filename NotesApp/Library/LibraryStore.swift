@@ -25,6 +25,8 @@ final class LibraryStore {
     @ObservationIgnored let context: ModelContext
     private(set) var lastError: String?
     @ObservationIgnored private let log = Logger(subsystem: "com.owais.NotesApp", category: "library")
+    @ObservationIgnored private var changesInFlight: [UUID: [UUID: @Sendable (inout NotebookManifest) -> Void]] = [:]
+    @ObservationIgnored private var folderWrite: Task<Void, Never>?
 
     init(root: StorageRoot, context: ModelContext) {
         self.root = root
@@ -55,6 +57,7 @@ final class LibraryStore {
 
     @discardableResult
     func importPDF(from url: URL, folder: FolderRecord?) async throws -> UUID {
+        let folderID = folder?.id
         let id = UUID()
         let package = NotebookPackage(root: root, id: id)
         do {
@@ -65,10 +68,10 @@ final class LibraryStore {
             cover.style = .firstPage
             var manifest = NotebookManifest(id: id, title: url.deletingPathExtension().lastPathComponent, cover: cover,
                                             defaults: PageDefaults(template: .blank, paperColor: .white, pageSize: .letter), pages: pages)
-            manifest.library.folderID = folder?.id
+            manifest.library.folderID = folderID
             try await package.create(manifest)
             index(manifest)
-            Task { [weak self] in
+            Task(priority: .utility) { [weak self] in
                 let text = await HandwritingIndexer.shared.index(HandwritingIndexer.Job(package: package, pages: pages))
                 self?.updateSearchText(text, for: id)
             }
@@ -81,10 +84,11 @@ final class LibraryStore {
 
     @discardableResult
     func duplicate(_ record: NotebookRecord) async throws -> UUID {
-        if let open = DocumentRegistry.shared.document(for: record.id) { await open.flush() }
+        let sourceID = record.id, searchText = record.searchText
+        if let open = DocumentRegistry.shared.document(for: sourceID) { await open.flush() }
         let newID = UUID()
-        let source = root.package(record.id), destination = root.package(newID)
-        try FileManager.default.copyItem(at: source, to: destination)
+        let source = root.package(sourceID), destination = root.package(newID)
+        try await Task.detached(priority: .userInitiated) { try FileManager.default.copyItem(at: source, to: destination) }.value
         let package = NotebookPackage(root: root, id: newID)
         do {
             let copy = try await package.updateManifest { manifest in
@@ -97,6 +101,7 @@ final class LibraryStore {
                 manifest.migratedFrom = nil
             }
             index(copy)
+            updateSearchText(searchText, for: newID)
             return newID
         } catch {
             try? FileManager.default.removeItem(at: destination)
@@ -108,7 +113,7 @@ final class LibraryStore {
 
     func rename(_ record: NotebookRecord, to title: String) {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, trimmed != record.title else { return }
+        guard !record.isReadOnly, !trimmed.isEmpty, trimmed != record.title else { return }
         record.title = trimmed
         saveIndex()
         if let document = DocumentRegistry.shared.document(for: record.id) {
@@ -119,6 +124,7 @@ final class LibraryStore {
     }
 
     func setCover(_ cover: CoverSpec, for record: NotebookRecord) {
+        guard !record.isReadOnly else { return }
         record.coverStyleRaw = cover.styleRaw
         record.clothRaw = cover.clothRaw
         record.inksRaw = cover.inksRaw.joined(separator: ",")
@@ -149,22 +155,33 @@ final class LibraryStore {
         changeLibraryState(records, index: { $0.folder = folder }) { $0.folderID = folderID }
     }
 
-    func noteOpened(_ record: NotebookRecord) {
-        record.lastOpenedAt = .now
-        saveIndex()
-    }
-
     /// Permanently removes notebooks from the library. Only offered for notebooks already in Recently Deleted.
+    /// Each package is renamed into `Deleting/` (one cheap move on the main thread) and removed in the background;
+    /// anything left there is swept at the next launch.
     func deletePermanently(_ records: [NotebookRecord]) {
-        for record in records where record.isTrashed && DocumentRegistry.shared.document(for: record.id) == nil {
+        let registry = DocumentRegistry.shared
+        var moved: [URL] = []
+        for record in records where record.isTrashed && registry.document(for: record.id) == nil && !registry.isOpening(record.id) {
+            let tombstone = root.deleting.appending(path: "\(record.id.uuidString)-\(UUID().uuidString)", directoryHint: .isDirectory)
             do {
-                try FileManager.default.removeItem(at: root.package(record.id))
+                try FileManager.default.createDirectory(at: root.deleting, withIntermediateDirectories: true)
+                try FileManager.default.moveItem(at: root.package(record.id), to: tombstone)
+                moved.append(tombstone)
                 context.delete(record)
             } catch {
                 lastError = "“\(record.title)” couldn't be deleted: \(error.localizedDescription)"
             }
         }
         saveIndex()
+        guard !moved.isEmpty else { return }
+        Task.detached(priority: .utility) {
+            for url in moved { try? FileManager.default.removeItem(at: url) }
+        }
+    }
+
+    /// Finishes deletes interrupted by the app quitting.
+    nonisolated static func sweepDeleted(root: StorageRoot) {
+        try? FileManager.default.removeItem(at: root.deleting)
     }
 
     func purgeExpiredTrash(olderThan days: Int = 30) {
@@ -176,7 +193,7 @@ final class LibraryStore {
 
     private func changeLibraryState(_ records: [NotebookRecord], index: (NotebookRecord) -> Void,
                                     manifest change: @escaping @Sendable (inout LibraryState) -> Void) {
-        for record in records {
+        for record in records where !record.isReadOnly {
             index(record)
             if let document = DocumentRegistry.shared.document(for: record.id) {
                 document.updateLibraryState(change)
@@ -187,16 +204,28 @@ final class LibraryStore {
         saveIndex()
     }
 
+    /// Read-modify-write of a closed notebook's manifest. A document that starts opening meanwhile gets the
+    /// change applied again (see `reapplyChangesInFlight`); if the write fails, the index is re-read from the file.
     private func update(_ id: UUID, _ change: @escaping @Sendable (inout NotebookManifest) -> Void) {
         let package = NotebookPackage(root: root, id: id)
+        let token = UUID()
+        changesInFlight[id, default: [:]][token] = change
         Task {
             do {
                 _ = try await package.updateManifest(change)
             } catch {
-                lastError = "A change couldn't be saved: \(error.localizedDescription)"
+                lastError = String(localized: "A change couldn't be saved: \(error.localizedDescription)")
                 log.error("manifest update failed for \(id): \(error.localizedDescription)")
+                if let manifest = try? await package.readManifest().manifest { index(manifest) }
             }
+            changesInFlight[id]?[token] = nil
+            if changesInFlight[id]?.isEmpty == true { changesInFlight[id] = nil }
         }
+    }
+
+    func reapplyChangesInFlight(to document: NotebookDocument) {
+        guard let changes = changesInFlight[document.id] else { return }
+        for change in changes.values { document.applyLibraryChange(change) }
     }
 
     // MARK: Folders
@@ -237,33 +266,42 @@ final class LibraryStore {
         writeFolders()
     }
 
+    /// Writes are chained so they land in order, and each merges into the file so keys this version
+    /// doesn't know about survive.
     private func writeFolders() {
         let folders = ((try? context.fetch(FetchDescriptor<FolderRecord>(sortBy: [SortDescriptor(\.sortIndex)]))) ?? []).map {
             FolderEntry(id: $0.id, name: $0.name, clothRaw: $0.clothRaw, createdAt: $0.createdAt, sortIndex: $0.sortIndex)
         }
-        let root = root
-        Task.detached(priority: .utility) {
-            var file = FolderFile.read(root)
-            file.folders = folders
-            try? file.write(root)
+        let root = root, previous = folderWrite
+        folderWrite = Task { [weak self] in
+            await previous?.value
+            let failure = await Task.detached(priority: .utility) { () -> String? in
+                var file = FolderFile.read(root)
+                file.merge(folders)
+                do { try file.write(root) } catch { return error.localizedDescription }
+                return nil
+            }.value
+            if let failure { self?.lastError = String(localized: "Folders couldn't be saved: \(failure)") }
         }
     }
 
     // MARK: Index
 
+    /// Mirrors a manifest into the index, saving only when something the library shows changed.
     func index(_ manifest: NotebookManifest) {
-        let record = self.record(manifest.id) ?? {
+        let existing = self.record(manifest.id)
+        let record = existing ?? {
             let new = NotebookRecord(id: manifest.id)
             context.insert(new)
             return new
         }()
-        record.apply(manifest, issues: record.issueCount)
-        if let folderID = manifest.library.folderID {
-            record.folder = try? context.fetch(FetchDescriptor<FolderRecord>(predicate: #Predicate { $0.id == folderID })).first
-        } else {
-            record.folder = nil
+        var changed = record.apply(manifest, issues: record.issueCount) || existing == nil
+        let folderID = manifest.library.folderID
+        if record.folder?.id != folderID {
+            record.folder = folderID.flatMap { id in try? context.fetch(FetchDescriptor<FolderRecord>(predicate: #Predicate { $0.id == id })).first }
+            changed = true
         }
-        saveIndex()
+        if changed { saveIndex() }
     }
 
     func updateSearchText(_ text: String, for id: UUID) {

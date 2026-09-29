@@ -7,6 +7,7 @@ struct FolderEntry: Sendable, Hashable, Identifiable {
     var createdAt: Date
     var sortIndex: Int
     var extra: [String: JSONValue] = [:]
+    var undecoded: [String: UndecodedField] = [:]
 
     var cloth: ClothColor {
         get { ClothColor(rawValue: clothRaw) ?? .slate }
@@ -36,10 +37,11 @@ struct FolderFile: Sendable, Hashable {
             var reader = ObjectReader(object)
             _ = reader.take("id")
             _ = reader.take("name")
-            file.folders.append(FolderEntry(id: id, name: name, clothRaw: reader.string("cloth", default: ClothColor.slate.rawValue),
-                                            createdAt: reader.date("createdAt", default: .now),
-                                            sortIndex: reader.int("sortIndex", default: file.folders.count),
-                                            extra: reader.remaining))
+            let cloth = reader.string("cloth", default: ClothColor.slate.rawValue)
+            let createdAt = reader.date("createdAt", default: .now)
+            let sortIndex = reader.int("sortIndex", default: file.folders.count)
+            file.folders.append(FolderEntry(id: id, name: name, clothRaw: cloth, createdAt: createdAt, sortIndex: sortIndex,
+                                            extra: reader.remaining, undecoded: reader.undecoded))
         }
         return file
     }
@@ -47,15 +49,27 @@ struct FolderFile: Sendable, Hashable {
     func write(_ root: StorageRoot) throws {
         try FileManager.default.createDirectory(at: root.library, withIntermediateDirectories: true)
         let encoded = folders.map { folder -> JSONValue in
-            var object = folder.extra
-            object["id"] = .string(folder.id.uuidString)
-            object["name"] = .string(folder.name)
-            object["cloth"] = .string(folder.clothRaw)
-            object["createdAt"] = ManifestCodec.encodeDate(folder.createdAt)
-            object["sortIndex"] = .number(Double(folder.sortIndex))
-            return .object(object)
+            var writer = ObjectWriter(base: folder.extra, undecoded: folder.undecoded)
+            writer.set("id", .string(folder.id.uuidString))
+            writer.set("name", .string(folder.name))
+            writer.set("cloth", .string(folder.clothRaw))
+            writer.set("createdAt", ManifestCodec.encodeDate(folder.createdAt))
+            writer.set("sortIndex", .number(Double(folder.sortIndex)))
+            return .object(writer.values)
         }
         try JSONValue.object(["folders": .array(encoded + opaque)]).serialized().write(to: root.foldersFile, options: .atomic)
+    }
+
+    /// Takes the app's folder list, keeping unknown keys and unreadable values of folders that still exist.
+    mutating func merge(_ current: [FolderEntry]) {
+        let existing = Dictionary(folders.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        folders = current.map { entry in
+            guard let old = existing[entry.id] else { return entry }
+            var merged = entry
+            merged.extra = old.extra
+            merged.undecoded = old.undecoded
+            return merged
+        }
     }
 
     mutating func upsert(_ folder: FolderEntry) {

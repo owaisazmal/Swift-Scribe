@@ -79,6 +79,7 @@ struct CoverSpec: Sendable, Hashable {
     var inksRaw: [String]
     var seed: UInt32
     var extra: [String: JSONValue] = [:]
+    var undecoded: [String: UndecodedField] = [:]
 
     init(style: CoverStyle, cloth: ClothColor, inks: (RisoInk, RisoInk), seed: UInt32) {
         styleRaw = style.rawValue
@@ -87,12 +88,14 @@ struct CoverSpec: Sendable, Hashable {
         self.seed = seed
     }
 
-    init(styleRaw: String, clothRaw: String, inksRaw: [String], seed: UInt32, extra: [String: JSONValue] = [:]) {
+    init(styleRaw: String, clothRaw: String, inksRaw: [String], seed: UInt32, extra: [String: JSONValue] = [:],
+         undecoded: [String: UndecodedField] = [:]) {
         self.styleRaw = styleRaw
         self.clothRaw = clothRaw
         self.inksRaw = inksRaw
         self.seed = seed
         self.extra = extra
+        self.undecoded = undecoded
     }
 
     var style: CoverStyle {

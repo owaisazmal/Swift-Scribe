@@ -9,7 +9,7 @@ import os
 actor HandwritingIndexer {
     static let shared = HandwritingIndexer()
 
-    private var running: [UUID: Task<Void, Never>] = [:]
+    private var running: [UUID: (token: UUID, task: Task<Void, Never>)] = [:]
     private let signposter = OSSignposter(subsystem: "com.owais.NotesApp", category: "ocr")
 
     struct Job: Sendable {
@@ -18,21 +18,26 @@ actor HandwritingIndexer {
     }
 
     /// Queues recognition for pages whose text is missing or older than their ink. Returns the notebook's full text.
+    /// A page already being read by another job is awaited rather than read twice.
     @discardableResult
     func index(_ job: Job) async -> String {
         for page in job.pages {
-            guard !Task.isCancelled else { break }
+            guard !Task.isCancelled,
+                  FileManager.default.fileExists(atPath: job.package.manifestURL.path(percentEncoded: false)) else { break }
+            if let existing = running[page.id] { await existing.task.value; continue }
             if await isCurrent(page, in: job.package) { continue }
+            if let existing = running[page.id] { await existing.task.value; continue }
+            let token = UUID()
             let task = Task(priority: .utility) { await recognize(page, in: job.package) }
-            running[page.id] = task
+            running[page.id] = (token, task)
             await task.value
-            running[page.id] = nil
+            if running[page.id]?.token == token { running[page.id] = nil }
         }
         return LibraryIndex.searchText(in: job.package.textDirectory)
     }
 
     func cancel(page: UUID) {
-        running[page]?.cancel()
+        running[page]?.task.cancel()
         running[page] = nil
     }
 
@@ -45,7 +50,8 @@ actor HandwritingIndexer {
         "#ink:\(page.inkHash ?? "none")\n"
     }
 
-    private func recognize(_ page: NotebookPage, in package: NotebookPackage) async {
+    /// Rendering and Vision run off the actor, so an edit's `cancel(page:)` gets through while they work.
+    private nonisolated func recognize(_ page: NotebookPage, in package: NotebookPackage) async {
         let interval = signposter.beginInterval("OCR page")
         defer { signposter.endInterval("OCR page", interval) }
         var chunks: [String] = []

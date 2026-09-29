@@ -44,6 +44,15 @@ extension Color {
 extension ClothColor {
     var color: Color { Color(hex: hex) }
     var uiColor: UIColor { UIColor(hex: hex) }
+
+    /// Text on the cloth itself (the page ribbon): white on dark cloths, ink on mustard, rose and oat,
+    /// whichever reaches 4.5:1.
+    var onCloth: Color {
+        switch self {
+        case .mustard, .rose, .oat: Color(hex: 0x1B2230)
+        default: .white
+        }
+    }
 }
 
 extension RisoInk {

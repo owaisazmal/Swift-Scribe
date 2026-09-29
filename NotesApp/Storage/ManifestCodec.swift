@@ -16,9 +16,19 @@ enum ManifestCodec {
         guard let object = root.objectValue else { throw ManifestError.notAnObject }
         var reader = ObjectReader(object)
         var warnings: [String] = []
+        let schemaVersion = reader.int("schemaVersion", default: NotebookManifest.currentSchemaVersion)
+        let isNewer = schemaVersion > NotebookManifest.currentSchemaVersion
 
-        let rawPages = reader.take("pages")
-        guard let pageValues = rawPages.map({ $0.arrayValue }) ?? [] else { throw ManifestError.pagesUnreadable }
+        var pageValues: [JSONValue] = []
+        if let rawPages = reader.take("pages") {
+            if let array = rawPages.arrayValue {
+                pageValues = array
+            } else if isNewer {
+                reader.keepUndecoded("pages", raw: rawPages, fallback: .array([]))
+            } else {
+                throw ManifestError.pagesUnreadable
+            }
+        }
         var pages: [NotebookPage] = []
         var opaque: [OpaquePage] = []
         for raw in pageValues {
@@ -39,7 +49,7 @@ enum ManifestCodec {
                                         defaults: reader.nested("defaults", default: PageDefaults(template: .narrowRuled, paperColor: .white, pageSize: .letter),
                                                                 decode: decodeDefaults, encode: encodeDefaults),
                                         pages: pages)
-        manifest.schemaVersion = reader.int("schemaVersion", default: NotebookManifest.currentSchemaVersion)
+        manifest.schemaVersion = schemaVersion
         manifest.modifiedAt = reader.date("modifiedAt", default: createdAt)
         manifest.opaquePages = opaque
         for raw in reader.array("recordings") {
@@ -60,6 +70,10 @@ enum ManifestCodec {
     }
 
     static func encode(_ manifest: NotebookManifest) throws -> Data {
+        try encodeValue(manifest).serialized()
+    }
+
+    static func encodeValue(_ manifest: NotebookManifest) -> JSONValue {
         var writer = ObjectWriter(base: manifest.extra, undecoded: manifest.undecoded)
         writer.set("schemaVersion", .number(Double(manifest.schemaVersion)))
         writer.set("id", .string(manifest.id.uuidString))
@@ -72,7 +86,7 @@ enum ManifestCodec {
         writer.set("recordings", .array(manifest.recordings.map(encodeRecording) + manifest.opaqueRecordings))
         writer.set("library", encodeLibrary(manifest.library))
         if let migratedFrom = manifest.migratedFrom { writer.set("migratedFrom", .string(migratedFrom)) }
-        return try JSONValue.object(writer.values).serialized()
+        return .object(writer.values)
     }
 
     // MARK: Pages
@@ -147,36 +161,44 @@ enum ManifestCodec {
     static func decodeCover(_ object: [String: JSONValue], id: UUID) -> CoverSpec {
         let fallback = CoverSpec.defaultCloth(for: id)
         var reader = ObjectReader(object)
-        let seed = reader.take("seed")?.doubleValue.flatMap { $0 >= 0 && $0 <= Double(UInt32.max) ? UInt32($0) : nil }
-        let inks = reader.take("inks")?.arrayValue?.compactMap(\.stringValue)
-        return CoverSpec(styleRaw: reader.string("style", default: fallback.styleRaw),
-                         clothRaw: reader.string("cloth", default: fallback.clothRaw),
-                         inksRaw: inks ?? fallback.inksRaw, seed: seed ?? fallback.seed, extra: reader.remaining)
+        let seed = reader.value("seed", default: fallback.seed, encode: { .number(Double($0)) }) { raw in
+            raw.intValue.flatMap { $0 >= 0 && $0 <= Int(UInt32.max) ? UInt32($0) : nil }
+        }
+        let inks = reader.value("inks", default: fallback.inksRaw, encode: { .array($0.map(JSONValue.string)) }) { raw in
+            raw.arrayValue.flatMap { values in
+                let strings = values.compactMap(\.stringValue)
+                return strings.count == values.count ? strings : nil
+            }
+        }
+        let style = reader.string("style", default: fallback.styleRaw)
+        let cloth = reader.string("cloth", default: fallback.clothRaw)
+        return CoverSpec(styleRaw: style, clothRaw: cloth, inksRaw: inks, seed: seed, extra: reader.remaining, undecoded: reader.undecoded)
     }
 
     static func encodeCover(_ cover: CoverSpec) -> JSONValue {
-        var object = cover.extra
-        object["style"] = .string(cover.styleRaw)
-        object["cloth"] = .string(cover.clothRaw)
-        object["inks"] = .array(cover.inksRaw.map(JSONValue.string))
-        object["seed"] = .number(Double(cover.seed))
-        return .object(object)
+        var writer = ObjectWriter(base: cover.extra, undecoded: cover.undecoded)
+        writer.set("style", .string(cover.styleRaw))
+        writer.set("cloth", .string(cover.clothRaw))
+        writer.set("inks", .array(cover.inksRaw.map(JSONValue.string)))
+        writer.set("seed", .number(Double(cover.seed)))
+        return .object(writer.values)
     }
 
     static func decodeDefaults(_ object: [String: JSONValue]) -> PageDefaults {
         var reader = ObjectReader(object)
-        return PageDefaults(templateRaw: reader.string("template", default: PaperTemplate.narrowRuled.rawValue),
-                            paperColorRaw: reader.string("paperColor", default: PaperColor.white.rawValue),
-                            pageSizeRaw: reader.string("pageSize", default: PageSize.letter.rawValue),
-                            extra: reader.remaining)
+        let template = reader.string("template", default: PaperTemplate.narrowRuled.rawValue)
+        let paperColor = reader.string("paperColor", default: PaperColor.white.rawValue)
+        let pageSize = reader.string("pageSize", default: PageSize.letter.rawValue)
+        return PageDefaults(templateRaw: template, paperColorRaw: paperColor, pageSizeRaw: pageSize,
+                            extra: reader.remaining, undecoded: reader.undecoded)
     }
 
     static func encodeDefaults(_ defaults: PageDefaults) -> JSONValue {
-        var object = defaults.extra
-        object["template"] = .string(defaults.templateRaw)
-        object["paperColor"] = .string(defaults.paperColorRaw)
-        object["pageSize"] = .string(defaults.pageSizeRaw)
-        return .object(object)
+        var writer = ObjectWriter(base: defaults.extra, undecoded: defaults.undecoded)
+        writer.set("template", .string(defaults.templateRaw))
+        writer.set("paperColor", .string(defaults.paperColorRaw))
+        writer.set("pageSize", .string(defaults.pageSizeRaw))
+        return .object(writer.values)
     }
 
     static func decodeRecording(_ raw: JSONValue) -> RecordingEntry? {
@@ -186,39 +208,41 @@ enum ManifestCodec {
         var reader = ObjectReader(object)
         _ = reader.take("id")
         _ = reader.take("file")
-        return RecordingEntry(id: id, file: file, createdAt: reader.date("createdAt", default: .distantPast),
-                              duration: reader.take("duration")?.doubleValue ?? 0, extra: reader.remaining)
+        let createdAt = reader.date("createdAt", default: .distantPast)
+        let duration = reader.value("duration", default: 0, encode: JSONValue.number) { $0.doubleValue.flatMap { $0.isFinite && $0 >= 0 ? $0 : nil } }
+        return RecordingEntry(id: id, file: file, createdAt: createdAt, duration: duration, extra: reader.remaining, undecoded: reader.undecoded)
     }
 
     static func encodeRecording(_ recording: RecordingEntry) -> JSONValue {
-        var object = recording.extra
-        object["id"] = .string(recording.id.uuidString)
-        object["file"] = .string(recording.file)
-        object["createdAt"] = encodeDate(recording.createdAt)
-        object["duration"] = .number(recording.duration)
-        return .object(object)
+        var writer = ObjectWriter(base: recording.extra, undecoded: recording.undecoded)
+        writer.set("id", .string(recording.id.uuidString))
+        writer.set("file", .string(recording.file))
+        writer.set("createdAt", encodeDate(recording.createdAt))
+        writer.set("duration", .number(recording.duration))
+        return .object(writer.values)
     }
 
     static func decodeLibrary(_ object: [String: JSONValue]) -> LibraryState {
         var reader = ObjectReader(object)
         var state = LibraryState()
-        state.isFavorite = reader.take("favorite")?.boolValue ?? false
+        state.isFavorite = reader.value("favorite", default: false, encode: JSONValue.bool) { $0.boolValue }
         state.deletedAt = reader.optionalDate("deletedAt")
         state.folderID = reader.optionalUUID("folderID")
         state.lastOpenedAt = reader.optionalDate("lastOpenedAt")
-        state.currentPage = max(0, reader.int("currentPage", default: 0))
+        state.currentPage = reader.value("currentPage", default: 0, encode: { .number(Double($0)) }) { $0.intValue.flatMap { $0 >= 0 ? $0 : nil } }
         state.extra = reader.remaining
+        state.undecoded = reader.undecoded
         return state
     }
 
     static func encodeLibrary(_ state: LibraryState) -> JSONValue {
-        var object = state.extra
-        object["favorite"] = .bool(state.isFavorite)
-        object["deletedAt"] = state.deletedAt.map(encodeDate) ?? .null
-        object["folderID"] = state.folderID.map { .string($0.uuidString) } ?? .null
-        object["lastOpenedAt"] = state.lastOpenedAt.map(encodeDate) ?? .null
-        object["currentPage"] = .number(Double(state.currentPage))
-        return .object(object)
+        var writer = ObjectWriter(base: state.extra, undecoded: state.undecoded)
+        writer.set("favorite", .bool(state.isFavorite))
+        writer.set("deletedAt", state.deletedAt.map(encodeDate) ?? .null)
+        writer.set("folderID", state.folderID.map { .string($0.uuidString) } ?? .null)
+        writer.set("lastOpenedAt", state.lastOpenedAt.map(encodeDate) ?? .null)
+        writer.set("currentPage", .number(Double(state.currentPage)))
+        return .object(writer.values)
     }
 
     // MARK: Scalars
@@ -255,11 +279,16 @@ struct ObjectReader {
         remaining.removeValue(forKey: key)
     }
 
-    private mutating func read<T>(_ key: String, default value: T, encode: (T) -> JSONValue, _ transform: (JSONValue) -> T?) -> T {
+    mutating func value<T>(_ key: String, default value: T, encode: (T) -> JSONValue, _ transform: (JSONValue) -> T?) -> T {
         guard let raw = take(key), raw != .null else { return value }
         if let decoded = transform(raw) { return decoded }
         undecoded[key] = UndecodedField(raw: raw, fallback: encode(value))
         return value
+    }
+
+    mutating func keepUndecoded(_ key: String, raw: JSONValue, fallback: JSONValue) {
+        remaining[key] = nil
+        undecoded[key] = UndecodedField(raw: raw, fallback: fallback)
     }
 
     private mutating func readOptional<T>(_ key: String, _ transform: (JSONValue) -> T?) -> T? {
@@ -270,34 +299,34 @@ struct ObjectReader {
     }
 
     mutating func string(_ key: String, default value: String) -> String {
-        read(key, default: value, encode: JSONValue.string) { $0.stringValue }
+        self.value(key, default: value, encode: JSONValue.string) { $0.stringValue }
     }
 
     mutating func optionalString(_ key: String) -> String? { readOptional(key) { $0.stringValue } }
 
     mutating func int(_ key: String, default value: Int) -> Int {
-        read(key, default: value, encode: { .number(Double($0)) }) { $0.intValue }
+        self.value(key, default: value, encode: { .number(Double($0)) }) { $0.intValue }
     }
 
     mutating func uuid(_ key: String, default value: UUID) -> UUID {
-        read(key, default: value, encode: { .string($0.uuidString) }) { $0.stringValue.flatMap(UUID.init(uuidString:)) }
+        self.value(key, default: value, encode: { .string($0.uuidString) }) { $0.stringValue.flatMap(UUID.init(uuidString:)) }
     }
 
     mutating func optionalUUID(_ key: String) -> UUID? { readOptional(key) { $0.stringValue.flatMap(UUID.init(uuidString:)) } }
 
     mutating func date(_ key: String, default value: Date) -> Date {
-        read(key, default: value, encode: ManifestCodec.encodeDate) { $0.stringValue.flatMap(ManifestCodec.parseDate) }
+        self.value(key, default: value, encode: ManifestCodec.encodeDate) { $0.stringValue.flatMap(ManifestCodec.parseDate) }
     }
 
     mutating func optionalDate(_ key: String) -> Date? { readOptional(key) { $0.stringValue.flatMap(ManifestCodec.parseDate) } }
 
     mutating func array(_ key: String) -> [JSONValue] {
-        read(key, default: [], encode: JSONValue.array) { $0.arrayValue }
+        self.value(key, default: [], encode: JSONValue.array) { $0.arrayValue }
     }
 
     mutating func nested<T>(_ key: String, default value: T, decode: ([String: JSONValue]) -> T?,
                             encode: (T) -> JSONValue) -> T {
-        read(key, default: value, encode: encode) { $0.objectValue.flatMap(decode) }
+        self.value(key, default: value, encode: encode) { $0.objectValue.flatMap(decode) }
     }
 }
 

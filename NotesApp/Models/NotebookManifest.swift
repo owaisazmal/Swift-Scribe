@@ -60,6 +60,23 @@ struct NotebookPage: Sendable, Hashable, Identifiable {
         copy.id = UUID()
         return copy
     }
+
+    /// Names a thumbnail by the page's ink and by how the page looks, so a template or paper change isn't served stale.
+    var thumbnailKey: String { "\(inkHash?.prefix(12) ?? "blank")-\(appearanceKey)" }
+
+    var appearanceKey: String {
+        let backgroundKey = switch background {
+        case .template(let raw): "t:\(raw)"
+        case .pdf(let file, let index): "p:\(file)#\(index)"
+        case .image(let file): "i:\(file)"
+        case .unknown(let raw): "u:" + ((try? raw.serialized(pretty: false)).map { String(decoding: $0, as: UTF8.self) } ?? "")
+        }
+        var hash: UInt64 = 0xcbf2_9ce4_8422_2325
+        for byte in "\(backgroundKey)|\(paperColorRaw)|\(Int(size.width))x\(Int(size.height))".utf8 {
+            hash = (hash ^ UInt64(byte)) &* 0x0100_0000_01b3
+        }
+        return String(hash, radix: 16).prefix(8).description
+    }
 }
 
 struct PageDefaults: Sendable, Hashable {
@@ -67,6 +84,7 @@ struct PageDefaults: Sendable, Hashable {
     var paperColorRaw: String
     var pageSizeRaw: String
     var extra: [String: JSONValue] = [:]
+    var undecoded: [String: UndecodedField] = [:]
 
     init(template: PaperTemplate, paperColor: PaperColor, pageSize: PageSize) {
         templateRaw = template.rawValue
@@ -74,11 +92,13 @@ struct PageDefaults: Sendable, Hashable {
         pageSizeRaw = pageSize.rawValue
     }
 
-    init(templateRaw: String, paperColorRaw: String, pageSizeRaw: String, extra: [String: JSONValue]) {
+    init(templateRaw: String, paperColorRaw: String, pageSizeRaw: String, extra: [String: JSONValue],
+         undecoded: [String: UndecodedField] = [:]) {
         self.templateRaw = templateRaw
         self.paperColorRaw = paperColorRaw
         self.pageSizeRaw = pageSizeRaw
         self.extra = extra
+        self.undecoded = undecoded
     }
 
     var template: PaperTemplate { PaperTemplate(rawValue: templateRaw) ?? .narrowRuled }
@@ -94,6 +114,7 @@ struct RecordingEntry: Sendable, Hashable, Identifiable {
     var createdAt: Date
     var duration: TimeInterval
     var extra: [String: JSONValue] = [:]
+    var undecoded: [String: UndecodedField] = [:]
 }
 
 struct LibraryState: Sendable, Hashable {
@@ -103,6 +124,7 @@ struct LibraryState: Sendable, Hashable {
     var lastOpenedAt: Date?
     var currentPage = 0
     var extra: [String: JSONValue] = [:]
+    var undecoded: [String: UndecodedField] = [:]
 }
 
 struct UndecodedField: Sendable, Hashable {

@@ -7,6 +7,7 @@
 
 import XCTest
 
+@MainActor
 final class NotesAppUITests: XCTestCase {
 
     override func setUpWithError() throws {

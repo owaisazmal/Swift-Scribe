@@ -389,29 +389,60 @@ final class CoverCache: Sendable {
         }
     }
 
-    func image(for request: CoverRequest) async -> UIImage {
+    /// Loads or renders a cover off the main thread. The work stops if the caller is cancelled (a cell scrolled
+    /// away, a preview re-keyed), and returns nil then. Disk hits are decoded before they reach the main thread.
+    /// `persist: false`, for the live preview, skips the disk and the shared memory cache.
+    func image(for request: CoverRequest, persist: Bool = true) async -> UIImage? {
         let key = request.key
         if let image = cached(key) { return image }
         let directory = directory
         let signposter = signposter
-        let image = await Task.detached(priority: .userInitiated) { () -> UIImage in
+        let work = Task.detached(priority: Task.currentPriority) { () -> UIImage? in
             let file = directory.appending(path: "\(key).png")
-            if let data = try? Data(contentsOf: file), let image = UIImage(data: data, scale: request.scale) {
-                return image
+            if persist, let data = try? Data(contentsOf: file), let image = UIImage(data: data, scale: request.scale) {
+                Self.markUsed(file)
+                return image.preparingForDisplay() ?? image
             }
+            if Task.isCancelled { return nil }
             let interval = signposter.beginInterval("Cover render")
             var firstPage: CGImage?
             if let url = request.firstPage, let data = try? Data(contentsOf: url) {
                 firstPage = UIImage(data: data)?.cgImage
             }
+            if Task.isCancelled { return nil }
             let image = CoverRenderer.render(request, firstPage: firstPage)
             signposter.endInterval("Cover render", interval)
-            try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            if let png = image.pngData() { try? png.write(to: file, options: .atomic) }
+            if persist, !Task.isCancelled {
+                try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                if let png = image.pngData() { try? png.write(to: file, options: .atomic) }
+            }
             return image
-        }.value
-        store(image, key: key)
+        }
+        let image = await withTaskCancellationHandler { await work.value } onCancel: { work.cancel() }
+        if let image, persist { store(image, key: key) }
         return image
+    }
+
+    /// Dates a file on use (at most daily), so the disk sweep removes covers nobody has looked at in a while.
+    private static func markUsed(_ file: URL) {
+        let modified = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
+        guard modified < Date.now.addingTimeInterval(-86_400) else { return }
+        try? FileManager.default.setAttributes([.modificationDate: Date.now], ofItemAtPath: file.path(percentEncoded: false))
+    }
+
+    /// Keeps the disk cache under `limit` bytes, removing the least recently used covers first.
+    func sweepDisk(limit: Int = 150 * 1_048_576) {
+        let keys: [URLResourceKey] = [.contentModificationDateKey, .fileSizeKey]
+        let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: keys)) ?? []
+        let entries = files.compactMap { file -> (URL, Date, Int)? in
+            guard let values = try? file.resourceValues(forKeys: Set(keys)) else { return nil }
+            return (file, values.contentModificationDate ?? .distantPast, values.fileSize ?? 0)
+        }.sorted { $0.1 > $1.1 }
+        var total = 0
+        for (file, _, size) in entries {
+            total += size
+            if total > limit { try? FileManager.default.removeItem(at: file) }
+        }
     }
 
     private func store(_ image: UIImage, key: String) {

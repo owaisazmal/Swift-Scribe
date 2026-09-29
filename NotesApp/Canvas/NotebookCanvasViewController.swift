@@ -28,7 +28,7 @@ private final class PageContentView: UIView {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    override func draw(_ rect: CGRect) {
+    nonisolated override func draw(_ rect: CGRect) {
         guard let ctx = UIGraphicsGetCurrentContext() else { return }
         PaperRenderer.drawBackground(page, notebookID: notebookID, in: ctx, size: size)
     }

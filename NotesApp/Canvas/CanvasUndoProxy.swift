@@ -6,7 +6,8 @@ import UIKit
 final class CanvasUndoProxy: UndoManager {
     private weak var document: UndoManager?
     private var purgeScheduled = false
-    private var relays: [NSObjectProtocol] = []
+    /// Only read again in deinit, when nothing else can reach it.
+    nonisolated(unsafe) private var relays: [NSObjectProtocol] = []
 
     init(document: UndoManager) {
         self.document = document

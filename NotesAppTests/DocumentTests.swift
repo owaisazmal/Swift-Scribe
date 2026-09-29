@@ -99,6 +99,8 @@ final class DocumentTests: XCTestCase {
         XCTAssertEqual(document.pages, [only])
     }
 
+    /// Ink-only saves no longer report to the library while editing (closing indexes everything), so the
+    /// report is checked on the next library-visible save, where it must carry the saved ink hash.
     func testAutosaveWritesDirtyPagesAndReportsTheManifest() async throws {
         let (document, root) = try await makeDocument()
         var saved: [NotebookManifest] = []
@@ -109,8 +111,14 @@ final class DocumentTests: XCTestCase {
         XCTAssertTrue(document.hasUnsavedChanges)
         await waitUntil { !document.hasUnsavedChanges }
         XCTAssertEqual(document.saveState, .saved)
-        XCTAssertEqual(saved.last?.pages[1].inkHash, document.pages[1].inkHash)
         XCTAssertNotNil(document.pages[1].inkHash)
+        let onDisk = try await NotebookPackage(root: root, id: document.id).readManifest().manifest
+        XCTAssertEqual(onDisk.pages[1].inkHash, document.pages[1].inkHash)
+        XCTAssertTrue(saved.isEmpty)
+        document.rename("Reported")
+        await waitUntil { !saved.isEmpty }
+        XCTAssertEqual(saved.last?.pages[1].inkHash, document.pages[1].inkHash)
+        XCTAssertEqual(saved.last?.title, "Reported")
 
         let reopened = try await NotebookDocument.open(document.id, root: root)
         let reloaded = await reopened.ink(page)

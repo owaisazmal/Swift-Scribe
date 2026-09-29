@@ -1,4 +1,5 @@
 import XCTest
+import SwiftData
 import PencilKit
 @testable import NotesApp
 
@@ -201,8 +202,9 @@ final class PerformanceBaselineTests: XCTestCase {
         print("PERF v2 \(name): median=\(String(format: "%.3f", median))\(unit) max=\(String(format: "%.3f", sorted.last ?? 0))\(unit) n=\(values.count)")
     }
 
-    private func spin(_ seconds: TimeInterval) {
-        RunLoop.main.run(until: Date().addingTimeInterval(seconds))
+    /// Async tests run as a main-queue job, so a nested run loop can't run main-actor work; sleeping yields instead.
+    private func pause(_ seconds: Double) async {
+        try? await Task.sleep(for: .seconds(seconds))
     }
 
     private func v2Root() -> StorageRoot {
@@ -223,7 +225,7 @@ final class PerformanceBaselineTests: XCTestCase {
         window.rootViewController = controller
         controller.view.layoutIfNeeded()
         await fulfillment(of: [rendered], timeout: 15)
-        spin(0.2)
+        await pause(0.2)
         return (document, controller, firstInk)
     }
 
@@ -237,14 +239,18 @@ final class PerformanceBaselineTests: XCTestCase {
         return { delegate?.canvasViewDrawingDidChange?(canvas) }
     }
 
-    private func measureV2StrokeEnd(pages: Int, label: String) async throws {
+    private func measureV2StrokeEnd(pages: Int, label: String, acrossEdge: Bool = false) async throws {
         let root = v2Root()
         let id = try await V2StressFixture.write(pages: pages, strokes: { $0 == 0 ? 1000 : 500 }, root: root)
         let (document, controller, _) = try await openV2(id, root: root, window: try hostWindow())
         let canvas = try XCTUnwrap(controller.canvas(forPage: 0))
+        let width = document.pages[0].size.width
         var samples: [Double] = []
         for i in 0..<30 {
-            let handler = stage(V2StressFixture.probe(at: CGPoint(x: 80, y: 60 + CGFloat(i % 10) * 4)), on: canvas)
+            let y = 60 + CGFloat(i % 10) * 4
+            let probe = acrossEdge ? stroke(from: CGPoint(x: width - 30, y: y), to: CGPoint(x: width + 40, y: y))
+                                   : V2StressFixture.probe(at: CGPoint(x: 80, y: y))
+            let handler = stage(probe, on: canvas)
             let start = CACurrentMediaTime()
             handler()
             samples.append((CACurrentMediaTime() - start) * 1000)
@@ -261,6 +267,51 @@ final class PerformanceBaselineTests: XCTestCase {
     func testV2StrokeEndSmallNotebook() async throws {
         try requirePerfRun()
         try await measureV2StrokeEnd(pages: 10, label: "10-page notebook")
+    }
+
+    func testV2StrokeEndAcrossThePageEdge() async throws {
+        try requirePerfRun()
+        try await measureV2StrokeEnd(pages: 100, label: "100-page notebook, stroke crossing the page edge", acrossEdge: true)
+    }
+
+    /// Main-thread CPU time of the calling thread, from the kernel's per-thread accounting.
+    private func threadCPUTime() -> Double {
+        var info = thread_basic_info()
+        var count = mach_msg_type_number_t(MemoryLayout<thread_basic_info_data_t>.size / MemoryLayout<natural_t>.size)
+        let port = mach_thread_self()
+        defer { mach_port_deallocate(mach_task_self_, port) }
+        _ = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { thread_info(port, thread_flavor_t(THREAD_BASIC_INFO), $0, &count) }
+        }
+        return Double(info.user_time.seconds + info.system_time.seconds) + Double(info.user_time.microseconds + info.system_time.microseconds) / 1_000_000
+    }
+
+    /// Everything a save costs the main thread, with the library index wired up as in the app: the snapshot,
+    /// the continuation after the off-main write, and on every other save an index update (a rename).
+    func testV2AutosaveMainThreadWithIndexing() async throws {
+        try requirePerfRun()
+        let root = v2Root()
+        let id = try await V2StressFixture.write(pages: 100, strokes: { _ in 500 }, root: root)
+        let schema = Schema(versionedSchema: LibraryIndexSchemaV1.self)
+        let container = try ModelContainer(for: schema, configurations: ModelConfiguration(schema: schema, isStoredInMemoryOnly: true))
+        let store = LibraryStore(root: root, context: container.mainContext)
+        let (document, controller, _) = try await openV2(id, root: root, window: try hostWindow())
+        store.index(document.manifest)
+        document.onSaved = { store.index($0) }
+        var inkOnly: [Double] = [], withIndex: [Double] = []
+        for i in 0..<12 {
+            await pause(0.05)
+            if let canvas = controller.canvas(forPage: 0) { stage(V2StressFixture.probe(at: CGPoint(x: 90, y: 70 + CGFloat(i) * 5)), on: canvas)() }
+            let renamed = i.isMultiple(of: 2)
+            if renamed { document.rename("Heavy \(i)") }
+            let before = threadCPUTime()
+            _ = await document.save()
+            let cost = (threadCPUTime() - before) * 1000
+            if renamed { withIndex.append(cost) } else { inkOnly.append(cost) }
+        }
+        report("autosave, main-thread CPU per save, ink only (heavy)", inkOnly)
+        report("autosave, main-thread CPU per save, with index update (heavy)", withIndex)
+        XCTAssertEqual(store.record(id)?.title, "Heavy 10")
     }
 
     func testV2AutosaveSnapshotHeavy() async throws {
@@ -290,24 +341,27 @@ final class PerformanceBaselineTests: XCTestCase {
         let (document, _, _) = try await openV2(id, root: root, window: try hostWindow())
         document.undoManager.groupsByEvent = false
         var insert: [Double] = [], move: [Double] = [], delete: [Double] = [], undo: [Double] = []
-        func timed(_ bucket: inout [Double], _ action: () -> Void) {
+        func timed(_ action: () -> Void) -> Double {
             document.undoManager.beginUndoGrouping()
             let start = CACurrentMediaTime()
             action()
-            bucket.append((CACurrentMediaTime() - start) * 1000)
+            let elapsed = (CACurrentMediaTime() - start) * 1000
             document.undoManager.endUndoGrouping()
-            spin(0.03)
+            return elapsed
         }
         for _ in 0..<8 {
-            timed(&insert) { document.insertPages([document.manifest.defaults.newPage()], at: 0) }
-            timed(&move) { document.movePage(from: 0, to: 50) }
-            timed(&delete) { document.removePages([document.pages[50].id]) }
+            insert.append(timed { document.insertPages([document.manifest.defaults.newPage()], at: 0) })
+            await pause(0.03)
+            move.append(timed { document.movePage(from: 0, to: 50) })
+            await pause(0.03)
+            delete.append(timed { document.removePages([document.pages[50].id]) })
+            await pause(0.03)
         }
         for _ in 0..<6 {
             let start = CACurrentMediaTime()
             document.undoManager.undo()
             undo.append((CACurrentMediaTime() - start) * 1000)
-            spin(0.03)
+            await pause(0.03)
         }
         report("insert page at start, incl. relayout (heavy)", insert)
         report("move page 0 to 50, incl. relayout (heavy)", move)
@@ -337,7 +391,7 @@ final class PerformanceBaselineTests: XCTestCase {
             await fulfillment(of: [rendered], timeout: 15)
             firstInk.append((inkAt - start) * 1000)
             window.rootViewController = UIViewController()
-            spin(0.2)
+            await pause(0.2)
         }
         report("open \(label): longest synchronous main-thread block", Array(sync.dropFirst()))
         report("open \(label): to first ink", Array(firstInk.dropFirst()))
@@ -353,11 +407,11 @@ final class PerformanceBaselineTests: XCTestCase {
         try await measureV2Open({ try await V2StressFixture.writePDF(pages: 300, root: $0) }, label: "300-page PDF")
     }
 
-    private func scrollThrough(_ controller: PageStackController, steps: Int, fraction: CGFloat) -> (peak: Double, live: Int) {
+    private func scrollThrough(_ controller: PageStackController, steps: Int, fraction: CGFloat) async -> (peak: Double, live: Int) {
         var peak = 0.0, live = 0
         for _ in 0..<steps {
             controller.scrollBy(viewportFraction: fraction)
-            spin(0.03)
+            await pause(0.03)
             peak = max(peak, V2StressFixture.footprintMB())
             live = max(live, controller.liveCanvasCount)
         }
@@ -370,12 +424,12 @@ final class PerformanceBaselineTests: XCTestCase {
         let id = try await V2StressFixture.writePDF(pages: 300, root: root)
         let baseline = V2StressFixture.footprintMB()
         let (_, controller, _) = try await openV2(id, root: root, window: try hostWindow())
-        let scroll = scrollThrough(controller, steps: 600, fraction: 0.6)
+        let scroll = await scrollThrough(controller, steps: 600, fraction: 0.6)
         print("PERF v2 memory, scrolling a 300-page PDF: baseline=\(Int(baseline))MB peak=\(Int(scroll.peak))MB liveCanvases<=\(scroll.live) reached page \(controller.currentPage + 1)")
         controller.scrollToPage(150)
         controller.setZoom(5)
-        spin(0.8)
-        let zoomed = scrollThrough(controller, steps: 60, fraction: 0.5)
+        await pause(0.8)
+        let zoomed = await scrollThrough(controller, steps: 60, fraction: 0.5)
         print("PERF v2 memory, 300-page PDF at 5x: peak=\(Int(zoomed.peak))MB liveCanvases<=\(zoomed.live)")
         XCTAssertGreaterThan(controller.currentPage, 150)
     }
@@ -386,11 +440,11 @@ final class PerformanceBaselineTests: XCTestCase {
         let id = try await V2StressFixture.write(pages: 100, strokes: { _ in 500 }, root: root)
         let baseline = V2StressFixture.footprintMB()
         let (_, controller, _) = try await openV2(id, root: root, window: try hostWindow())
-        let scroll = scrollThrough(controller, steps: 200, fraction: 0.6)
+        let scroll = await scrollThrough(controller, steps: 200, fraction: 0.6)
         print("PERF v2 memory, scrolling heavy ink: baseline=\(Int(baseline))MB peak=\(Int(scroll.peak))MB liveCanvases<=\(scroll.live)")
         controller.setZoom(5)
-        spin(0.8)
-        let zoomed = scrollThrough(controller, steps: 40, fraction: 0.5)
+        await pause(0.8)
+        let zoomed = await scrollThrough(controller, steps: 40, fraction: 0.5)
         print("PERF v2 memory, heavy ink at 5x: peak=\(Int(zoomed.peak))MB liveCanvases<=\(zoomed.live)")
     }
 
@@ -399,20 +453,17 @@ final class PerformanceBaselineTests: XCTestCase {
         let root = v2Root()
         let id = try await V2StressFixture.write(pages: 20, strokes: { _ in 400 }, root: root)
         let document = try await NotebookDocument.open(id, root: root)
-        var longest: CFTimeInterval = 0
-        var last = CACurrentMediaTime()
+        let gaps = GapMonitor()
         let timer = Timer.scheduledTimer(withTimeInterval: 0.002, repeats: true) { _ in
-            let now = CACurrentMediaTime()
-            longest = max(longest, now - last)
-            last = now
+            MainActor.assumeIsolated { gaps.tick() }
         }
         let start = CACurrentMediaTime()
         let job = ExportJob(document: document)
-        while case .running = job.state { spin(0.01) }
+        while case .running = job.state { await pause(0.01) }
         timer.invalidate()
         guard case .finished(let url) = job.state else { return XCTFail("export failed: \(job.state)") }
         let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
-        print("PERF v2 export 20 pages: total=\(Int((CACurrentMediaTime() - start) * 1000))ms longestMainThreadGap=\(String(format: "%.1f", longest * 1000))ms bytes=\(size)")
+        print("PERF v2 export 20 pages: total=\(Int((CACurrentMediaTime() - start) * 1000))ms longestMainThreadGap=\(String(format: "%.1f", gaps.longest * 1000))ms bytes=\(size)")
     }
 
     func testV2CoverRender() throws {
@@ -444,6 +495,19 @@ final class PerformanceBaselineTests: XCTestCase {
         _ = await HandwritingIndexer.shared.index(HandwritingIndexer.Job(package: package, pages: pages))
         let second = CACurrentMediaTime() - start
         print("PERF v2 OCR 3 pages: first=\(Int(first * 1000))ms unchanged re-run=\(String(format: "%.1f", second * 1000))ms (background)")
+    }
+}
+
+/// The longest interval between main-thread timer ticks: how long the main thread was unavailable.
+@MainActor
+private final class GapMonitor {
+    private(set) var longest: CFTimeInterval = 0
+    private var last = CACurrentMediaTime()
+
+    func tick() {
+        let now = CACurrentMediaTime()
+        longest = max(longest, now - last)
+        last = now
     }
 }
 
@@ -554,7 +618,7 @@ enum V2StressFixture {
         return result
     }
 
-    static func write(pages count: Int, strokes: (Int) -> Int, root: StorageRoot) async throws -> UUID {
+    static func write(pages count: Int, strokes: @Sendable (Int) -> Int, root: StorageRoot) async throws -> UUID {
         var rng = SplitMix64(state: 7)
         let pages = (0..<count).map { _ in NotebookPage.template(.narrowRuled, color: .white, size: .letter) }
         var ink: [UUID: PKDrawing] = [:]

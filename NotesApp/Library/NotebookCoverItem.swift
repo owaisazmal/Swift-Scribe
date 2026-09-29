@@ -24,6 +24,7 @@ struct NotebookCoverItem: View {
     let isSelected: Bool
     let zoomNamespace: Namespace.ID
     let action: () -> Void
+    @Environment(LibraryStore.self) private var store
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -48,7 +49,13 @@ struct NotebookCoverItem: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(record.accessibilityDescription)
             .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
-            .accessibilityHint(isSelecting ? Text("Selects or deselects this notebook") : Text("Opens the notebook"))
+            .accessibilityHint(record.accessibilityHint(isSelecting: isSelecting))
+            .accessibilityActions {
+                if record.isTrashed, !isSelecting {
+                    Button("Restore") { store.restore([record]) }
+                    Button("Delete Permanently") { store.deletePermanently([record]) }
+                }
+            }
             .accessibilityIdentifier("notebook.\(record.title)")
             meta
                 .accessibilityHidden(true)
@@ -59,7 +66,7 @@ struct NotebookCoverItem: View {
     private var meta: some View {
         Group {
             if record.coverStyle == .firstPage {
-                Text("\(record.title) · \(record.pageCount == 1 ? String(localized: "1 page") : String(localized: "\(record.pageCount) pages"))")
+                Text("\(record.title) · \(record.pageCountText)")
             } else {
                 Text(record.metaLine)
             }

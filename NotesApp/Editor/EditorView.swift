@@ -127,12 +127,14 @@ private struct EditorContent: View {
         }
         .sheet(item: $export) { job in ExportSheet(job: job) }
         .fileImporter(isPresented: $importingPDF, allowedContentTypes: [.pdf]) { result in
-            Task { await insertPDF(result) }
+            let position = session.currentPage + 1
+            document.perform { await insertPDF(result, at: position) }
         }
         .photosPicker(isPresented: $showingPhotoPicker, selection: $photoItem, matching: .images)
         .onChange(of: photoItem) { _, item in
             guard let item else { return }
-            Task { await insertPhoto(item) }
+            let position = session.currentPage + 1
+            document.perform { await insertPhoto(item, at: position) }
         }
         .confirmationDialog("Delete page \(session.currentPage + 1)?", isPresented: $confirmingDelete, titleVisibility: .visible) {
             Button("Delete Page", role: .destructive) {
@@ -175,7 +177,7 @@ private struct EditorContent: View {
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
         ToolbarItem(placement: .topBarLeading) {
-            Button(action: close) { Label("Library", systemImage: "chevron.backward") }
+            Button { session.recorder.shutdown(); close() } label: { Label("Library", systemImage: "chevron.backward") }
                 .keyboardShortcut("w", modifiers: .command)
                 .accessibilityIdentifier("editor.back")
         }
@@ -213,9 +215,8 @@ private struct EditorContent: View {
                     .font(.subheadline.weight(.bold).monospacedDigit())
                 Text("of \(document.pages.count)")
                     .font(.caption2.weight(.medium).monospacedDigit())
-                    .opacity(0.85)
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(cloth.onCloth)
             .padding(.top, Space.x2)
             .padding(.bottom, Space.x5)
             .frame(width: 44)
@@ -326,20 +327,21 @@ private struct EditorContent: View {
 
     // MARK: Import
 
-    private func insertPDF(_ result: Result<URL, Error>) async {
+    private func insertPDF(_ result: Result<URL, Error>, at position: Int) async {
         do {
             let url = try result.get()
             let file = try await document.package.importAsset(from: url, ext: "pdf")
             let assetURL = document.package.assetURL(file)
             let pages = try await Task.detached(priority: .userInitiated) { try PDFImport.pages(at: assetURL, file: file) }.value
-            document.insertPages(pages, at: session.currentPage + 1, actionName: String(localized: "Insert PDF"))
-            session.go(to: session.currentPage + 1)
+            let position = min(position, document.pages.count)
+            document.insertPages(pages, at: position, actionName: String(localized: "Insert PDF"))
+            session.go(to: position)
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
-    private func insertPhoto(_ item: PhotosPickerItem) async {
+    private func insertPhoto(_ item: PhotosPickerItem, at position: Int) async {
         defer { photoItem = nil }
         do {
             guard let data = try await item.loadTransferable(type: Data.self) else { throw ImportError.unreadable }
@@ -348,8 +350,9 @@ private struct EditorContent: View {
             let width = PageSize.letter.points.width
             let page = NotebookPage(background: .image(file: file), paperColor: .white,
                                     size: CGSize(width: width, height: (width * size.height / size.width).rounded()))
-            document.insertPages([page], at: session.currentPage + 1, actionName: String(localized: "Insert Photo"))
-            session.go(to: session.currentPage + 1)
+            let position = min(position, document.pages.count)
+            document.insertPages([page], at: position, actionName: String(localized: "Insert Photo"))
+            session.go(to: position)
         } catch {
             errorMessage = error.localizedDescription
         }
