@@ -161,6 +161,7 @@ struct ShelfView: View {
                     }
                 }
                 .accessibilityLabel(record.accessibilityDescription)
+                .accessibilityIdentifier("notebook.\(record.title)")
                 .accessibilityAddTraits(selection.contains(record.id) ? .isSelected : [])
                 .contextMenu { if !isSelecting { menu(for: record) } }
                 .listRowBackground(Color.surface)
@@ -356,11 +357,9 @@ struct ShelfLabel: View {
     let title: String
     var body: some View {
         HStack(spacing: Space.x3) {
-            Text(title).metaStyle(.footnote).fixedSize()
-            Rectangle().fill(Color.hairline).frame(height: 1)
+            Text(title).metaStyle(.footnote).fixedSize().accessibilityAddTraits(.isHeader)
+            Rectangle().fill(Color.hairline).frame(height: 1).accessibilityHidden(true)
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isHeader)
     }
 }
 

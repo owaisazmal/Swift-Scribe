@@ -43,8 +43,8 @@ final class CanvasUndoProxy: UndoManager {
         DispatchQueue.main.async { [weak self] in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                purgeScheduled = false
-                if groupingLevel == 0 { removeAllActions() }
+                self.purgeScheduled = false
+                if self.groupingLevel == 0 { self.removeAllActions() }
             }
         }
     }

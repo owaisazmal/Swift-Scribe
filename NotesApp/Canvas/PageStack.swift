@@ -579,7 +579,10 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         layout = PageStackLayout(pages: pages)
         for id in Set(changed) where slots[id] != nil { removeSlot(id) }
         for (id, slot) in slots {
-            if let index = index(of: id) { position(slot, at: index) } else { removeSlot(id) }
+            guard let index = index(of: id) else { removeSlot(id); continue }
+            position(slot, at: index)
+            slot.canvas?.accessibilityLabel = String(localized: "Page \(index + 1), handwriting")
+            slot.canvas?.accessibilityIdentifier = "page.canvas.\(index + 1)"
         }
         contentView.frame = CGRect(x: 0, y: 0, width: layout.size.width * effectiveScale, height: layout.size.height * effectiveScale)
         scrollView.contentSize = contentView.frame.size

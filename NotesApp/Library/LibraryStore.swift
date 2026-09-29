@@ -59,7 +59,8 @@ final class LibraryStore {
         let package = NotebookPackage(root: root, id: id)
         do {
             let file = try await package.importAsset(from: url, ext: "pdf")
-            let pages = try PDFImport.pages(at: package.assetURL(file), file: file)
+            let assetURL = package.assetURL(file)
+            let pages = try await Task.detached(priority: .userInitiated) { try PDFImport.pages(at: assetURL, file: file) }.value
             var cover = CoverSpec.defaultCloth(for: id)
             cover.style = .firstPage
             var manifest = NotebookManifest(id: id, title: url.deletingPathExtension().lastPathComponent, cover: cover,

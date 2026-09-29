@@ -114,7 +114,7 @@ struct LibrarySidebar: View {
             Label(title, systemImage: icon)
             Spacer()
             if let count, count > 0 {
-                Text(count, format: .number).font(.subheadline.monospacedDigit()).foregroundStyle(Color.inkSecondary)
+                Text(count, format: .number).font(.subheadline.monospacedDigit()).foregroundStyle(.primary.opacity(0.8))
             }
         }
         .accessibilityElement(children: .combine)
@@ -127,7 +127,7 @@ struct LibrarySidebar: View {
             Text(folder.name).lineLimit(1)
             Spacer()
             if count > 0 {
-                Text(count, format: .number).font(.subheadline.monospacedDigit()).foregroundStyle(Color.inkSecondary)
+                Text(count, format: .number).font(.subheadline.monospacedDigit()).foregroundStyle(.primary.opacity(0.8))
             }
         }
         .accessibilityElement(children: .combine)

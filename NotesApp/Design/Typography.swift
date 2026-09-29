@@ -63,7 +63,7 @@ extension Font {
 extension View {
     /// Small-caps metadata with tabular digits: "24 PAGES · EDITED TODAY".
     func metaStyle(_ style: Font.TextStyle = .caption) -> some View {
-        font(.system(style).smallCaps().monospacedDigit())
+        font(.system(style, weight: .semibold).smallCaps().monospacedDigit())
             .tracking(0.6)
             .foregroundStyle(Color.inkSecondary)
     }
