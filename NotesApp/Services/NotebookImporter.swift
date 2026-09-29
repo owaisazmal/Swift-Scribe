@@ -1,17 +1,5 @@
 import UIKit
 
-enum ImportError: LocalizedError {
-    case unreadable, locked, empty
-
-    var errorDescription: String? {
-        switch self {
-        case .unreadable: "The file couldn't be read."
-        case .locked: "This PDF is password protected. Unlock it in Files or Preview, then import it again."
-        case .empty: "The file doesn't contain any pages."
-        }
-    }
-}
-
 enum NotebookImporter {
     static func pdfPages(from url: URL, notebookID: UUID) throws -> [PageSpec] {
         let file = try NotebookStore.importAsset(from: url, notebook: notebookID, ext: "pdf")
