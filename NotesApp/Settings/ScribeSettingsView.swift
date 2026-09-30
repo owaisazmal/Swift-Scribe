@@ -9,6 +9,8 @@ struct ScribeSettingsView: View {
     @AppStorage(SettingsKey.defaultPaperColor) private var color: PaperColor = .white
     @AppStorage(SettingsKey.defaultPageSize) private var size: PageSize = .letter
     @State private var backupSize: String?
+    @State private var confirmingBackupDelete = false
+    @State private var backupError: String?
 
     private let repository = URL(string: "https://github.com/owaisazmal/Swift-Scribe")!
 
@@ -20,12 +22,12 @@ struct ScribeSettingsView: View {
                         ForEach(DrawingInput.allCases) { Text($0.displayName).tag($0) }
                     }
                 } header: {
-                    Text("Input")
+                    SettingsNote("Input")
                 } footer: {
-                    Text("“System Setting” follows Settings › Apple Pencil › Only Draw with Apple Pencil.")
+                    SettingsNote("“System Setting” follows Settings › Apple Pencil › Only Draw with Apple Pencil.")
                 }
 
-                Section("New Notebooks") {
+                Section {
                     Picker("Template", selection: $template) {
                         ForEach(PaperTemplate.allCases) { Text($0.displayName).tag($0) }
                     }
@@ -35,23 +37,26 @@ struct ScribeSettingsView: View {
                     Picker("Page Size", selection: $size) {
                         ForEach(PageSize.allCases) { Text($0.displayName).tag($0) }
                     }
+                } header: {
+                    SettingsNote("New Notebooks")
                 }
 
                 if let problem = app.migrationProblem {
                     Section {
                         Text(problem)
                     } header: {
-                        Text("Moving to the New Format")
+                        SettingsNote("Moving to the New Format")
                     } footer: {
-                        Text("Your original notebooks are untouched. Swift Scribe tries again each time it opens.")
+                        SettingsNote("Your original notebooks are untouched. Swift Scribe tries again each time it opens.")
                     }
                 }
 
                 if let backupSize {
                     Section {
                         LabeledContent("Previous-format backup", value: backupSize)
+                        Button("Delete Backup…", role: .destructive) { confirmingBackupDelete = true }
                     } footer: {
-                        Text("Your notebooks were moved to the new format. The original files are kept in Backups/v1 inside the app's storage.")
+                        SettingsNote("Your notebooks were moved to the new format. The original files are kept in Backups/v1 inside the app's storage.")
                     }
                 }
 
@@ -65,9 +70,9 @@ struct ScribeSettingsView: View {
                         Label("Report a Problem or Request a Feature", systemImage: "exclamationmark.bubble")
                     }
                 } header: {
-                    Text("About")
+                    SettingsNote("About")
                 } footer: {
-                    Text("Swift Scribe is free and open source. No ads, no subscriptions, no tracking — your notes stay on your device.")
+                    SettingsNote("Swift Scribe is free and open source. No ads, no subscriptions, no tracking — your notes stay on your device.")
                 }
             }
             .scrollContentBackground(.hidden)
@@ -77,11 +82,36 @@ struct ScribeSettingsView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
             }
-            .task {
-                let backup = store.root.backups.appending(path: "v1", directoryHint: .isDirectory)
-                backupSize = await Task.detached { Self.size(of: backup) }.value
+            .task { await refreshBackupSize() }
+            .confirmationDialog("Delete the previous-format backup?", isPresented: $confirmingBackupDelete, titleVisibility: .visible) {
+                Button("Delete Backup", role: .destructive) { Task { await deleteBackup() } }
+            } message: {
+                Text("This removes the copy of your notebooks in the old format. The notebooks in your library aren't affected. This can't be undone.")
+            }
+            .alert("The backup couldn't be deleted", isPresented: Binding(get: { backupError != nil }, set: { if !$0 { backupError = nil } })) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(backupError ?? "")
             }
         }
+        .presentationSizing(.page)
+    }
+
+    private var backupDirectory: URL { store.root.backups.appending(path: "v1", directoryHint: .isDirectory) }
+
+    private func refreshBackupSize() async {
+        let backup = backupDirectory
+        backupSize = await Task.detached { Self.size(of: backup) }.value
+    }
+
+    private func deleteBackup() async {
+        let backup = backupDirectory
+        let failure = await Task.detached(priority: .userInitiated) { () -> String? in
+            do { try FileManager.default.removeItem(at: backup) } catch { return error.localizedDescription }
+            return nil
+        }.value
+        backupError = failure
+        await refreshBackupSize()
     }
 
     nonisolated static func size(of directory: URL) -> String? {
@@ -90,6 +120,13 @@ struct ScribeSettingsView: View {
         for case let url as URL in enumerator { total += (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0 }
         return total > 0 ? total.formatted(.byteCount(style: .file)) : nil
     }
+}
+
+/// Section headers and footers in the text token: the system grey doesn't reach 4.5:1 on the surface colour.
+private struct SettingsNote: View {
+    let text: LocalizedStringKey
+    init(_ text: LocalizedStringKey) { self.text = text }
+    var body: some View { Text(text).foregroundStyle(Color.textSecondary) }
 }
 
 struct AcknowledgementsView: View {
@@ -112,12 +149,12 @@ struct AcknowledgementsView: View {
         List {
             ForEach(entries) { entry in
                 Section {
-                    Text(entry.use).foregroundStyle(Color.inkSecondary)
+                    Text(entry.use).foregroundStyle(Color.textSecondary)
                     DisclosureGroup("SIL Open Font License 1.1") {
                         Text(entry.license).font(.footnote.monospaced()).textSelection(.enabled)
                     }
                 } header: {
-                    Text(entry.name).font(.display(20, relativeTo: .title3)).textCase(nil).foregroundStyle(Color.ink)
+                    Text(entry.name).displayFont(20, relativeTo: .title3).textCase(nil).foregroundStyle(Color.ink)
                 }
             }
         }

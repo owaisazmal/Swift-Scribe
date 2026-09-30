@@ -200,8 +200,8 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         scrollView.contentInsetAdjustmentBehavior = .never
         scrollView.delaysContentTouches = false
         scrollView.bouncesZoom = true
-        let fingers = [NSNumber(value: UITouch.TouchType.direct.rawValue)]
-        scrollView.panGestureRecognizer.allowedTouchTypes = fingers
+        scrollView.panGestureRecognizer.allowedTouchTypes = Self.scrollTouchTypes
+        scrollView.scrollsToTop = true
         view.addSubview(scrollView)
         scrollView.addSubview(contentView)
         anchor.undoProxy = undoProxy
@@ -210,11 +210,19 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         toolPicker.addObserver(self)
         toolPicker.colorUserInterfaceStyle = .light
         toolPicker.stateAutosaveName = "SwiftScribe.ToolPicker"
+        toolPicker.showsDrawingPolicyControls = false
         applyDrawingPolicy(session.drawingInput.policy)
         registerForTraitChanges([UITraitUserInterfaceStyle.self, UITraitAccessibilityContrast.self]) { (self: Self, _) in
             self.updatePageEdges()
         }
+        NotificationCenter.default.addObserver(self, selector: #selector(sceneDidActivate), name: UIScene.didActivateNotification, object: nil)
     }
+
+    /// Fingers and the trackpad scroll and zoom; the Pencil never does.
+    private static let scrollTouchTypes = [NSNumber(value: UITouch.TouchType.direct.rawValue),
+                                           NSNumber(value: UITouch.TouchType.indirectPointer.rawValue)]
+
+    @objc private func sceneDidActivate() { updateScrollTouches() }
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
@@ -246,12 +254,35 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     }
 
     override var keyCommands: [UIKeyCommand]? {
-        [UIKeyCommand(title: String(localized: "Next Page"), action: #selector(nextPage), input: UIKeyCommand.inputPageDown),
-         UIKeyCommand(title: String(localized: "Previous Page"), action: #selector(previousPage), input: UIKeyCommand.inputPageUp)]
+        guard !toolPickerSuppressed else { return [] }
+        let commands = [
+            UIKeyCommand(title: String(localized: "Next Page"), action: #selector(nextPage), input: UIKeyCommand.inputPageDown),
+            UIKeyCommand(title: String(localized: "Previous Page"), action: #selector(previousPage), input: UIKeyCommand.inputPageUp),
+            UIKeyCommand(title: String(localized: "Scroll Down"), action: #selector(lineDown), input: UIKeyCommand.inputDownArrow),
+            UIKeyCommand(title: String(localized: "Scroll Up"), action: #selector(lineUp), input: UIKeyCommand.inputUpArrow),
+            UIKeyCommand(title: String(localized: "Scroll Down a Screen"), action: #selector(screenDown), input: " "),
+            UIKeyCommand(title: String(localized: "Scroll Up a Screen"), action: #selector(screenUp), input: " ", modifierFlags: .shift),
+            UIKeyCommand(title: String(localized: "First Page"), action: #selector(firstPage), input: UIKeyCommand.inputUpArrow, modifierFlags: .command),
+            UIKeyCommand(title: String(localized: "Last Page"), action: #selector(lastPage), input: UIKeyCommand.inputDownArrow, modifierFlags: .command),
+            UIKeyCommand(title: String(localized: "First Page"), action: #selector(firstPage), input: UIKeyCommand.inputHome),
+            UIKeyCommand(title: String(localized: "Last Page"), action: #selector(lastPage), input: UIKeyCommand.inputEnd),
+            UIKeyCommand(title: String(localized: "Fit Width"), action: #selector(fitWidth), input: "0", modifierFlags: .command),
+            UIKeyCommand(title: String(localized: "Fit Page"), action: #selector(fitWholePage), input: "9", modifierFlags: .command),
+        ]
+        for command in commands { command.wantsPriorityOverSystemBehavior = true }
+        return commands
     }
 
-    @objc private func nextPage() { session.go(to: min(currentPage + 1, pages.count - 1)) }
-    @objc private func previousPage() { session.go(to: max(currentPage - 1, 0)) }
+    @objc private func nextPage() { session.go(to: min((pendingPage ?? currentPage) + 1, pages.count - 1)) }
+    @objc private func previousPage() { session.go(to: max((pendingPage ?? currentPage) - 1, 0)) }
+    @objc private func lineDown() { scrollBy(viewportFraction: 0.12, animated: true) }
+    @objc private func lineUp() { scrollBy(viewportFraction: -0.12, animated: true) }
+    @objc private func screenDown() { scrollBy(viewportFraction: 0.9, animated: true) }
+    @objc private func screenUp() { scrollBy(viewportFraction: -0.9, animated: true) }
+    @objc private func firstPage() { session.go(to: 0) }
+    @objc private func lastPage() { session.go(to: pages.count - 1) }
+    @objc private func fitWidth() { fit(.width) }
+    @objc private func fitWholePage() { fit(.page) }
 
     // MARK: Layout and zoom
 
@@ -284,7 +315,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         scrollView.contentSize = contentView.frame.size
         scrollView.minimumZoomScale = minimumZoom / zoom
         scrollView.maximumZoomScale = maximumZoom / zoom
-        scrollView.pinchGestureRecognizer?.allowedTouchTypes = [NSNumber(value: UITouch.TouchType.direct.rawValue)]
+        scrollView.pinchGestureRecognizer?.allowedTouchTypes = Self.scrollTouchTypes
         for (id, slot) in slots {
             guard let index = index(of: id) else { continue }
             position(slot, at: index)
@@ -343,17 +374,64 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         updateWindow(force: true)
     }
 
+    /// The part of the view pages can be read in: below the bar, above a docked tool picker.
+    private var readableArea: CGRect {
+        var area = view.bounds.inset(by: UIEdgeInsets(top: view.safeAreaInsets.top, left: 0, bottom: 0, right: 0))
+        let obscured = toolPicker.isVisible ? toolPicker.frameObscured(in: view) : .null
+        if !obscured.isNull, obscured.minY > area.minY { area.size.height = obscured.minY - area.minY }
+        return area
+    }
+
+    /// The zoom that fits the current page, not the widest one, so a small page can fill the screen.
+    func fitZoom(_ fit: PageFit, page index: Int) -> CGFloat {
+        guard layout.frames.indices.contains(index), fitScale > 0 else { return 1 }
+        let frame = layout.frames[index], area = readableArea, margin = PageStackLayout.margin
+        let width = area.width / ((frame.width + margin * 2) * fitScale)
+        return fit == .width ? width : min(width, area.height / ((frame.height + margin * 2) * fitScale))
+    }
+
+    func fit(_ fit: PageFit) {
+        guard !pages.isEmpty, fitScale > 0 else { return }
+        let index = pendingPage ?? currentPage, frame = layout.frames[index], area = readableArea
+        let line = scrollView.bounds.height * 0.3
+        let anchor = (scrollView.contentOffset.y + scrollView.adjustedContentInset.top + line) / effectiveScale
+        let target = min(fitZoom(fit, page: index), maximumZoom)
+        minimumZoom = min(minimumZoom, target)
+        pendingPage = nil
+        bake(zoom: target)
+        let y: CGFloat = if fit == .page {
+            frame.midY * bakedScale - area.midY
+        } else if (frame.minY...frame.maxY).contains(anchor) {
+            anchor * bakedScale - scrollView.adjustedContentInset.top - line
+        } else {
+            (frame.minY - PageStackLayout.margin / 2) * bakedScale - area.minY
+        }
+        scrollView.contentOffset = clamped(CGPoint(x: frame.midX * bakedScale - area.midX, y: y))
+        // A short page centred by Fit Page can sit below the line that picks the current page; it stays current until the next scroll.
+        if currentPage != index { pendingPage = index }
+        updateWindow(force: true)
+        session.pageDidChange(index)
+    }
+
+    /// The page an animated scroll is heading for. While it's set, the pages passed on the way don't become current.
+    private var pendingPage: Int?
+
     func scrollToPage(_ index: Int, animated: Bool = false) {
         guard layout.frames.indices.contains(index) else { return }
         let y = (layout.frames[index].minY - PageStackLayout.margin / 2) * effectiveScale - scrollView.contentInset.top
-        scrollView.setContentOffset(clamped(CGPoint(x: scrollView.contentOffset.x, y: y)), animated: animated)
-        if !animated { updateWindow() }
+        let target = clamped(CGPoint(x: scrollView.contentOffset.x, y: y))
+        let moves = animated && abs(target.y - scrollView.contentOffset.y) > 0.5
+        pendingPage = moves ? index : nil
+        scrollView.setContentOffset(target, animated: moves)
+        if !moves { updateWindow() }
     }
 
-    func scrollBy(viewportFraction: CGFloat) {
+    func scrollBy(viewportFraction: CGFloat, animated: Bool = false) {
         let offset = scrollView.contentOffset
-        scrollView.contentOffset = clamped(CGPoint(x: offset.x, y: offset.y + viewportFraction * scrollView.bounds.height))
-        updateWindow()
+        let visible = scrollView.bounds.inset(by: scrollView.adjustedContentInset).height
+        let target = clamped(CGPoint(x: offset.x, y: offset.y + viewportFraction * visible))
+        scrollView.setContentOffset(target, animated: animated)
+        if !animated { updateWindow() }
     }
 
     // MARK: Window of live pages
@@ -386,7 +464,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
             updateChunks(in: slot)
         }
         let page = currentPage
-        if page != session.currentPage { session.pageDidChange(page) }
+        if pendingPage == nil, page != session.currentPage { session.pageDidChange(page) }
     }
 
     private func makeSlot(_ page: NotebookPage, at index: Int) -> PageSlotView {
@@ -458,6 +536,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         canvas.backgroundColor = .clear
         canvas.isOpaque = false
         canvas.clipsToBounds = true
+        canvas.scrollsToTop = false
         canvas.overrideUserInterfaceStyle = .light
         canvas.drawingPolicy = session.drawingInput.policy
         canvas.maximumSupportedContentVersion = .latest
@@ -469,7 +548,12 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
 
     /// Observers only hear about later picker changes, so a new or reused canvas starts from the picker's current tool.
     private func syncTool(_ canvas: PageCanvasView) {
-        canvas.tool = toolPicker.selectedTool
+        switch toolPicker.selectedToolItem {
+        case let item as PKToolPickerInkingItem: canvas.tool = item.inkingTool
+        case let item as PKToolPickerEraserItem: canvas.tool = item.eraserTool
+        case let item as PKToolPickerLassoItem: canvas.tool = item.lassoTool
+        default: break
+        }
         canvas.isRulerActive = toolPicker.isRulerActive
     }
 
@@ -634,7 +718,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         let shown = visible && !toolPickerSuppressed && !document.isReadOnly
         toolPicker.setVisible(shown, forFirstResponder: anchor)
         for canvas in canvases.values { toolPicker.setVisible(shown, forFirstResponder: canvas) }
-        anchor.becomeFirstResponder()
+        if !toolPickerSuppressed { anchor.becomeFirstResponder() }
     }
 
     func setToolPickerSuppressed(_ suppressed: Bool) {
@@ -648,8 +732,23 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     }
 
     private func applyDrawingPolicy(_ policy: PKCanvasViewDrawingPolicy) {
+        drawingPolicy = policy
         for canvas in canvases.values + pool { canvas.drawingPolicy = policy }
-        scrollView.panGestureRecognizer.minimumNumberOfTouches = policy == .anyInput ? 2 : 1
+        updateScrollTouches()
+    }
+
+    private var drawingPolicy: PKCanvasViewDrawingPolicy = .default
+
+    /// When a finger can draw, scrolling takes two. "System Setting" follows the system's Only Draw with Apple Pencil
+    /// switch, which only applies while the tool picker is showing.
+    private func updateScrollTouches() {
+        let fingersDraw = switch drawingPolicy {
+        case _ where document.isReadOnly: false
+        case .anyInput: true
+        case .pencilOnly: false
+        default: toolPicker.isVisible && !UIPencilInteraction.prefersPencilOnlyDrawing
+        }
+        scrollView.panGestureRecognizer.minimumNumberOfTouches = fingersDraw ? 2 : 1
     }
 
     // MARK: PKToolPickerObserver
@@ -659,6 +758,11 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
             session.isToolPickerVisible = toolPicker.isVisible
         }
         updateInsets()
+        updateScrollTouches()
+    }
+
+    func toolPickerSelectedToolItemDidChange(_ toolPicker: PKToolPicker) {
+        updateScrollTouches()
     }
 
     func toolPickerFramesObscuredDidChange(_ toolPicker: PKToolPicker) {
@@ -672,6 +776,19 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
         guard !isBaking else { return }
         updateWindow()
+    }
+
+    func scrollViewDidEndScrollingAnimation(_ scrollView: UIScrollView) {
+        pendingPage = nil
+        updateWindow()
+    }
+
+    func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+        pendingPage = nil
+    }
+
+    func scrollViewWillBeginZooming(_ scrollView: UIScrollView, with view: UIView?) {
+        pendingPage = nil
     }
 
     func scrollViewDidZoom(_ scrollView: UIScrollView) {

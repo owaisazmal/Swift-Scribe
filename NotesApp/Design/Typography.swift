@@ -3,6 +3,7 @@ import CoreText
 import os
 
 enum ScribeFonts {
+    static let frauncesBold = "Fraunces-Bold"
     static let frauncesSemiBold = "Fraunces-SemiBold"
     static let frauncesRegular = "Fraunces-Regular"
     static let bricolage = "BricolageGrotesque-96ptExtraBold"
@@ -49,22 +50,34 @@ enum ScribeFonts {
     }
 }
 
-extension Font {
-    /// Fraunces for library headings and empty states, scaled with Dynamic Type.
-    static func display(_ size: CGFloat, relativeTo style: Font.TextStyle = .largeTitle) -> Font {
-        .custom(ScribeFonts.frauncesSemiBold, size: size, relativeTo: style)
-    }
+/// Fraunces for library headings and empty states, scaled with Dynamic Type and one step heavier with Bold Text.
+private struct DisplayFont: ViewModifier {
+    let size: CGFloat
+    let style: Font.TextStyle
+    let heading: Bool
+    @Environment(\.legibilityWeight) private var legibility
 
-    static func displayText(_ size: CGFloat, relativeTo style: Font.TextStyle = .body) -> Font {
-        .custom(ScribeFonts.frauncesRegular, size: size, relativeTo: style)
+    func body(content: Content) -> some View {
+        let bold = legibility == .bold
+        let name = heading ? (bold ? ScribeFonts.frauncesBold : ScribeFonts.frauncesSemiBold)
+                           : (bold ? ScribeFonts.frauncesSemiBold : ScribeFonts.frauncesRegular)
+        content.font(.custom(name, size: size, relativeTo: style))
     }
 }
 
 extension View {
+    func displayFont(_ size: CGFloat, relativeTo style: Font.TextStyle = .largeTitle) -> some View {
+        modifier(DisplayFont(size: size, style: style, heading: true))
+    }
+
+    func displayTextFont(_ size: CGFloat, relativeTo style: Font.TextStyle = .body) -> some View {
+        modifier(DisplayFont(size: size, style: style, heading: false))
+    }
+
     /// Small-caps metadata with tabular digits: "24 PAGES · EDITED TODAY".
     func metaStyle(_ style: Font.TextStyle = .caption) -> some View {
         font(.system(style, weight: .semibold).smallCaps().monospacedDigit())
             .tracking(0.6)
-            .foregroundStyle(Color.inkSecondary)
+            .foregroundStyle(Color.textSecondary)
     }
 }

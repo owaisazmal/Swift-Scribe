@@ -3,100 +3,35 @@ import PencilKit
 import SwiftData
 @testable import NotesApp
 
-/// Builds a v1 library exactly as the v1 app stored it: one SwiftData store and one drawing per notebook
-/// in the shared 800-point layout.
-@MainActor
+/// A v1 library as the v1 app stored it. `Fixtures/v1-library.json` was written by the real v1 code before it was removed.
 struct V1LibraryFixture {
     let root: StorageRoot
-    let cellBiology = UUID(), syllabus = UUID(), damaged = UUID(), lostPages = UUID(), orphan = UUID()
-    let folderID = UUID()
+    let cellBiology = UUID(uuidString: "C0FFEE00-0000-4000-8000-000000000001")!
+    let syllabus = UUID(uuidString: "C0FFEE00-0000-4000-8000-000000000002")!
+    let damaged = UUID(uuidString: "C0FFEE00-0000-4000-8000-000000000003")!
+    let lostPages = UUID(uuidString: "C0FFEE00-0000-4000-8000-000000000004")!
+    let orphan = UUID(uuidString: "C0FFEE00-0000-4000-8000-000000000005")!
+    let folderID = UUID(uuidString: "C0FFEE00-0000-4000-8000-0000000000F0")!
     /// Page-local (page point) centres of the strokes written on each Cell Biology page.
     let cellBiologyLocal: [[CGPoint]] = [
         [CGPoint(x: 76.5, y: 114.75), CGPoint(x: 300, y: 500)],
         [CGPoint(x: 100, y: 100), CGPoint(x: 200, y: 200), CGPoint(x: 400, y: 700)],
         [CGPoint(x: 500, y: 60)],
     ]
-    let pdfFile = "\(UUID().uuidString).pdf"
-    let imageFile = "\(UUID().uuidString).jpg"
-    let audioFile = "\(UUID().uuidString).m4a"
+    let pdfFile = "5B1D5B1D-0000-4000-8000-00000000A001.pdf"
+    let imageFile = "5B1D5B1D-0000-4000-8000-00000000A002.jpg"
+    let audioFile = "5B1D5B1D-0000-4000-8000-00000000A003.m4a"
     let corruptBytes = Data("this is not a PencilKit drawing".utf8)
 
     func v1Directory(_ id: UUID) -> URL { root.v1Notebooks.appending(path: id.uuidString, directoryHint: .isDirectory) }
 
-    private func canvasPoint(_ local: CGPoint, frame: CGRect, pageSize: CGSize) -> CGPoint {
-        let scale = frame.width / pageSize.width
-        return CGPoint(x: frame.minX + local.x * scale, y: frame.minY + local.y * scale)
-    }
-
     func write() throws {
-        let fileManager = FileManager.default
-        let schema = Schema([Notebook.self, Folder.self])
-        let container = try ModelContainer(for: schema, configurations: ModelConfiguration(schema: schema, url: root.v1Store))
-        let context = ModelContext(container)
-
-        let folder = Folder(name: "Biology", color: .green)
-        folder.id = folderID
-        context.insert(folder)
-
-        let cell = Notebook(title: "Cell Biology", template: .narrowRuled, color: .white, size: .letter, folder: folder)
-        cell.id = cellBiology
-        cell.isFavorite = true
-        cell.pages = [.template(.narrowRuled, color: .white, size: .letter), .template(.grid, color: .ivory, size: .letter),
-                      .template(.dotted, color: .white, size: .a4)]
-        cell.searchText = "mitochondria ribosome"
-        context.insert(cell)
-        let layout = NotebookLayout(pages: cell.pages)
-        var strokes: [PKStroke] = []
-        for (index, points) in cellBiologyLocal.enumerated() {
-            for point in points {
-                strokes.append(dot(at: canvasPoint(point, frame: layout.frames[index], pageSize: cell.pages[index].size)))
-            }
-        }
-        try fileManager.createDirectory(at: v1Directory(cellBiology), withIntermediateDirectories: true)
-        try PKDrawing(strokes: strokes).dataRepresentation().write(to: v1Directory(cellBiology).appending(path: "drawing.pkdrawing"))
-
-        let syllabus = Notebook(title: "Syllabus", template: .blank, color: .white, size: .letter)
-        syllabus.id = self.syllabus
-        syllabus.deletedAt = Date(timeIntervalSince1970: 1_790_000_000)
-        syllabus.pages = [PageSpec(background: .pdf(file: pdfFile, pageIndex: 0), paperColor: .white, size: CGSize(width: 612, height: 792)),
-                          PageSpec(background: .pdf(file: pdfFile, pageIndex: 1), paperColor: .white, size: CGSize(width: 792, height: 612)),
-                          PageSpec(background: .image(file: imageFile), paperColor: .white, size: CGSize(width: 612, height: 400))]
-        syllabus.recordings = [Recording(fileName: audioFile, createdAt: Date(timeIntervalSince1970: 1_790_000_500), duration: 42)]
-        context.insert(syllabus)
-        let syllabusLayout = NotebookLayout(pages: syllabus.pages)
-        let assets = v1Directory(self.syllabus).appending(path: "assets", directoryHint: .isDirectory)
-        try fileManager.createDirectory(at: assets, withIntermediateDirectories: true)
-        try PKDrawing(strokes: [dot(at: canvasPoint(CGPoint(x: 200, y: 100), frame: syllabusLayout.frames[1], pageSize: syllabus.pages[1].size))])
-            .dataRepresentation().write(to: v1Directory(self.syllabus).appending(path: "drawing.pkdrawing"))
-        try Self.pdfData(sizes: [CGSize(width: 612, height: 792), CGSize(width: 792, height: 612)]).write(to: assets.appending(path: pdfFile))
-        try Data(repeating: 0xAB, count: 2048).write(to: assets.appending(path: imageFile))
-        try Data(repeating: 0xCD, count: 4096).write(to: assets.appending(path: audioFile))
-
-        let damagedNotebook = Notebook(title: "Damaged", template: .grid, color: .white, size: .letter)
-        damagedNotebook.id = damaged
-        context.insert(damagedNotebook)
-        try fileManager.createDirectory(at: v1Directory(damaged), withIntermediateDirectories: true)
-        try corruptBytes.write(to: v1Directory(damaged).appending(path: "drawing.pkdrawing"))
-
-        let lost = Notebook(title: "Lost Pages", template: .narrowRuled, color: .white, size: .letter)
-        lost.id = lostPages
-        lost.pagesData = Data("{not json".utf8)
-        context.insert(lost)
-        let twoPages = NotebookLayout(pages: [.template(.blank, color: .white, size: .letter), .template(.blank, color: .white, size: .letter)])
-        try fileManager.createDirectory(at: v1Directory(lostPages), withIntermediateDirectories: true)
-        try PKDrawing(strokes: [dot(at: CGPoint(x: 200, y: twoPages.frames[0].midY)), dot(at: CGPoint(x: 200, y: twoPages.frames[1].midY))])
-            .dataRepresentation().write(to: v1Directory(lostPages).appending(path: "drawing.pkdrawing"))
-
-        try fileManager.createDirectory(at: v1Directory(orphan), withIntermediateDirectories: true)
-        try PKDrawing(strokes: [dot(at: CGPoint(x: 300, y: 300))]).dataRepresentation()
-            .write(to: v1Directory(orphan).appending(path: "drawing.pkdrawing"))
-
-        try context.save()
-    }
-
-    static func pdfData(sizes: [CGSize]) -> Data {
-        UIGraphicsPDFRenderer(bounds: CGRect(origin: .zero, size: sizes[0])).pdfData { context in
-            for size in sizes { context.beginPage(withBounds: CGRect(origin: .zero, size: size), pageInfo: [:]) }
+        let url = try XCTUnwrap(Bundle(for: MigrationTests.self).url(forResource: "v1-library", withExtension: "json"))
+        let files = try XCTUnwrap(JSONValue.parse(Data(contentsOf: url))["files"]?.objectValue)
+        for (path, value) in files {
+            let target = root.url.appending(path: path)
+            try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try XCTUnwrap(Data(base64Encoded: try XCTUnwrap(value.stringValue))).write(to: target)
         }
     }
 
@@ -133,10 +68,12 @@ final class MigrationTests: XCTestCase {
         return PKDrawing()
     }
 
+    /// Frames v1's NotebookLayout produced for Letter, A4 and a 612 × 400 photo page, recorded before v1 was removed.
     func testLegacyLayoutMatchesV1() {
-        let pages: [PageSpec] = [.template(.blank, color: .white, size: .letter), .template(.blank, color: .white, size: .a4),
-                                 PageSpec(background: .image(file: "x"), paperColor: .white, size: CGSize(width: 612, height: 400))]
-        XCTAssertEqual(LegacyV1Layout.frames(for: pages.map(\.size)), NotebookLayout(pages: pages).frames)
+        let sizes = [PageSize.letter.points, PageSize.a4.points, CGSize(width: 612, height: 400)]
+        XCTAssertEqual(LegacyV1Layout.frames(for: sizes), [CGRect(x: 24, y: 24, width: 800, height: 1035),
+                                                           CGRect(x: 24, y: 1083, width: 800, height: 1131),
+                                                           CGRect(x: 24, y: 2238, width: 800, height: 523)])
     }
 
     func testEveryNotebookMigrates() async throws {
@@ -184,7 +121,7 @@ final class MigrationTests: XCTestCase {
         let (package, cell) = try await load(fixture.root, fixture.cellBiology)
         XCTAssertTrue(cell.library.isFavorite)
         XCTAssertEqual(cell.library.folderID, fixture.folderID)
-        XCTAssertEqual(cell.cover.style, .cloth)
+        XCTAssertEqual(cell.cover.style, .firstPage, "migrated notebooks show their first page, as their v1 cards did")
         XCTAssertEqual(try String(contentsOf: package.textDirectory.appending(path: "legacy-v1.txt"), encoding: .utf8), "mitochondria ribosome")
         let folders = FolderFile.read(fixture.root)
         XCTAssertEqual(folders.folders.map(\.name), ["Biology"])
@@ -225,6 +162,42 @@ final class MigrationTests: XCTestCase {
         let (_, orphan) = try await load(fixture.root, fixture.orphan)
         XCTAssertEqual(orphan.title, "Recovered Notebook")
         XCTAssertGreaterThanOrEqual(report.warnings.count, 3)
+    }
+
+    func testLegacySearchTextGoesOnceEveryPageHasItsOwn() async throws {
+        let (fixture, _, _) = try await migrated()
+        let (package, manifest) = try await load(fixture.root, fixture.cellBiology)
+        let legacy = package.textDirectory.appending(path: NotebookPackage.legacyTextName)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: legacy.path(percentEncoded: false)))
+        for page in manifest.pages.dropLast() {
+            try await package.writeText(HandwritingIndexer.header(for: page) + "cell", pageID: page.id)
+        }
+        let last = try XCTUnwrap(manifest.pages.last)
+        let partial = await HandwritingIndexer.shared.index(HandwritingIndexer.Job(package: package, pages: Array(manifest.pages.dropLast())))
+        XCTAssertTrue(partial.contains("mitochondria"), "kept while any page of the notebook might still need it")
+        try await package.writeText(HandwritingIndexer.header(for: last) + "membrane", pageID: last.id)
+        let text = await HandwritingIndexer.shared.index(HandwritingIndexer.Job(package: package, pages: manifest.pages))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacy.path(percentEncoded: false)))
+        XCTAssertFalse(text.contains("mitochondria"), "v1 text that no page has any more stops matching")
+        XCTAssertTrue(text.contains("membrane"))
+    }
+
+    func testMigratedFoldersGoAfterExistingShelvesWithoutGaps() async throws {
+        let fixture = V1LibraryFixture(root: temporaryRoot(self))
+        try fixture.write()
+        var file = FolderFile()
+        file.folders = [FolderEntry(id: UUID(), name: "Existing", clothRaw: ClothColor.slate.rawValue, createdAt: .now, sortIndex: 0)]
+        try file.write(fixture.root)
+        _ = await V1Migrator(root: fixture.root).run()
+        let folders = FolderFile.read(fixture.root).folders
+        XCTAssertEqual(folders.map(\.name), ["Existing", "Biology"])
+        XCTAssertEqual(folders.map(\.sortIndex), [0, 1])
+    }
+
+    func testFoldersKeepV1OrderAndDistinctColours() {
+        let clothes = FolderColor.allCases.map(\.cloth)
+        XCTAssertEqual(Set(clothes).count, FolderColor.allCases.count)
+        XCTAssertEqual(FolderColor.purple.cloth, .plum)
     }
 
     func testV1FilesMoveToBackupUnchanged() async throws {

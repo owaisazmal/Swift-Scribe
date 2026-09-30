@@ -198,6 +198,30 @@ final class DocumentTests: XCTestCase {
         XCTAssertTrue(document.notices.contains { $0.kind == .readOnly })
     }
 
+    /// Replaces v1's PageRemapper tests: ink belongs to its page through delete, insert, move and duplicate.
+    func testInkFollowsItsPageThroughPageOperations() async throws {
+        let (document, _) = try await makeDocument(pages: 3)
+        let ids = document.pages.map(\.id)
+        for (index, id) in ids.enumerated() {
+            _ = await document.ink(id)
+            document.canvasDidChangeInk(id, to: ink(index + 1))
+        }
+        document.removePages([ids[0]])
+        XCTAssertEqual(document.pages.map(\.id), [ids[1], ids[2]])
+        document.insertPages([.template(.blank, color: .white, size: .letter)], at: 0)
+        document.movePage(from: 2, to: 1)
+        await document.duplicatePage(at: 1)
+        XCTAssertEqual(document.pages.count, 4)
+        for page in document.pages {
+            let expected = page.id == ids[1] ? 2 : page.id == ids[2] ? 3 : page.id == document.pages[0].id ? 0 : 3
+            let drawing = await document.ink(page.id)
+            XCTAssertEqual(drawing.strokes.count, expected)
+        }
+        XCTAssertEqual(document.pages[1].id, ids[2], "the move kept the page's identity")
+        let saved = await document.flush()
+        XCTAssertTrue(saved)
+    }
+
     func testForeignUndoRegistrationsAreDropped() {
         let manager = DocumentUndoManager()
         manager.groupsByEvent = false

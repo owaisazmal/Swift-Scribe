@@ -78,10 +78,21 @@ final class ExportJob: Identifiable {
     private(set) var state: State = .running
     @ObservationIgnored private var task: Task<Void, Never>?
 
-    init(document: NotebookDocument) {
+    convenience init(document: NotebookDocument) {
         var inMemory: [UUID: PKDrawing] = [:]
         for page in document.pages { if let ink = document.loadedInk(page.id) { inMemory[page.id] = ink } }
-        let input = NotebookExporter.Input(title: document.title, pages: document.pages, inMemoryInk: inMemory, package: document.package)
+        self.init(input: NotebookExporter.Input(title: document.title, pages: document.pages, inMemoryInk: inMemory, package: document.package))
+    }
+
+    /// Exports from the library: the open document, with its unsaved ink, if the notebook is being edited, otherwise the saved pages.
+    static func forNotebook(_ id: UUID, root: StorageRoot) async throws -> ExportJob {
+        if let document = DocumentRegistry.shared.document(for: id) { return ExportJob(document: document) }
+        let package = NotebookPackage(root: root, id: id)
+        let manifest = try await package.readManifest().manifest
+        return ExportJob(input: NotebookExporter.Input(title: manifest.title, pages: manifest.pages, inMemoryInk: [:], package: package))
+    }
+
+    init(input: NotebookExporter.Input) {
         task = Task { [weak self] in
             let work = Task.detached(priority: .userInitiated) {
                 try await NotebookExporter.export(input) { value in
@@ -123,7 +134,7 @@ struct ExportSheet: View {
                     Label("Your PDF is ready.", systemImage: "checkmark.circle").font(.headline)
                     HStack(spacing: Space.x3) {
                         Button { sharing = true } label: { Label("Share", systemImage: "square.and.arrow.up") }
-                            .buttonStyle(.borderedProminent)
+                            .prominentButton()
                         Button { print(url) } label: { Label("Print", systemImage: "printer") }
                             .buttonStyle(.bordered)
                     }

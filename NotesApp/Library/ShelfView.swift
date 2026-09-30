@@ -12,17 +12,26 @@ struct ShelfView: View {
     let scope: LibraryScope
     let zoomNamespace: Namespace.ID
     let onOpen: (NotebookRecord) -> Void
+    let onOpenPage: (NotebookRecord, UUID) -> Void
     let onCreate: () -> Void
+    let onQuickNote: () -> Void
+    @Binding var isSearching: Bool
+    let isCovered: Bool
 
     @Environment(LibraryStore.self) private var store
     @Environment(\.modelContext) private var context
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Query private var records: [NotebookRecord]
     @Query(sort: \FolderRecord.sortIndex) private var folders: [FolderRecord]
-    @AppStorage("librarySort") private var sort: LibrarySortOrder = .opened
+    @AppStorage(SettingsKey.librarySort) private var sort: LibrarySortOrder = .opened
     @AppStorage("libraryGrouping") private var grouping: LibraryGrouping = .recency
     @State private var searchText = ""
     @State private var matches: Set<UUID>?
+    @State private var pageHits: [UUID: [PageHit]] = [:]
+    @State private var hitsQuery = ""
+    @State private var searchPending = false
+    @State private var export: ExportJob?
+    @State private var editingCover: NotebookRecord?
     @State private var isSelecting = false
     @State private var selection: Set<UUID> = []
     @State private var importingPDF = false
@@ -62,7 +71,15 @@ struct ShelfView: View {
     /// keystroke nor a library full of PDF text ever scans on the main thread.
     private func runSearch() async {
         let query = searchText.trimmingCharacters(in: .whitespaces)
-        guard !query.isEmpty else { matches = nil; return }
+        guard !query.isEmpty else {
+            matches = nil
+            pageHits = [:]
+            searchPending = false
+            return
+        }
+        if query != hitsQuery { pageHits = [:] }
+        searchPending = true
+        defer { if !Task.isCancelled { searchPending = false } }
         try? await Task.sleep(for: .milliseconds(250))
         guard !Task.isCancelled else { return }
         let container = context.container
@@ -75,6 +92,12 @@ struct ShelfView: View {
         }.value
         guard !Task.isCancelled else { return }
         matches = found
+        guard scope != .trash else { pageHits = [:]; return }
+        let ordered = visible.map(\.id).filter(found.contains)
+        let hits = await PageSearch.hits(for: query, in: ordered, root: store.root)
+        guard !Task.isCancelled else { return }
+        pageHits = hits
+        hitsQuery = query
     }
 
     var body: some View {
@@ -87,11 +110,12 @@ struct ShelfView: View {
             }
         }
         .background(Color.paper)
-        .overlay { if visible.isEmpty { emptyState } }
+        .overlay { if visible.isEmpty, !searchPending { emptyState } }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarTitleDisplayMode(.inline)
-        .searchable(text: $searchText, prompt: Text("Search notebooks and handwriting"))
+        .searchable(text: $searchText, isPresented: $isSearching, prompt: Text("Search"))
+        .background(SearchActivator(isRequested: $isSearching, isCovered: isCovered))
         .toolbar { toolbar(visible) }
         .toolbar { if isSelecting { selectionBar(visible) } }
         .fileImporter(isPresented: $importingPDF, allowedContentTypes: [.pdf], allowsMultipleSelection: true) { result in
@@ -114,7 +138,9 @@ struct ShelfView: View {
             Text(errorMessage ?? store.lastError ?? "")
         }
         .onChange(of: scope) { _, _ in endSelection() }
-        .task(id: "\(records.count)|\(searchText)") { await runSearch() }
+        .task(id: "\(store.searchVersion)|\(records.count)|\(scope)|\(searchText)") { await runSearch() }
+        .sheet(item: $export) { job in ExportSheet(job: job) }
+        .sheet(item: $editingCover) { record in CoverEditorView(record: record) }
     }
 
     // MARK: Shelves
@@ -124,7 +150,7 @@ struct ShelfView: View {
             LazyVStack(alignment: .leading, spacing: Space.x6) {
                 VStack(alignment: .leading, spacing: Space.x1) {
                     Text(title)
-                        .font(.display(40, relativeTo: .largeTitle))
+                        .displayFont(40, relativeTo: .largeTitle)
                         .foregroundStyle(Color.ink)
                         .accessibilityAddTraits(.isHeader)
                     Text(subtitle(visible.count)).metaStyle(.footnote)
@@ -132,6 +158,9 @@ struct ShelfView: View {
                 if scope == .all, searchText.isEmpty, !isSelecting, let recent = records.filter({ !$0.isTrashed && $0.lastOpenedAt != nil })
                     .max(by: { ($0.lastOpenedAt ?? .distantPast) < ($1.lastOpenedAt ?? .distantPast) }) {
                     ContinueWritingSpread(record: recent) { onOpen(recent) }
+                }
+                if !searchText.isEmpty, !pageHits.isEmpty, scope != .trash {
+                    PageHitsSection(records: visible, hits: pageHits, onOpen: onOpenPage)
                 }
                 ForEach(groups(visible)) { shelf in
                     VStack(alignment: .leading, spacing: Space.x4) {
@@ -151,7 +180,7 @@ struct ShelfView: View {
 
     private func item(_ record: NotebookRecord) -> some View {
         NotebookCoverItem(record: record, isSelecting: isSelecting, isSelected: selection.contains(record.id),
-                          zoomNamespace: zoomNamespace) {
+                          zoomNamespace: zoomNamespace, showsFolder: scope == .all || scope == .favorites) {
             if isSelecting { toggle(record) } else if !record.isTrashed { onOpen(record) }
         }
         .contextMenu { if !isSelecting { menu(for: record) } }
@@ -170,7 +199,7 @@ struct ShelfView: View {
                         RecordCover(record: record, width: CoverWidth.row).frame(width: 48)
                         VStack(alignment: .leading, spacing: Space.x1) {
                             Text(record.title).font(.headline).foregroundStyle(Color.ink)
-                            Text(record.metaLine).font(.subheadline).foregroundStyle(Color.inkSecondary)
+                            Text(record.metaLine).font(.subheadline).foregroundStyle(Color.textSecondary)
                         }
                         Spacer()
                         if isSelecting {
@@ -185,7 +214,25 @@ struct ShelfView: View {
                 .accessibilityAddTraits(selection.contains(record.id) ? .isSelected : [])
                 .accessibilityActions { if !isSelecting { trashActions(for: record) } }
                 .contextMenu { if !isSelecting { menu(for: record) } }
+                .draggable(NotebookReference(id: record.id))
                 .listRowBackground(Color.surface)
+            }
+            if !searchText.isEmpty, !pageHits.isEmpty, scope != .trash {
+                Section {
+                    ForEach(visible.flatMap { record in (pageHits[record.id] ?? []).map { (record, $0) } }, id: \.1.id) { record, hit in
+                        Button { onOpenPage(record, hit.page.id) } label: {
+                            VStack(alignment: .leading, spacing: Space.x1) {
+                                Text("\(record.title), page \(hit.index + 1)").font(.headline).foregroundStyle(Color.ink)
+                                Text(hit.snippet).font(.subheadline).foregroundStyle(Color.textSecondary)
+                            }
+                        }
+                        .accessibilityLabel(Text("\(record.title), page \(hit.index + 1): \(hit.snippet)"))
+                        .accessibilityHint(Text("Opens the notebook at this page"))
+                        .listRowBackground(Color.surface)
+                    }
+                } header: {
+                    Text("Pages").metaStyle(.footnote)
+                }
             }
         }
         .scrollContentBackground(.hidden)
@@ -302,6 +349,7 @@ struct ShelfView: View {
                     } label: { Label("Sort", systemImage: "arrow.up.arrow.down") }
                     Menu {
                         Button { onCreate() } label: { Label("New Notebook", systemImage: "book.closed") }
+                        Button { onQuickNote() } label: { Label("Quick Note", systemImage: "square.and.pencil") }
                         Button { importingPDF = true } label: { Label("Import PDF…", systemImage: "doc.richtext") }
                     } label: {
                         Label("New", systemImage: "plus")
@@ -335,6 +383,9 @@ struct ShelfView: View {
             Button(role: .destructive) { store.deletePermanently([record]) } label: { Label("Delete Permanently", systemImage: "trash") }
         } else if record.isReadOnly {
             Button { onOpen(record) } label: { Label("Open", systemImage: "book") }
+            Button {
+                Task { do { export = try await ExportJob.forNotebook(record.id, root: store.root) } catch { errorMessage = error.localizedDescription } }
+            } label: { Label("Export as PDF", systemImage: "square.and.arrow.up") }
             Text("Made with a newer version of Swift Scribe, so it can only be read here.")
         } else {
             Button { onOpen(record) } label: { Label("Open", systemImage: "book") }
@@ -353,6 +404,10 @@ struct ShelfView: View {
             Button {
                 Task { do { try await store.duplicate(record) } catch { errorMessage = error.localizedDescription } }
             } label: { Label("Duplicate", systemImage: "plus.square.on.square") }
+            Button { editingCover = record } label: { Label("Change Cover…", systemImage: "book.closed") }
+            Button {
+                Task { do { export = try await ExportJob.forNotebook(record.id, root: store.root) } catch { errorMessage = error.localizedDescription } }
+            } label: { Label("Export as PDF", systemImage: "square.and.arrow.up") }
             Divider()
             Button(role: .destructive) { store.moveToTrash([record]) } label: { Label("Delete", systemImage: "trash") }
         }
@@ -369,8 +424,8 @@ struct ShelfView: View {
         } else {
             EmptyShelf(title: String(localized: "Every notebook starts with a blank page."),
                        message: String(localized: "Create a notebook to start writing, or import a PDF to annotate.")) {
-                Button("New Notebook", action: onCreate).buttonStyle(.borderedProminent)
-                Button("Import PDF") { importingPDF = true }
+                Button("New Notebook", action: onCreate).prominentButton()
+                Button("Import PDF") { importingPDF = true }.buttonStyle(.bordered)
             }
         }
     }
@@ -417,6 +472,7 @@ struct ShelfLabel: View {
 }
 
 struct EmptyShelf<Actions: View>: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let title: String
     let message: String
     @ViewBuilder var actions: Actions
@@ -428,18 +484,127 @@ struct EmptyShelf<Actions: View>: View {
     }
 
     var body: some View {
+        GeometryReader { geometry in
+            ScrollView {
+                content.frame(minHeight: geometry.size.height)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+        }
+    }
+
+    private var content: some View {
         VStack(spacing: Space.x4) {
             Text(title)
-                .font(.display(30, relativeTo: .title))
+                .displayFont(30, relativeTo: .title)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(Color.ink)
             Text(message)
-                .font(.displayText(17, relativeTo: .body))
+                .displayTextFont(17, relativeTo: .body)
                 .multilineTextAlignment(.center)
-                .foregroundStyle(Color.inkSecondary)
-            HStack(spacing: Space.x3) { actions }
+                .foregroundStyle(Color.textSecondary)
+            (dynamicTypeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: Space.x3)) : AnyLayout(HStackLayout(spacing: Space.x3))) {
+                actions
+            }
+            .controlSize(.large)
         }
+        .fixedSize(horizontal: false, vertical: true)
         .frame(maxWidth: 420)
         .padding(Space.x8)
+        .frame(maxWidth: .infinity)
+    }
+}
+
+/// Opens the navigation bar's search on ⌘F or when asked. On iPadOS 18+ the toolbar search is a button until
+/// activated, SwiftUI's isPresented doesn't expand it, and the toolbar swallows ⌘F, so this view holds first
+/// responder while the library is in front, claims ⌘F with priority, and activates the underlying search controller.
+private struct SearchActivator: UIViewRepresentable {
+    @Binding var isRequested: Bool
+    let isCovered: Bool
+
+    func makeUIView(context: Context) -> ActivatorView { ActivatorView() }
+
+    /// Acts only on changes, so ordinary library updates never move first responder.
+    func updateUIView(_ view: ActivatorView, context: Context) {
+        view.onFind = { isRequested = true; view.activate() }
+        if isCovered != view.wasCovered {
+            view.wasCovered = isCovered
+            view.isCovered = isCovered
+            DispatchQueue.main.async { if isCovered { view.resignFirstResponder() } else { view.reclaimFirstResponder() } }
+        }
+        guard isRequested != view.wasRequested else { return }
+        view.wasRequested = isRequested
+        DispatchQueue.main.async {
+            if isRequested { view.activate() } else { view.reclaimFirstResponder() }
+        }
+    }
+
+    final class ActivatorView: UIView {
+        var onFind: (() -> Void)?
+        var wasRequested = false
+        var wasCovered = false
+        var isCovered = false
+
+        override var canBecomeFirstResponder: Bool { !isCovered }
+
+        override var keyCommands: [UIKeyCommand]? {
+            guard !isCovered else { return [] }
+            let find = UIKeyCommand(title: String(localized: "Search Library"), action: #selector(findRequested), input: "f", modifierFlags: .command)
+            find.wantsPriorityOverSystemBehavior = true
+            return [find]
+        }
+
+        @objc private func findRequested() { if !isCovered { onFind?() } }
+
+        override func find(_ sender: Any?) { findRequested() }
+
+        override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
+            (action == #selector(find(_:)) && !isCovered) || super.canPerformAction(action, withSender: sender)
+        }
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            guard window != nil else { return }
+            NotificationCenter.default.removeObserver(self, name: UITextField.textDidEndEditingNotification, object: nil)
+            NotificationCenter.default.addObserver(self, selector: #selector(textDidEndEditing(_:)), name: UITextField.textDidEndEditingNotification, object: nil)
+            DispatchQueue.main.async { self.reclaimFirstResponder() }
+        }
+
+        @objc private func textDidEndEditing(_ note: Notification) {
+            guard note.object as? UISearchTextField === searchController()?.searchBar.searchTextField else { return }
+            DispatchQueue.main.async { self.reclaimFirstResponder() }
+        }
+
+        func activate() {
+            guard !isCovered, let search = searchController() else { return }
+            search.isActive = true
+            search.searchBar.becomeFirstResponder()
+        }
+
+        /// Takes ⌘F back once search closes or loses focus, unless the user has gone straight back into the field.
+        func reclaimFirstResponder() {
+            guard !isCovered, window != nil, searchController()?.searchBar.searchTextField.isFirstResponder != true else { return }
+            becomeFirstResponder()
+        }
+
+        fileprivate func searchController() -> UISearchController? {
+            var responder: UIResponder? = self
+            while let current = responder {
+                if let controller = current as? UIViewController, let search = Self.searchController(near: controller) { return search }
+                responder = current.next
+            }
+            return nil
+        }
+
+        private static func searchController(near controller: UIViewController) -> UISearchController? {
+            var candidate: UIViewController? = controller
+            while let current = candidate {
+                if let search = current.navigationItem.searchController { return search }
+                if let navigation = current as? UINavigationController, let search = navigation.topViewController?.navigationItem.searchController {
+                    return search
+                }
+                candidate = current.parent
+            }
+            return nil
+        }
     }
 }

@@ -87,14 +87,16 @@ struct FavoriteRibbon: View {
 
 extension NotebookRecord {
     @MainActor
-    func coverRequest(width: CGFloat, scale: CGFloat, colorScheme: ColorScheme, contrast: ColorSchemeContrast, root: StorageRoot) -> CoverRequest {
+    func coverRequest(width: CGFloat, scale: CGFloat, colorScheme: ColorScheme, contrast: ColorSchemeContrast, root: StorageRoot,
+                      spec: CoverSpec? = nil) -> CoverRequest {
+        let spec = spec ?? cover
         let package = NotebookPackage(root: root, id: id)
         let thumbKey = firstPageThumbKey ?? "none"
         let thumb = firstPageID.map { package.thumbURL($0, key: thumbKey) }
-        return CoverRequest(notebookID: id, spec: cover, title: title.isEmpty ? String(localized: "Untitled") : title,
+        return CoverRequest(notebookID: id, spec: spec, title: title.isEmpty ? String(localized: "Untitled") : title,
                             meta: folder?.name ?? pageCountText, width: width, scale: scale,
                             dark: colorScheme == .dark, highContrast: contrast == .increased, firstPage: thumb,
-                            firstPageKey: coverStyle == .firstPage ? "\(firstPageID?.uuidString ?? "")-\(thumbKey)" : nil,
+                            firstPageKey: spec.style == .firstPage ? "\(firstPageID?.uuidString ?? "")-\(thumbKey)" : nil,
                             firstPageIsPDF: firstPageIsPDF)
     }
 

@@ -119,16 +119,23 @@ enum LegacyV1Layout {
     }
 }
 
+/// v1 folder colours, as stored in the v1 database.
+enum FolderColor: String, CaseIterable, Identifiable {
+    case red, orange, yellow, green, mint, blue, indigo, purple, pink, gray
+    var id: String { rawValue }
+}
 extension FolderColor {
+    /// One cloth per v1 colour, so folders that looked different in v1 still do.
     var cloth: ClothColor {
         switch self {
-        case .red: .tomato
-        case .orange, .yellow: .mustard
+        case .red: .oxblood
+        case .orange: .tomato
+        case .yellow: .mustard
         case .green: .moss
         case .mint: .jade
         case .blue: .cobalt
         case .indigo: .navy
-        case .purple: .oxblood
+        case .purple: .plum
         case .pink: .rose
         case .gray: .slate
         }

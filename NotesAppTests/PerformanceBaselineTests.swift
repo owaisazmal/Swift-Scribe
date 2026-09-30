@@ -6,20 +6,8 @@ import PencilKit
 // Opt-in: TEST_RUNNER_SCRIBE_PERF=1 xcodebuild test ... -only-testing:NotesAppTests/PerformanceBaselineTests
 @MainActor
 final class PerformanceBaselineTests: XCTestCase {
-    private static let typical = StressFixture(pages: 20, strokesPerPage: 400)
-    private static let heavy = StressFixture(pages: 100, strokesPerPage: 500)
-
     private func requirePerfRun() throws {
         try XCTSkipUnless(ProcessInfo.processInfo.environment["SCRIBE_PERF"] == "1", "Set SCRIBE_PERF=1 to run")
-    }
-
-    private func storedNotebook(_ fixture: StressFixture) -> Notebook {
-        let notebook = Notebook(title: "Stress", template: .narrowRuled, color: .white, size: .letter)
-        notebook.pages = fixture.pages
-        NotebookStore.save(fixture.drawing, for: notebook.id)
-        let id = notebook.id
-        addTeardownBlock { NotebookStore.deleteFiles(for: id) }
-        return notebook
     }
 
     private func hostWindow() throws -> UIWindow {
@@ -31,170 +19,6 @@ final class PerformanceBaselineTests: XCTestCase {
         addTeardownBlock { @MainActor in window.isHidden = true }
         return window
     }
-
-    func testFixtureSizes() throws {
-        try requirePerfRun()
-        for (name, fixture) in [("typical", Self.typical), ("heavy", Self.heavy)] {
-            let bytes = fixture.drawing.dataRepresentation().count
-            let points = fixture.drawing.strokes.reduce(0) { $0 + $1.path.count }
-            print("PERF fixture \(name): pages=\(fixture.pages.count) strokes=\(fixture.drawing.strokes.count) points=\(points) bytes=\(bytes)")
-        }
-    }
-
-    func testLoadDrawingHeavy() throws {
-        try requirePerfRun()
-        let id = storedNotebook(Self.heavy).id
-        measure { _ = NotebookStore.loadDrawing(for: id) }
-    }
-
-    func testSerializeDrawingHeavy() throws {
-        try requirePerfRun()
-        let drawing = Self.heavy.drawing
-        measure { _ = drawing.dataRepresentation() }
-    }
-
-    func testAutosaveTypical() throws {
-        try requirePerfRun()
-        let model = EditorModel(notebook: storedNotebook(Self.typical))
-        measure {
-            model.drawingDidChange(Self.typical.drawing)
-            model.save()
-        }
-    }
-
-    func testAutosaveHeavy() throws {
-        try requirePerfRun()
-        let model = EditorModel(notebook: storedNotebook(Self.heavy))
-        measure {
-            model.drawingDidChange(Self.heavy.drawing)
-            model.save()
-        }
-    }
-
-    func testCoverThumbnailHeavy() throws {
-        try requirePerfRun()
-        let fixture = Self.heavy
-        let frame = NotebookLayout(pages: fixture.pages).frames[0]
-        measure {
-            _ = PaperRenderer.renderPage(fixture.pages[0], frame: frame, drawing: fixture.drawing,
-                                         notebookID: UUID(), width: 360)
-        }
-    }
-
-    func testNavigatorThumbnailHeavy() throws {
-        try requirePerfRun()
-        let model = EditorModel(notebook: storedNotebook(Self.heavy))
-        measure { _ = model.pageThumbnail(at: 50, width: 280) }
-    }
-
-    func testInsertPageAtStartTypical() throws {
-        try requirePerfRun()
-        measureInsertPageAtStart(Self.typical)
-    }
-
-    func testInsertPageAtStartHeavy() throws {
-        try requirePerfRun()
-        measureInsertPageAtStart(Self.heavy)
-    }
-
-    private func measureInsertPageAtStart(_ fixture: StressFixture) {
-        measure {
-            var entries = fixture.pages.map { (page: $0, source: Optional($0.id)) }
-            entries.insert((page: .template(.blank, color: .white, size: .letter), source: nil), at: 0)
-            _ = PageRemapper.remap(drawing: fixture.drawing, oldPages: fixture.pages, newPages: entries)
-        }
-    }
-
-    func testCanvasDrawingGetterTypical() throws {
-        try requirePerfRun()
-        try measureDrawingGetter(Self.typical)
-    }
-
-    func testCanvasDrawingGetterHeavy() throws {
-        try requirePerfRun()
-        try measureDrawingGetter(Self.heavy)
-    }
-
-    private func measureDrawingGetter(_ fixture: StressFixture) throws {
-        let window = try hostWindow()
-        let canvas = PKCanvasView(frame: window.bounds)
-        window.rootViewController?.view.addSubview(canvas)
-        canvas.drawing = fixture.drawing
-        measure { _ = canvas.drawing }
-    }
-
-    func testOpenNotebookSyncHeavy() throws {
-        try requirePerfRun()
-        let notebook = storedNotebook(Self.heavy)
-        let window = try hostWindow()
-        measure(metrics: [XCTClockMetric(), XCTMemoryMetric()]) {
-            let model = EditorModel(notebook: notebook)
-            let controller = NotebookCanvasViewController(model: model)
-            model.canvas = controller
-            window.rootViewController = controller
-            controller.view.layoutIfNeeded()
-            window.rootViewController = UIViewController()
-        }
-    }
-
-    func testOpenLongPDFNotebookSync() throws {
-        try requirePerfRun()
-        let notebook = Notebook(title: "Textbook", template: .blank, color: .white, size: .letter)
-        let id = notebook.id
-        addTeardownBlock { NotebookStore.deleteFiles(for: id) }
-        notebook.pages = try NotebookImporter.pdfPages(from: StressFixture.makePDF(pageCount: 300), notebookID: id)
-        let window = try hostWindow()
-        measure(metrics: [XCTClockMetric(), XCTMemoryMetric()]) {
-            let model = EditorModel(notebook: notebook)
-            let controller = NotebookCanvasViewController(model: model)
-            model.canvas = controller
-            window.rootViewController = controller
-            controller.view.layoutIfNeeded()
-            window.rootViewController = UIViewController()
-        }
-    }
-
-    func testFirstRenderHeavy() throws {
-        try requirePerfRun()
-        let window = try hostWindow()
-        let options = XCTMeasureOptions()
-        options.invocationOptions = [.manuallyStop]
-        measure(metrics: [XCTClockMetric()], options: options) {
-            let canvas = PKCanvasView(frame: window.bounds)
-            let probe = RenderProbe()
-            let rendered = expectation(description: "rendered")
-            probe.onFinish = { rendered.fulfill() }
-            canvas.delegate = probe
-            window.rootViewController?.view.addSubview(canvas)
-            canvas.drawing = Self.heavy.drawing
-            wait(for: [rendered], timeout: 15)
-            stopMeasuring()
-            canvas.removeFromSuperview()
-        }
-    }
-
-    func testExportPDFTypical() throws {
-        try requirePerfRun()
-        let fixture = Self.typical
-        var size = 0
-        measure {
-            let url = try? PDFExporter.export(title: "Stress", pages: fixture.pages, drawing: fixture.drawing, notebookID: UUID())
-            size = (try? url?.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
-        }
-        print("PERF export typical bytes=\(size)")
-    }
-
-    func testHandwritingIndexThreePages() throws {
-        try requirePerfRun()
-        let notebook = storedNotebook(StressFixture(pages: 3, strokesPerPage: 400))
-        let pages = notebook.pages
-        let id = notebook.id
-        let options = XCTMeasureOptions()
-        options.iterationCount = 3
-        measure(options: options) { _ = SearchIndexer.recognizeText(notebookID: id, pages: pages) }
-    }
-
-    // MARK: - v2 (package storage, per-page canvases)
 
     private func report(_ name: String, _ values: [Double], unit: String = "ms") {
         let sorted = values.sorted()
@@ -511,70 +335,6 @@ private final class GapMonitor {
     }
 }
 
-private final class RenderProbe: NSObject, PKCanvasViewDelegate {
-    var onFinish: (() -> Void)?
-
-    func canvasViewDidFinishRendering(_ canvasView: PKCanvasView) {
-        onFinish?()
-        onFinish = nil
-    }
-}
-
-struct StressFixture {
-    let pages: [PageSpec]
-    let drawing: PKDrawing
-
-    init(pages count: Int, strokesPerPage: Int, seed: UInt64 = 7) {
-        var rng = SplitMix64(state: seed)
-        let pages = (0..<count).map { _ in PageSpec.template(.narrowRuled, color: .white, size: .letter) }
-        let layout = NotebookLayout(pages: pages)
-        let created = Date(timeIntervalSince1970: 1_790_000_000)
-        var strokes: [PKStroke] = []
-        strokes.reserveCapacity(count * strokesPerPage)
-
-        for frame in layout.frames {
-            var x = frame.minX + 110
-            var baseline = frame.minY + 120
-            for _ in 0..<strokesPerPage {
-                let width = CGFloat.random(in: 6...22, using: &rng)
-                if x + width > frame.maxX - 30 {
-                    x = frame.minX + 110
-                    baseline += 28
-                    if baseline > frame.maxY - 30 { baseline = frame.minY + 120 }
-                }
-                let pointCount = Int.random(in: 16...32, using: &rng)
-                let height = CGFloat.random(in: 8...18, using: &rng)
-                let phase = CGFloat.random(in: 0...(.pi), using: &rng)
-                let points = (0..<pointCount).map { i -> PKStrokePoint in
-                    let t = CGFloat(i) / CGFloat(pointCount - 1)
-                    let location = CGPoint(x: x + width * t, y: baseline - 4 - height * abs(sin(phase + t * 3 * .pi)))
-                    return PKStrokePoint(location: location, timeOffset: TimeInterval(t) * 0.3,
-                                         size: CGSize(width: 2.6, height: 2.6), opacity: 1,
-                                         force: 0.6 + 0.4 * t, azimuth: 0, altitude: .pi / 3)
-                }
-                let ink = PKInk(.pen, color: .black)
-                strokes.append(PKStroke(ink: ink, path: PKStrokePath(controlPoints: points, creationDate: created)))
-                x += width + CGFloat.random(in: 3...12, using: &rng)
-            }
-        }
-        self.pages = pages
-        self.drawing = PKDrawing(strokes: strokes)
-    }
-
-    static func makePDF(pageCount: Int) throws -> URL {
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).pdf")
-        let bounds = CGRect(origin: .zero, size: PageSize.letter.points)
-        try UIGraphicsPDFRenderer(bounds: bounds).writePDF(to: url) { context in
-            for index in 0..<pageCount {
-                context.beginPage()
-                ("Chapter \(index + 1)" as NSString).draw(at: CGPoint(x: 72, y: 72),
-                                                         withAttributes: [.font: UIFont.systemFont(ofSize: 28)])
-            }
-        }
-        return url
-    }
-}
-
 struct SplitMix64: RandomNumberGenerator {
     var state: UInt64
 
@@ -587,8 +347,21 @@ struct SplitMix64: RandomNumberGenerator {
     }
 }
 
-/// v2 fixtures: packages with page-local ink, shaped like the v1 StressFixture.
+/// Stress fixtures: packages with page-local ink. Heavy is 100 Letter pages × 500 strokes.
 enum V2StressFixture {
+    static func makePDF(pageCount: Int) throws -> URL {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).pdf")
+        let bounds = CGRect(origin: .zero, size: PageSize.letter.points)
+        try UIGraphicsPDFRenderer(bounds: bounds).writePDF(to: url) { context in
+            for index in 0..<pageCount {
+                context.beginPage()
+                ("Chapter \(index + 1)" as NSString).draw(at: CGPoint(x: 72, y: 72),
+                                                         withAttributes: [.font: UIFont.systemFont(ofSize: 28)])
+            }
+        }
+        return url
+    }
+
     static func handwriting(count: Int, pageSize: CGSize, rng: inout SplitMix64) -> [PKStroke] {
         let k = pageSize.width / 800
         let created = Date(timeIntervalSince1970: 1_790_000_000)
@@ -635,7 +408,7 @@ enum V2StressFixture {
     static func writePDF(pages count: Int, root: StorageRoot) async throws -> UUID {
         let id = UUID()
         let package = NotebookPackage(root: root, id: id)
-        let file = try await package.importAsset(from: StressFixture.makePDF(pageCount: count), ext: "pdf")
+        let file = try await package.importAsset(from: makePDF(pageCount: count), ext: "pdf")
         let pages = try PDFImport.pages(at: package.assetURL(file), file: file)
         try await package.create(NotebookManifest(id: id, title: "Textbook", defaults: PageDefaults(template: .blank, paperColor: .white, pageSize: .letter), pages: pages))
         return id

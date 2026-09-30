@@ -14,13 +14,14 @@ struct PageReference: Codable, Transferable, Hashable {
 }
 
 struct PageNavigator: View {
-    let document: NotebookDocument
-    let currentPage: Int
-    let onSelect: (Int) -> Void
+    let session: EditorSession
     @Environment(\.dismiss) private var dismiss
     @State private var pendingDelete: UUID?
     @State private var goToPage = ""
     @FocusState private var goToFocused: Bool
+
+    private var document: NotebookDocument { session.document }
+    private var currentPage: Int { session.currentPage }
 
     var body: some View {
         NavigationStack {
@@ -29,7 +30,7 @@ struct PageNavigator: View {
                     ForEach(Array(document.pages.enumerated()), id: \.element.id) { index, page in
                         Button {
                             dismiss()
-                            onSelect(index)
+                            session.go(to: index)
                         } label: {
                             PageThumbnailCell(document: document, page: page, index: index, isCurrent: index == currentPage)
                         }
@@ -38,15 +39,15 @@ struct PageNavigator: View {
                         .contextMenu { menu(for: page, at: index) }
                         .draggable(PageReference(id: page.id))
                         .dropDestination(for: PageReference.self) { items, _ in
-                            guard let item = items.first, let from = document.index(of: item.id), from != index else { return false }
+                            guard !document.isReadOnly, let item = items.first, let from = document.index(of: item.id), from != index else { return false }
                             document.movePage(from: from, to: index)
                             return true
                         }
                         .accessibilityLabel(Text("Page \(index + 1) of \(document.pages.count)\(index == currentPage ? ", current" : "")"))
                         .accessibilityHint(Text("Opens this page"))
                         .accessibilityActions {
-                            if index > 0 { Button("Move earlier") { document.movePage(from: index, to: index - 1) } }
-                            if index < document.pages.count - 1 { Button("Move later") { document.movePage(from: index, to: index + 1) } }
+                            if !document.isReadOnly, index > 0 { Button("Move earlier") { document.movePage(from: index, to: index - 1) } }
+                            if !document.isReadOnly, index < document.pages.count - 1 { Button("Move later") { document.movePage(from: index, to: index + 1) } }
                         }
                     }
                 }
@@ -66,7 +67,7 @@ struct PageNavigator: View {
                         .onSubmit(go)
                 }
                 ToolbarItem(placement: .primaryAction) {
-                    Button { document.insertPages([document.manifest.defaults.newPage()], at: document.pages.count) } label: {
+                    Button { session.addPage(after: document.pages.count - 1) } label: {
                         Label("Add Page", systemImage: "plus")
                     }
                     .disabled(document.isReadOnly)
@@ -84,15 +85,20 @@ struct PageNavigator: View {
     private func go() {
         guard let number = Int(goToPage), (1...document.pages.count).contains(number) else { return }
         dismiss()
-        onSelect(number - 1)
+        session.go(to: number - 1)
     }
 
     @ViewBuilder
     private func menu(for page: NotebookPage, at index: Int) -> some View {
-        Button { document.insertPages([document.manifest.defaults.newPage()], at: index + 1) } label: {
+        if !document.isReadOnly { editMenu(for: page, at: index) }
+    }
+
+    @ViewBuilder
+    private func editMenu(for page: NotebookPage, at index: Int) -> some View {
+        Button { session.addPage(after: index) } label: {
             Label("Insert Page After", systemImage: "doc.badge.plus")
         }
-        Button { Task { await document.duplicatePage(at: index) } } label: {
+        Button { Task { await session.duplicatePage(at: index) } } label: {
             Label("Duplicate", systemImage: "plus.square.on.square")
         }
         if index > 0 {
@@ -128,7 +134,7 @@ private struct PageThumbnailCell: View {
             .overlay { RoundedRectangle(cornerRadius: 6).strokeBorder(Color.accentColor, lineWidth: isCurrent ? 3 : 0) }
             Text(index + 1, format: .number)
                 .font(.caption.weight(isCurrent ? .bold : .regular).monospacedDigit())
-                .foregroundStyle(isCurrent ? Color.accentColor : Color.inkSecondary)
+                .foregroundStyle(isCurrent ? Color.accentColor : Color.textSecondary)
         }
         .contentShape(Rectangle())
         .task(id: "\(page.id)-\(page.inkHash ?? "")-\(page.background)-\(page.paperColorRaw)") {

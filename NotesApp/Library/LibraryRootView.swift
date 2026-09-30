@@ -3,6 +3,7 @@ import SwiftData
 
 struct OpenNotebook: Identifiable, Hashable {
     let id: UUID
+    var pageID: UUID?
 }
 
 struct LibraryRootView: View {
@@ -13,13 +14,15 @@ struct LibraryRootView: View {
     @State private var open: OpenNotebook?
     @State private var showingSettings = false
     @State private var creating = false
+    @State private var quickNoteError: String?
+    @State private var creatingQuickNote = false
+    @Environment(AppModel.self) private var app
     @State private var sceneID: String?
+    @State private var isSearching = false
     @Namespace private var zoom
 
-    private var usesZoom: Bool {
-        if #available(iOS 18.0, *) { return !reduceMotion }
-        return false
-    }
+    /// With Reduce Motion the editor cross-fades in over the library instead of zooming out of the cover.
+    private var usesZoom: Bool { !reduceMotion }
 
     private var folder: FolderRecord? {
         if case .folder(let id) = scope { return folders.first { $0.id == id } }
@@ -32,7 +35,9 @@ struct LibraryRootView: View {
                 LibrarySidebar(scope: $scope, showingSettings: $showingSettings)
             } detail: {
                 NavigationStack {
-                    ShelfView(scope: scope ?? .all, zoomNamespace: zoom, onOpen: { openNotebook($0.id) }, onCreate: { creating = true })
+                    ShelfView(scope: scope ?? .all, zoomNamespace: zoom, onOpen: { openNotebook($0.id) },
+                              onOpenPage: { openNotebook($0.id, pageID: $1) }, onCreate: { creating = true },
+                              onQuickNote: quickNote, isSearching: $isSearching, isCovered: open != nil || creating || showingSettings)
                 }
             }
             .tint(Color.accentColor)
@@ -40,7 +45,7 @@ struct LibraryRootView: View {
             .disabled(editorCoversLibrary)
 
             if !usesZoom, let open {
-                EditorScreen(notebookID: open.id, sceneID: sceneID) { self.open = nil }
+                EditorScreen(notebookID: open.id, initialPageID: open.pageID, sceneID: sceneID) { self.open = nil }
                     .id(open.id)
                     .accessibilityAddTraits(.isModal)
                     .transition(.opacity)
@@ -49,7 +54,7 @@ struct LibraryRootView: View {
         }
         .animation(.easeInOut(duration: 0.18), value: open)
         .fullScreenCover(item: Binding(get: { usesZoom ? open : nil }, set: { open = $0 })) { item in
-            EditorScreen(notebookID: item.id, sceneID: sceneID) { open = nil }
+            EditorScreen(notebookID: item.id, initialPageID: item.pageID, sceneID: sceneID) { open = nil }
                 .zoomTransition(id: item.id, in: zoom)
         }
         .sheet(isPresented: $creating) {
@@ -60,29 +65,58 @@ struct LibraryRootView: View {
         .sheet(isPresented: $showingSettings) {
             ScribeSettingsView()
         }
+        .alert("The note couldn't be created", isPresented: Binding(get: { quickNoteError != nil }, set: { if !$0 { quickNoteError = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(quickNoteError ?? "")
+        }
         .background(SceneReader { sceneID = $0 })
-        .keyboardShortcut(for: { creating = true }, enabled: open == nil)
+        .keyboardShortcut(for: { creating = true }, enabled: libraryInFront)
+        .background {
+            if libraryInFront {
+                Button("Quick Note", action: quickNote)
+                    .keyboardShortcut("n", modifiers: [.command, .shift])
+                    .hidden()
+                    .accessibilityHidden(true)
+            }
+        }
+    }
+
+    /// Library shortcuts only act when nothing else is in front of the library.
+    private var libraryInFront: Bool {
+        open == nil && !creating && !showingSettings && !creatingQuickNote && app.phase == .ready
+    }
+
+    private func quickNote() {
+        guard libraryInFront else { return }
+        creatingQuickNote = true
+        Task {
+            defer { creatingQuickNote = false }
+            do {
+                openNotebook(try await store.createQuickNote(folder: folder))
+            } catch {
+                quickNoteError = error.localizedDescription
+            }
+        }
     }
 
     /// Without the zoom transition the editor is drawn over the library, which then must not be reachable.
     private var editorCoversLibrary: Bool { !usesZoom && open != nil }
 
     /// Only one editor per window: while one is open, the library can't switch it to another notebook.
-    private func openNotebook(_ id: UUID) {
+    private func openNotebook(_ id: UUID, pageID: UUID? = nil) {
         guard open == nil else { return }
-        if DocumentRegistry.shared.activateExistingEditor(for: id, from: sceneID) { return }
-        open = OpenNotebook(id: id)
+        if DocumentRegistry.shared.activateExistingEditor(for: id, from: sceneID) {
+            if let pageID { NotificationCenter.default.post(name: .scribeShowPage, object: id, userInfo: ["page": pageID]) }
+            return
+        }
+        open = OpenNotebook(id: id, pageID: pageID)
     }
 }
 
 extension View {
-    @ViewBuilder
     func zoomTransition(id: UUID, in namespace: Namespace.ID) -> some View {
-        if #available(iOS 18.0, *) {
-            navigationTransition(.zoom(sourceID: id, in: namespace))
-        } else {
-            self
-        }
+        navigationTransition(.zoom(sourceID: id, in: namespace))
     }
 
     /// ⌘N: new notebook, from anywhere in the library. Off while an editor is open, which has its own ⌘N.
@@ -117,4 +151,9 @@ struct SceneReader: UIViewRepresentable {
             onChange?(window?.windowScene?.session.persistentIdentifier)
         }
     }
+}
+
+extension Notification.Name {
+    /// Asks the editor showing a notebook (object: its ID) to go to a page (userInfo "page": the page ID).
+    static let scribeShowPage = Notification.Name("ScribeShowPage")
 }

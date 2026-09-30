@@ -21,8 +21,8 @@ struct ScribeRoot: View {
             if app.phase == .migrating {
                 VStack(spacing: Space.x4) {
                     ProgressView().controlSize(.large)
-                    Text("Moving your notebooks to the new format…").font(.displayText(19, relativeTo: .title3))
-                    Text("Your originals are kept as a backup.").foregroundStyle(Color.inkSecondary)
+                    Text("Moving your notebooks to the new format…").displayTextFont(19, relativeTo: .title3)
+                    Text("Your originals are kept as a backup.").foregroundStyle(Color.textSecondary)
                 }
                 .foregroundStyle(Color.ink)
                 .accessibilityElement(children: .combine)

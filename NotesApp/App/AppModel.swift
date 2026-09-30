@@ -35,8 +35,13 @@ final class AppModel {
         let interval = signposter.beginInterval("Launch")
         if LaunchOptions.seedV1Fixture { await LaunchOptions.seedV1(into: root) }
         #if DEBUG
-        if let count = LaunchOptions.value("-seedLibrary").flatMap(Int.init) { await LibrarySeed.write(count: count, root: root) }
-        if LaunchOptions.arguments.contains("-seedLongPDF") { await LibrarySeed.writeLongPDF(root: root) }
+        if root.packageIDs().isEmpty {
+            if let count = LaunchOptions.value("-seedLibrary").flatMap(Int.init) { await LibrarySeed.write(count: count, root: root) }
+            if LaunchOptions.arguments.contains("-seedLongPDF") { await LibrarySeed.writeLongPDF(root: root) }
+        }
+        if LaunchOptions.arguments.contains("-increaseContrast") {
+            for case let scene as UIWindowScene in UIApplication.shared.connectedScenes { scene.traitOverrides.accessibilityContrast = .high }
+        }
         #endif
         let root = root
         Task.detached(priority: .utility) { LibraryStore.sweepDeleted(root: root) }
@@ -51,8 +56,32 @@ final class AppModel {
                                    full: indexWasRecovered || !(migrationReport?.migrated.isEmpty ?? true))
         library.purgeExpiredTrash()
         phase = .ready
+        let pending = await Task.detached(priority: .utility) { Self.notebooksWithLegacyText(root: root) }.value
+        if !pending.isEmpty { indexMigratedHandwriting(pending) }
         Task.detached(priority: .background) { CoverCache.shared.sweepDisk() }
         signposter.endInterval("Launch", interval)
+    }
+
+    /// Migrated notebooks whose pages haven't all been recognised yet, including any left over from an earlier launch.
+    nonisolated static func notebooksWithLegacyText(root: StorageRoot) -> [UUID] {
+        root.packageIDs().filter { id in
+            let file = root.package(id).appending(path: "text/\(NotebookPackage.legacyTextName)")
+            return FileManager.default.fileExists(atPath: file.path(percentEncoded: false))
+        }
+    }
+
+    /// v1 kept one search text per notebook. Recognising each migrated page, one notebook at a time in the
+    /// background, gives them page-level search results without opening each one.
+    private func indexMigratedHandwriting(_ ids: [UUID]) {
+        let root = root, library = library
+        Task(priority: .background) {
+            for id in ids {
+                let package = NotebookPackage(root: root, id: id)
+                guard let pages = try? await package.readManifest().manifest.pages else { continue }
+                let text = await HandwritingIndexer.shared.index(HandwritingIndexer.Job(package: package, pages: pages))
+                library.updateSearchText(text, for: id)
+            }
+        }
     }
 
     /// What went wrong moving v1 notebooks, in words for the alert and Settings. Nil when nothing did.

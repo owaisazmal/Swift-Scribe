@@ -19,9 +19,12 @@ final class NotebookRecorder: NSObject {
 
     init(document: NotebookDocument) {
         self.document = document
+        super.init()
+        document.recorder = self
     }
 
     var recordings: [RecordingEntry] { document.manifest.recordings }
+    var isReadOnly: Bool { document.isReadOnly }
 
     func toggleRecording() {
         isRecording ? stopRecording() : startRecording()
@@ -70,8 +73,10 @@ final class NotebookRecorder: NSObject {
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 
+    /// Playback would switch the shared audio session away from recording, so it waits until recording stops.
     func togglePlayback(_ recording: RecordingEntry) {
         if playingID == recording.id { return stopPlayback() }
+        guard !isRecording else { return }
         stopPlayback()
         do {
             try AVAudioSession.sharedInstance().setCategory(.playback)

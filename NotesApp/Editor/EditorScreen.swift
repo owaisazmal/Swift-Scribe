@@ -3,6 +3,7 @@ import SwiftUI
 /// Opens a notebook's document and hosts the editor. One per notebook across windows.
 struct EditorScreen: View {
     let notebookID: UUID
+    var initialPageID: UUID?
     let sceneID: String?
     let onClose: () -> Void
 
@@ -16,17 +17,21 @@ struct EditorScreen: View {
         ZStack {
             Color.desk.ignoresSafeArea()
             if let document {
-                EditorView(document: document, close: close)
+                EditorView(document: document, initialPageID: initialPageID, close: close)
                     .id(document.id)
             } else if let failure {
                 EmptyShelf(title: String(localized: "This notebook couldn't be opened"), message: failure) {
-                    Button("Back to Library", action: onClose).buttonStyle(.borderedProminent)
+                    Button("Back to Library", action: onClose).prominentButton()
                 }
             } else {
                 ProgressView().controlSize(.large)
             }
         }
         .task(id: notebookID) { await open() }
+        .onReceive(NotificationCenter.default.publisher(for: UIScene.didDisconnectNotification)) { note in
+            guard (note.object as? UIScene)?.session.persistentIdentifier == sceneID else { return }
+            closeWithWindow()
+        }
         .alert("Your latest changes aren't saved yet", isPresented: Binding(get: { unsavedReason != nil },
                                                                             set: { if !$0 { unsavedReason = nil } })) {
             Button("Try Again") { close() }
@@ -66,7 +71,25 @@ struct EditorScreen: View {
             store.index(document.manifest)
             DocumentRegistry.shared.unregister(notebookID, document: document)
             onClose()
-            indexHandwriting(of: document)
+            store.indexHandwriting(package: document.package, pages: document.pages)
+        }
+    }
+
+    /// The window went away with the editor still open: no UI to ask with, so save, and keep retrying if that fails.
+    private func closeWithWindow() {
+        guard let document, !isClosing else { return }
+        isClosing = true
+        document.recorder?.shutdown()
+        Task {
+            await document.finishPendingWork()
+            if await document.flush() {
+                await document.collectGarbage()
+                store.index(document.manifest)
+                store.indexHandwriting(package: document.package, pages: document.pages)
+                DocumentRegistry.shared.unregister(notebookID, document: document)
+            } else {
+                closeWhileSaving()
+            }
         }
     }
 
@@ -74,16 +97,9 @@ struct EditorScreen: View {
         guard let document else { return onClose() }
         DocumentRegistry.shared.keepUntilSaved(document) { [weak store] in
             store?.index(document.manifest)
+            store?.indexHandwriting(package: document.package, pages: document.pages)
+            Task { await document.collectGarbage() }
         }
         onClose()
-    }
-
-    private func indexHandwriting(of document: NotebookDocument) {
-        let job = HandwritingIndexer.Job(package: document.package, pages: document.pages)
-        let id = document.id
-        Task(priority: .utility) { [weak store] in
-            let text = await HandwritingIndexer.shared.index(job)
-            store?.updateSearchText(text, for: id)
-        }
     }
 }

@@ -15,7 +15,7 @@ enum CoverStyle: String, CaseIterable, Identifiable, Sendable {
 }
 
 enum ClothColor: String, CaseIterable, Identifiable, Sendable {
-    case oxblood, tomato, mustard, moss, jade, cobalt, navy, slate, rose, oat
+    case oxblood, tomato, mustard, moss, jade, cobalt, navy, plum, slate, rose, oat
 
     var id: String { rawValue }
 
@@ -30,6 +30,7 @@ enum ClothColor: String, CaseIterable, Identifiable, Sendable {
         case .jade: 0x2F7D6B
         case .cobalt: 0x2F4DA0
         case .navy: 0x1E2A45
+        case .plum: 0x5A2F52
         case .slate: 0x56606B
         case .rose: 0xC98A86
         case .oat: 0xCDBF9F

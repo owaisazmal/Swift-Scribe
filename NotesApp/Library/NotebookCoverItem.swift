@@ -23,6 +23,7 @@ struct NotebookCoverItem: View {
     let isSelecting: Bool
     let isSelected: Bool
     let zoomNamespace: Namespace.ID
+    var showsFolder = false
     let action: () -> Void
     @Environment(LibraryStore.self) private var store
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -63,17 +64,21 @@ struct NotebookCoverItem: View {
         }
     }
 
+    /// Page count and date on every card, the title where the cover doesn't carry it, and the shelf in
+    /// mixed views unless the cloth label already names it.
     private var meta: some View {
-        Group {
+        var parts = [record.metaLine]
+        if showsFolder, record.coverStyle != .cloth, let folder = record.folder { parts.append(folder.name) }
+        return VStack(alignment: .leading, spacing: 2) {
             if record.coverStyle == .firstPage {
-                Text("\(record.title) · \(record.pageCountText)")
-            } else {
-                Text(record.metaLine)
+                Text(record.title).font(.footnote.weight(.semibold)).foregroundStyle(Color.ink)
             }
+            Text(parts.joined(separator: " · "))
+                .font(.footnote.weight(.medium).monospacedDigit())
+                .foregroundStyle(Color.textSecondary)
         }
-        .font(.footnote.weight(.medium).monospacedDigit())
-        .foregroundStyle(Color.inkSecondary)
-        .lineLimit(1)
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(width: CoverWidth.shelf, alignment: .leading)
     }
 }
 
@@ -123,12 +128,12 @@ struct ContinueWritingSpread: View {
                         .tracking(0.8)
                         .foregroundStyle(Color.accentColor)
                     Text(record.title)
-                        .font(.display(26, relativeTo: .title2))
+                        .displayFont(26, relativeTo: .title2)
                         .foregroundStyle(Color.ink)
                         .lineLimit(2)
                     Text("Page \(record.currentPage + 1) of \(record.pageCount) · edited \(record.modifiedAt.formatted(.relative(presentation: .named)))")
                         .font(.subheadline.monospacedDigit())
-                        .foregroundStyle(Color.inkSecondary)
+                        .foregroundStyle(Color.textSecondary)
                 }
                 .padding(.leading, Space.x6)
                 .padding(.bottom, Space.x2)
@@ -150,13 +155,8 @@ struct ContinueWritingSpread: View {
 }
 
 extension View {
-    /// The source of the zoom transition into the editor, where the OS supports it.
-    @ViewBuilder
+    /// The source of the zoom transition into the editor.
     func zoomSource(id: UUID, in namespace: Namespace.ID) -> some View {
-        if #available(iOS 18.0, *) {
-            matchedTransitionSource(id: id, in: namespace)
-        } else {
-            self
-        }
+        matchedTransitionSource(id: id, in: namespace)
     }
 }

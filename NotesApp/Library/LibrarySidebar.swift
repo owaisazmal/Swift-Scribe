@@ -90,6 +90,7 @@ struct LibrarySidebar: View {
                         }
                         .contextMenu { folderMenu(folder) }
                 }
+                .onMove { store.moveFolders(folders, from: $0, to: $1) }
                 Button { folderName = ""; creatingFolder = true } label: {
                     if dynamicTypeSize.isAccessibilitySize {
                         Text("New Folder")
@@ -103,6 +104,7 @@ struct LibrarySidebar: View {
         }
         .scrollContentBackground(.hidden)
         .background(Color.surface)
+        .tint(Color.sidebarTint)
         .navigationTitle("Swift Scribe")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -135,11 +137,12 @@ struct LibrarySidebar: View {
             }
             Spacer()
             if let count, count > 0, !dynamicTypeSize.isAccessibilitySize {
-                Text(count, format: .number).font(.subheadline.monospacedDigit()).foregroundStyle(.primary.opacity(0.8))
+                Text(count, format: .number).font(.subheadline.monospacedDigit()).foregroundStyle(.primary)
             }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(count.map { $0 > 0 ? "\(title), \($0)" : title } ?? title)
+        .accessibilityAddTraits(.isButton)
     }
 
     private func folderRow(_ folder: FolderRecord, count: Int) -> some View {
@@ -148,17 +151,19 @@ struct LibrarySidebar: View {
             Text(folder.name).lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
             Spacer()
             if count > 0, !dynamicTypeSize.isAccessibilitySize {
-                Text(count, format: .number).font(.subheadline.monospacedDigit()).foregroundStyle(.primary.opacity(0.8))
+                Text(count, format: .number).font(.subheadline.monospacedDigit()).foregroundStyle(.primary)
             }
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(count == 1 ? String(localized: "\(folder.name), folder, 1 notebook")
                                        : String(localized: "\(folder.name), folder, \(count) notebooks"))
+        .accessibilityAddTraits(.isButton)
     }
 
     @ViewBuilder
     private func folderMenu(_ folder: FolderRecord) -> some View {
         Button { folderName = folder.name; editingFolder = folder } label: { Label("Rename", systemImage: "pencil") }
+        Button { store.sortFoldersByName(folders) } label: { Label("Sort Shelves A to Z", systemImage: "textformat") }
         Menu {
             ForEach(ClothColor.allCases) { cloth in
                 Button { store.setCloth(cloth, for: folder) } label: {
