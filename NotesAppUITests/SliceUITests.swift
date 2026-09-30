@@ -23,22 +23,6 @@ final class SliceUITests: XCTestCase {
         add(attachment)
     }
 
-    /// Runs the audit. Contrast and Dynamic Type issues on the system Liquid Glass navigation bar are logged instead
-    /// of failing: the audit can't measure text on glass (the flagged "Select" measured 7.7:1 in the rendered screenshot),
-    /// and system bars cap their text size by design and offer the Large Content Viewer instead.
-    @available(iOS 17.0, *)
-    private func audit(_ app: XCUIApplication, _ types: XCUIAccessibilityAuditType) throws {
-        let barMaxY = app.navigationBars.allElementsBoundByIndex.map { $0.frame.maxY }.max() ?? 0
-        try app.performAccessibilityAudit(for: types) { issue in
-            print("AUDIT issue: \(issue.compactDescription) | element: \(issue.element.map { String($0.elementType.rawValue) } ?? "-") '\(issue.element?.label ?? "nil")' \(issue.element?.frame ?? .zero)")
-            if issue.auditType == .contrast || issue.auditType == .dynamicType, let element = issue.element, element.frame.maxY <= barMaxY + 1 {
-                print("AUDIT ignored \(issue.auditType == .contrast ? "contrast" : "dynamic type") on system bar element: \(element.label)")
-                return true
-            }
-            return false
-        }
-    }
-
     private func waitForLibrary(_ app: XCUIApplication) {
         XCTAssertTrue(app.staticTexts["All notebooks"].firstMatch.waitForExistence(timeout: 30), "library heading")
     }
@@ -63,7 +47,7 @@ final class SliceUITests: XCTestCase {
         let migrated = app.buttons["notebook.Migrated Lecture"]
         XCTAssertTrue(migrated.waitForExistence(timeout: 10), "the v1 notebook is migrated at launch")
         attach(app, "library-light")
-        if #available(iOS 17.0, *) { try audit(app, [.contrast, .elementDetection, .hitRegion, .sufficientElementDescription]) }
+        try audit(app, [.contrast, .elementDetection, .hitRegion, .sufficientElementDescription], screen: "library")
 
         app.buttons["New"].firstMatch.tap()
         let title = app.textFields["Title"]
@@ -79,7 +63,7 @@ final class SliceUITests: XCTestCase {
         write(3, on: canvas)
         XCTAssertEqual(strokeCount(canvas), 3)
         attach(app, "editor-written")
-        if #available(iOS 17.0, *) { try audit(app, [.contrast, .elementDetection, .sufficientElementDescription]) }
+        try audit(app, [.contrast, .elementDetection, .sufficientElementDescription], screen: "editor")
         sleep(3)
 
         app.buttons["editor.back"].tap()
@@ -121,7 +105,7 @@ final class SliceUITests: XCTestCase {
         if app.buttons["Continue"].waitForExistence(timeout: 2) { app.buttons["Continue"].tap() }
         app.buttons["Cloth"].firstMatch.tap()
         let screen = app.windows.firstMatch.frame
-        for name in ["Oxblood", "Tomato", "Mustard", "Moss", "Jade", "Cobalt", "Navy", "Slate", "Rose", "Oat"] {
+        for name in ["Oxblood", "Tomato", "Mustard", "Moss", "Jade", "Cobalt", "Navy", "Plum", "Slate", "Rose", "Oat"] {
             let swatch = app.buttons[name].firstMatch
             XCTAssertTrue(swatch.exists, name)
             XCTAssertTrue(screen.contains(swatch.frame), "\(name) at \(swatch.frame) is outside \(screen)")
@@ -146,6 +130,6 @@ final class SliceUITests: XCTestCase {
         app = launch(reset: false, extra: ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"])
         XCTAssertTrue(app.buttons["notebook.Migrated Lecture"].waitForExistence(timeout: 30) || app.staticTexts["Migrated Lecture"].waitForExistence(timeout: 5))
         attach(app, "library-largest-text")
-        if #available(iOS 17.0, *) { try audit(app, [.dynamicType, .textClipped]) }
+        try audit(app, [.dynamicType, .textClipped], screen: "largest text")
     }
 }

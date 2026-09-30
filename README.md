@@ -1,6 +1,6 @@
 # Swift Scribe
 
-**A free, open-source handwritten notes app for iPad and iPhone — a Notability / GoodNotes alternative with no subscriptions, no ads, and no tracking.**
+**A free, open-source handwritten notes app for iPad — a Notability / GoodNotes alternative with no subscriptions, no ads, and no tracking.**
 
 Swift Scribe is built entirely on Apple frameworks (SwiftUI, PencilKit, PDFKit, Vision, SwiftData). Your notes stay on your device.
 
@@ -10,7 +10,9 @@ Swift Scribe is built entirely on Apple frameworks (SwiftUI, PencilKit, PDFKit, 
 - Apple Pencil handwriting with palm rejection and pressure/tilt, powered by PencilKit
 - Full tool palette: pen, monoline, fountain pen, pencil, marker/highlighter, crayon, watercolor, eraser, lasso (move/copy/delete), ruler, and custom colors
 - Pinch to zoom up to 5× with crisp ink and backgrounds at every zoom level
-- Undo / redo (toolbar, tool palette, ⌘Z / ⇧⌘Z)
+- Pages keep their true relative size; Fit Width (⌘0) and Fit Page (⌘9) enlarge a smaller page
+- Undo / redo (toolbar, tool palette, ⌘Z / ⇧⌘Z), including page operations
+- Hardware keyboard: arrows, space and Page Up/Down to scroll, ⌘↑/⌘↓ for the first and last page, ⌘N for a new page
 - Choose to draw with Apple Pencil only, finger and pencil, or follow the system setting
 
 **Notebooks & paper**
@@ -18,29 +20,30 @@ Swift Scribe is built entirely on Apple frameworks (SwiftUI, PencilKit, PDFKit, 
 - Paper templates: blank, narrow ruled, wide ruled, grid, dotted, Cornell, music staff
 - Paper colors: white, ivory, legal-pad yellow, gray, charcoal
 - Page sizes: US Letter, A4, A5, widescreen
-- Page navigator with thumbnails: jump, drag to reorder, insert, duplicate, delete
+- Page navigator with thumbnails: jump, drag to reorder, insert, duplicate, delete, go to page
 - Change template or paper color per page
 
 **PDFs & images**
 - Import PDFs as new notebooks, or insert them into an existing one, and annotate them
 - Insert photos as pages
-- Export any notebook as a PDF (vector backgrounds, PDF text stays selectable)
+- Export any notebook as a PDF from the editor or the library (vector backgrounds, PDF text stays selectable), then share or print
 
 **Audio**
 - Record lectures or meetings alongside a notebook, and play them back later
 
 **Organization & search**
-- Cloth, Print (riso) and first-page notebook covers
-- Folders with spine colours, drag notebooks onto folders in the sidebar
-- Favorites, sorting (modified, created, title), duplicate, rename
+- Cloth, Print (riso) and first-page notebook covers, changeable at any time
+- Quick Note (⇧⌘N) for a new notebook with your default paper
+- Folders with spine colours, drag notebooks onto folders in the sidebar, reorder folders
+- Favorites, sorting (last opened, modified, created, title), duplicate, rename
 - Recently Deleted with 30-day auto-purge
-- Search by title, **handwriting** (on-device OCR with Vision), and imported PDF text
+- Search by title, **handwriting** (on-device OCR with Vision), and imported PDF text, with page-level results that open at the matching page
 
 ## Requirements
 
 - Xcode 16 or later (folder-synchronized groups, Swift 6 language mode)
-- iOS / iPadOS 17.4 or later
-- Runs on iPad, iPhone, and Apple silicon Macs ("Designed for iPad")
+- iPadOS 18 or later
+- Runs on iPad and on Apple silicon Macs ("Designed for iPad")
 
 ## Getting started
 
@@ -104,6 +107,7 @@ Contributions toward any of these are very welcome:
 - [ ] Outline / bookmarks, page links
 - [ ] Nested folders
 - [ ] Export as images, backup / restore of the whole library
+- [ ] Lasso and ruler across pages (both work within a page today)
 - [ ] Localization
 
 ## Contributing

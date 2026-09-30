@@ -10,7 +10,10 @@ protocol EditorCanvasControlling: AnyObject {
     func setToolPickerVisible(_ visible: Bool)
     func setToolPickerSuppressed(_ suppressed: Bool)
     func setDrawingPolicy(_ policy: PKCanvasViewDrawingPolicy)
+    func fit(_ fit: PageFit)
 }
+
+enum PageFit { case width, page }
 
 @MainActor
 @Observable
@@ -29,10 +32,11 @@ final class EditorSession {
     }
     @ObservationIgnored weak var canvas: EditorCanvasControlling?
 
-    init(document: NotebookDocument) {
+    init(document: NotebookDocument, initialPageID: UUID? = nil) {
         self.document = document
         recorder = NotebookRecorder(document: document)
-        currentPage = min(document.manifest.library.currentPage, max(document.pages.count - 1, 0))
+        let saved = document.manifest.library.currentPage
+        currentPage = max(0, min(initialPageID.flatMap(document.index(of:)) ?? saved, document.pages.count - 1))
         drawingInput = UserDefaults.standard.string(forKey: SettingsKey.drawingInput).flatMap(DrawingInput.init(rawValue:)) ?? .system
     }
 
@@ -58,18 +62,16 @@ final class EditorSession {
         canRedo = document.undoManager.canRedo
     }
 
+    /// Inserts after `index` (or at the end) and makes the new page current.
     func addPage(after index: Int? = nil, template: PaperTemplate? = nil) {
-        var page = document.manifest.defaults.newPage()
-        let anchor = index.flatMap { document.pages.indices.contains($0) ? document.pages[$0] : nil }
-        if let anchor, anchor.template != nil {
-            page.size = anchor.size
-            page.paperColor = anchor.paperColor
-            page.background = anchor.background
-        }
-        if let template { page.background = .template(template) }
+        guard !document.isReadOnly else { return }
         let position = (index ?? document.pages.count - 1) + 1
-        document.insertPages([page], at: position)
+        document.insertPages([document.newPage(after: index, template: template)], at: position)
         go(to: position)
+    }
+
+    func duplicatePage(at index: Int) async {
+        if let position = await document.duplicatePage(at: index) { go(to: position) }
     }
 }
 
@@ -78,10 +80,10 @@ struct EditorView: View {
     let close: () -> Void
     @State private var session: EditorSession
 
-    init(document: NotebookDocument, close: @escaping () -> Void) {
+    init(document: NotebookDocument, initialPageID: UUID? = nil, close: @escaping () -> Void) {
         self.document = document
         self.close = close
-        _session = State(initialValue: EditorSession(document: document))
+        _session = State(initialValue: EditorSession(document: document, initialPageID: initialPageID))
     }
 
     var body: some View {
@@ -107,6 +109,7 @@ private struct EditorContent: View {
     @State private var renaming = false
     @State private var titleText = ""
     @State private var errorMessage: String?
+    @State private var ribbonWidth: CGFloat = 44
 
     private var document: NotebookDocument { session.document }
     private var cloth: ClothColor { document.manifest.cover.cloth }
@@ -116,6 +119,13 @@ private struct EditorContent: View {
             PageStack(session: session)
                 .ignoresSafeArea(edges: .bottom)
                 .background(Color.desk.ignoresSafeArea())
+                .background {
+                    Button("Page After Current") { session.addPage(after: session.currentPage) }
+                        .keyboardShortcut("n", modifiers: .command)
+                        .disabled(document.isReadOnly)
+                        .hidden()
+                        .accessibilityHidden(true)
+                }
                 .overlay(alignment: .topTrailing) { ribbon }
                 .overlay(alignment: .top) { banners }
                 .navigationBarTitleDisplayMode(.inline)
@@ -123,7 +133,7 @@ private struct EditorContent: View {
                 .toolbarBackground(.hidden, for: .navigationBar)
         }
         .sheet(isPresented: $showingPages) {
-            PageNavigator(document: document, currentPage: session.currentPage) { session.go(to: $0) }
+            PageNavigator(session: session)
         }
         .sheet(item: $export) { job in ExportSheet(job: job) }
         .fileImporter(isPresented: $importingPDF, allowedContentTypes: [.pdf]) { result in
@@ -166,6 +176,10 @@ private struct EditorContent: View {
         .onReceive(NotificationCenter.default.publisher(for: .NSUndoManagerDidUndoChange)) { _ in session.refreshUndoState() }
         .onReceive(NotificationCenter.default.publisher(for: .NSUndoManagerDidRedoChange)) { _ in session.refreshUndoState() }
         .onDisappear { session.recorder.shutdown() }
+        .onReceive(NotificationCenter.default.publisher(for: .scribeShowPage)) { note in
+            guard (note.object as? UUID) == document.id, let page = note.userInfo?["page"] as? UUID, let index = document.index(of: page) else { return }
+            session.go(to: index)
+        }
     }
 
     private var isPresentingModal: Bool {
@@ -189,23 +203,42 @@ private struct EditorContent: View {
                 }
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(Text("\(document.title). Rename"))
+            .disabled(document.isReadOnly)
+            .accessibilityLabel(Text(document.isReadOnly ? "\(document.title)" : "\(document.title). Rename"))
         }
-        if !session.isToolPickerVisible {
-            ToolbarItemGroup(placement: .topBarTrailing) {
-                Button { document.undoManager.undo() } label: { Label("Undo", systemImage: "arrow.uturn.backward") }
-                    .disabled(!session.canUndo)
-                Button { document.undoManager.redo() } label: { Label("Redo", systemImage: "arrow.uturn.forward") }
-                    .disabled(!session.canRedo)
-            }
+        ToolbarItemGroup(placement: .topBarTrailing) {
+            Button { document.undoManager.undo() } label: { Label("Undo", systemImage: "arrow.uturn.backward") }
+                .keyboardShortcut(isPresentingModal ? nil : KeyboardShortcut("z", modifiers: .command))
+                .disabled(!session.canUndo)
+                .accessibilityIdentifier("editor.undo")
+            Button { document.undoManager.redo() } label: { Label("Redo", systemImage: "arrow.uturn.forward") }
+                .keyboardShortcut(isPresentingModal ? nil : KeyboardShortcut("z", modifiers: [.command, .shift]))
+                .disabled(!session.canRedo)
+                .accessibilityIdentifier("editor.redo")
         }
         ToolbarItemGroup(placement: .topBarTrailing) {
             Button { showingPages = true } label: { Label("Pages", systemImage: "square.grid.2x2") }
                 .keyboardShortcut("p", modifiers: [.command, .shift])
             addMenu
             recordButton
+            recordingsButton
+            Button { session.toggleToolPicker() } label: {
+                Label(session.isToolPickerVisible ? "Hide Tools" : "Show Tools",
+                      systemImage: session.isToolPickerVisible ? "pencil.tip.crop.circle.fill" : "pencil.tip.crop.circle")
+            }
+            .disabled(document.isReadOnly)
             moreMenu
         }
+    }
+
+    private var recordingsButton: some View {
+        Button { showingRecordings = true } label: { Label("Recordings", systemImage: "waveform") }
+            .popover(isPresented: $showingRecordings) {
+                RecordingList(recorder: session.recorder)
+                    .frame(minWidth: 320, minHeight: 280)
+                    .presentationBackground(Color.surface)
+                    .presentationCompactAdaptation(.sheet)
+            }
     }
 
     private var ribbon: some View {
@@ -214,12 +247,14 @@ private struct EditorContent: View {
                 Text(min(session.currentPage + 1, document.pages.count), format: .number)
                     .font(.subheadline.weight(.bold).monospacedDigit())
                 Text("of \(document.pages.count)")
-                    .font(.caption2.weight(.medium).monospacedDigit())
+                    .font(.caption.weight(.medium).monospacedDigit())
             }
             .foregroundStyle(cloth.onCloth)
+            .padding(.horizontal, Space.x2)
             .padding(.top, Space.x2)
-            .padding(.bottom, Space.x5)
-            .frame(width: 44)
+            .frame(minWidth: 44)
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { ribbonWidth = $0 }
+            .padding(.bottom, Space.x2 + ribbonWidth * RibbonShape.notch)
             .background(cloth.color)
             .clipShape(RibbonShape())
             .shadow(color: .black.opacity(0.15), radius: 1, y: 1)
@@ -269,7 +304,6 @@ private struct EditorContent: View {
     private var addMenu: some View {
         Menu {
             Button { session.addPage(after: session.currentPage) } label: { Label("Page After Current", systemImage: "doc.badge.plus") }
-                .keyboardShortcut("n", modifiers: .command)
             Button { session.addPage() } label: { Label("Page at End", systemImage: "arrow.down.doc") }
             Menu {
                 ForEach(PaperTemplate.allCases) { template in
@@ -288,12 +322,9 @@ private struct EditorContent: View {
     private var moreMenu: some View {
         Menu {
             Button { export = ExportJob(document: document) } label: { Label("Export as PDF", systemImage: "square.and.arrow.up") }
-            if !document.manifest.recordings.isEmpty {
-                Button { showingRecordings = true } label: { Label("Recordings", systemImage: "waveform") }
-            }
             Divider()
             let current = document.pages.indices.contains(session.currentPage) ? document.pages[session.currentPage] : nil
-            if let current, let template = current.template {
+            if let current, let template = current.template, !document.isReadOnly {
                 Picker(selection: Binding(get: { template }, set: { document.setTemplate($0, forPage: current.id) })) {
                     ForEach(PaperTemplate.allCases) { Text($0.displayName).tag($0) }
                 } label: { Label("Page Template", systemImage: "square.grid.3x3") }
@@ -303,25 +334,23 @@ private struct EditorContent: View {
                 } label: { Label("Paper Colour", systemImage: "paintpalette") }
                 .pickerStyle(.menu)
             }
-            Button { Task { await document.duplicatePage(at: session.currentPage) } } label: {
-                Label("Duplicate Page", systemImage: "plus.square.on.square")
+            Group {
+                Button { Task { await session.duplicatePage(at: session.currentPage) } } label: {
+                    Label("Duplicate Page", systemImage: "plus.square.on.square")
+                }
+                Button(role: .destructive) { confirmingDelete = true } label: { Label("Delete Page", systemImage: "trash") }
             }
-            Button(role: .destructive) { confirmingDelete = true } label: { Label("Delete Page", systemImage: "trash") }
+            .disabled(document.isReadOnly)
             Divider()
-            Button { session.toggleToolPicker() } label: {
-                Label(session.isToolPickerVisible ? "Hide Tools" : "Show Tools", systemImage: "pencil.tip.crop.circle")
-            }
+            Button { session.canvas?.fit(.width) } label: { Label("Fit Width", systemImage: "arrow.left.and.right") }
+            Button { session.canvas?.fit(.page) } label: { Label("Fit Page", systemImage: "arrow.up.and.down") }
+            Divider()
             Picker(selection: $session.drawingInput) {
                 ForEach(DrawingInput.allCases) { Text($0.displayName).tag($0) }
             } label: { Label("Draw With", systemImage: "hand.draw") }
             .pickerStyle(.menu)
         } label: {
             Label("More", systemImage: "ellipsis.circle")
-        }
-        .popover(isPresented: $showingRecordings) {
-            RecordingList(recorder: session.recorder)
-                .frame(minWidth: 320, minHeight: 280)
-                .presentationCompactAdaptation(.sheet)
         }
     }
 
@@ -374,10 +403,12 @@ enum PhotoImport {
 }
 
 struct RibbonShape: Shape {
+    static let notch: CGFloat = 0.28
+
     func path(in rect: CGRect) -> Path {
         Path { path in
             path.addLines([CGPoint(x: rect.minX, y: rect.minY), CGPoint(x: rect.maxX, y: rect.minY), CGPoint(x: rect.maxX, y: rect.maxY),
-                           CGPoint(x: rect.midX, y: rect.maxY - rect.width * 0.28), CGPoint(x: rect.minX, y: rect.maxY)])
+                           CGPoint(x: rect.midX, y: rect.maxY - rect.width * Self.notch), CGPoint(x: rect.minX, y: rect.maxY)])
             path.closeSubpath()
         }
     }
@@ -423,19 +454,35 @@ struct RecordingList: View {
                             Image(systemName: recorder.playingID == recording.id ? "stop.circle.fill" : "play.circle.fill").font(.title)
                         }
                         .buttonStyle(.borderless)
+                        .disabled(recorder.isRecording)
                         .accessibilityLabel(recorder.playingID == recording.id ? "Stop" : "Play")
                         VStack(alignment: .leading, spacing: Space.x1) {
                             Text("Recording \(index + 1)").font(.body.weight(.medium))
-                            Text(recording.createdAt.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(Color.inkSecondary)
+                            Text(recording.createdAt.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(Color.textSecondary)
                             if recorder.playingID == recording.id { ProgressView(value: recorder.playbackProgress) }
                         }
                         Spacer()
                         Text(Duration.seconds(recording.duration).formatted(.time(pattern: .minuteSecond)))
-                            .font(.callout.monospacedDigit()).foregroundStyle(Color.inkSecondary)
+                            .font(.callout.monospacedDigit()).foregroundStyle(Color.textSecondary)
                     }
                     .swipeActions {
-                        Button(role: .destructive) { recorder.delete(recording) } label: { Label("Delete", systemImage: "trash") }
+                        if !recorder.isReadOnly {
+                            Button(role: .destructive) { recorder.delete(recording) } label: { Label("Delete", systemImage: "trash") }
+                        }
                     }
+                }
+            }
+            .overlay {
+                if recorder.recordings.isEmpty {
+                    ScrollView {
+                        ContentUnavailableView {
+                            Label("No Recordings", systemImage: "waveform").foregroundStyle(Color.ink)
+                        } description: {
+                            Text("Tap the microphone to record a lecture or meeting alongside your notes.").foregroundStyle(Color.textSecondary)
+                        }
+                    }
+                    .scrollBounceBehavior(.basedOnSize)
+                    .background(Color.surface)
                 }
             }
             .navigationTitle("Recordings")

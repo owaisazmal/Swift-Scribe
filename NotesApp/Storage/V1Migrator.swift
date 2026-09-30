@@ -71,10 +71,11 @@ struct V1Migrator: Sendable {
         let finishedEarlier = loggedAsMigrated()
 
         var folderFile = FolderFile.read(root)
-        for (index, folder) in folders.enumerated() where !folderFile.folders.contains(where: { $0.id == folder.id }) {
+        let byName = folders.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        for folder in byName where !folderFile.folders.contains(where: { $0.id == folder.id }) {
             folderFile.upsert(FolderEntry(id: folder.id, name: folder.name,
                                           clothRaw: (FolderColor(rawValue: folder.colorRaw) ?? .blue).cloth.rawValue,
-                                          createdAt: folder.createdAt, sortIndex: folderFile.folders.count + index))
+                                          createdAt: folder.createdAt, sortIndex: (folderFile.folders.map(\.sortIndex).max() ?? -1) + 1))
         }
         do { try folderFile.write(root) } catch { report.warnings.append("folders couldn't be written: \(error.localizedDescription)") }
 
@@ -245,12 +246,11 @@ struct V1Migrator: Sendable {
             }
         }
         if !notebook.searchText.isEmpty {
-            try Data(notebook.searchText.utf8).write(to: staging.appending(path: "text/legacy-v1.txt"), options: .atomic)
+            try Data(notebook.searchText.utf8).write(to: staging.appending(path: "text/\(NotebookPackage.legacyTextName)"), options: .atomic)
         }
 
-        let firstIsPDF: Bool = if case .pdf = pages.first?.background { true } else { false }
         var cover = CoverSpec.defaultCloth(for: notebook.id)
-        if firstIsPDF { cover.style = .firstPage }
+        cover.style = .firstPage
         var manifest = NotebookManifest(id: notebook.id, title: notebook.title.isEmpty ? "Untitled Notebook" : notebook.title,
                                         createdAt: notebook.createdAt, cover: cover, defaults: notebook.defaults, pages: pages)
         manifest.modifiedAt = notebook.modifiedAt

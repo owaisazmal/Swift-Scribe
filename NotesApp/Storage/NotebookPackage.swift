@@ -249,6 +249,13 @@ actor NotebookPackage {
         try Data(text.utf8).write(to: textURL(pageID), options: .atomic)
     }
 
+    /// The search text a v1 notebook brought with it, kept until every page has its own recognised text.
+    nonisolated static let legacyTextName = "legacy-v1.txt"
+
+    func removeLegacyText() {
+        try? FileManager.default.removeItem(at: textDirectory.appending(path: Self.legacyTextName))
+    }
+
     func writeThumbnail(_ png: Data, pageID: UUID, key: String) throws {
         try makeDirectoryInExistingPackage(thumbsDirectory)
         try png.write(to: thumbURL(pageID, key: key), options: .atomic)

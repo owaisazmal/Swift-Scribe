@@ -9,6 +9,8 @@ struct NewNotebookView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.displayScale) private var displayScale
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @AppStorage(SettingsKey.defaultTemplate) private var template: PaperTemplate = .narrowRuled
     @AppStorage(SettingsKey.defaultPaperColor) private var paperColor: PaperColor = .white
     @AppStorage(SettingsKey.defaultPageSize) private var pageSize: PageSize = .letter
@@ -54,15 +56,12 @@ struct NewNotebookView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .top, spacing: Space.x8) {
-                        preview.frame(width: 220)
-                        form
-                    }
-                    VStack(alignment: .leading, spacing: Space.x6) {
-                        preview.frame(width: 180).frame(maxWidth: .infinity)
-                        form
-                    }
+                let sideBySide = sizeClass == .regular && !dynamicTypeSize.isAccessibilitySize
+                let layout = sideBySide ? AnyLayout(HStackLayout(alignment: .top, spacing: Space.x8))
+                                        : AnyLayout(VStackLayout(alignment: .leading, spacing: Space.x6))
+                layout {
+                    preview.frame(width: sideBySide ? 220 : 180).frame(maxWidth: sideBySide ? nil : .infinity)
+                    form
                 }
                 .padding(Space.x6)
             }
@@ -86,6 +85,7 @@ struct NewNotebookView: View {
             }
         }
         .presentationDetents([.large])
+        .presentationSizing(.page)
     }
 
     private var preview: some View {
@@ -103,6 +103,7 @@ struct NewNotebookView: View {
                     seed = UInt32.random(in: 0...UInt32.max)
                 } label: {
                     Label("Reprint pattern", systemImage: "arrow.triangle.2.circlepath")
+                        .frame(minHeight: 44)
                 }
                 .font(.subheadline.weight(.semibold))
             }
@@ -112,7 +113,7 @@ struct NewNotebookView: View {
     private var form: some View {
         VStack(alignment: .leading, spacing: Space.x4) {
             TextField("Untitled Notebook", text: $title)
-                .font(.display(24, relativeTo: .title2))
+                .displayFont(24, relativeTo: .title2)
                 .padding(.horizontal, Space.x3)
                 .padding(.vertical, Space.x2)
                 .background(Color.paper, in: RoundedRectangle(cornerRadius: Radius.control))
@@ -267,8 +268,8 @@ struct PaperSwatch: View {
                 .padding(3)
                 .overlay { RoundedRectangle(cornerRadius: 4).strokeBorder(Color.accentColor, lineWidth: isSelected ? 2.5 : 0) }
             Text(template.displayName)
-                .font(.caption2)
-                .foregroundStyle(isSelected ? Color.accentColor : Color.inkSecondary)
+                .font(.caption)
+                .foregroundStyle(isSelected ? Color.accentColor : Color.textSecondary)
         }
     }
 

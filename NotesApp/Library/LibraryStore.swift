@@ -24,6 +24,11 @@ final class LibraryStore {
     let root: StorageRoot
     @ObservationIgnored let context: ModelContext
     private(set) var lastError: String?
+    /// Bumped on every index save, so views holding derived results (search) know to refresh them.
+    private(set) var indexVersion = 0
+    /// Bumped only when something search matches on changes (titles, recognised text, notebooks added), so an
+    /// active search isn't redone on every autosave.
+    private(set) var searchVersion = 0
     @ObservationIgnored private let log = Logger(subsystem: "com.owais.NotesApp", category: "library")
     @ObservationIgnored private var changesInFlight: [UUID: [UUID: @Sendable (inout NotebookManifest) -> Void]] = [:]
     @ObservationIgnored private var folderWrite: Task<Void, Never>?
@@ -39,6 +44,7 @@ final class LibraryStore {
 
     func saveIndex() {
         do { try context.save() } catch { log.error("index save failed: \(error.localizedDescription)") }
+        indexVersion &+= 1
     }
 
     func clearError() { lastError = nil }
@@ -53,6 +59,18 @@ final class LibraryStore {
         try await NotebookPackage(root: root, id: manifest.id).create(manifest)
         index(manifest)
         return manifest.id
+    }
+
+    /// A notebook with the default paper from Settings, dated rather than named, created without the sheet.
+    func createQuickNote(folder: FolderRecord?) async throws -> UUID {
+        let defaults = UserDefaults.standard
+        let template = defaults.string(forKey: SettingsKey.defaultTemplate).flatMap(PaperTemplate.init(rawValue:)) ?? .narrowRuled
+        let color = defaults.string(forKey: SettingsKey.defaultPaperColor).flatMap(PaperColor.init(rawValue:)) ?? .white
+        let size = defaults.string(forKey: SettingsKey.defaultPageSize).flatMap(PageSize.init(rawValue:)) ?? .letter
+        let id = UUID()
+        return try await createNotebook(id: id, title: String(localized: "Note \(Date.now.formatted(date: .abbreviated, time: .shortened))"),
+                                        cover: .defaultCloth(for: id), defaults: PageDefaults(template: template, paperColor: color, pageSize: size),
+                                        folder: folder)
     }
 
     @discardableResult
@@ -71,10 +89,7 @@ final class LibraryStore {
             manifest.library.folderID = folderID
             try await package.create(manifest)
             index(manifest)
-            Task(priority: .utility) { [weak self] in
-                let text = await HandwritingIndexer.shared.index(HandwritingIndexer.Job(package: package, pages: pages))
-                self?.updateSearchText(text, for: id)
-            }
+            indexHandwriting(package: package, pages: pages)
             return id
         } catch {
             try? FileManager.default.removeItem(at: package.url)
@@ -115,6 +130,7 @@ final class LibraryStore {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !record.isReadOnly, !trimmed.isEmpty, trimmed != record.title else { return }
         record.title = trimmed
+        searchVersion &+= 1
         saveIndex()
         if let document = DocumentRegistry.shared.document(for: record.id) {
             document.rename(trimmed)
@@ -234,8 +250,8 @@ final class LibraryStore {
     func createFolder(name: String, cloth: ClothColor) -> FolderRecord? {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
-        let count = (try? context.fetchCount(FetchDescriptor<FolderRecord>())) ?? 0
-        let entry = FolderEntry(id: UUID(), name: trimmed, clothRaw: cloth.rawValue, createdAt: .now, sortIndex: count)
+        let last = try? context.fetch(FetchDescriptor<FolderRecord>(sortBy: [SortDescriptor(\.sortIndex, order: .reverse)])).first
+        let entry = FolderEntry(id: UUID(), name: trimmed, clothRaw: cloth.rawValue, createdAt: .now, sortIndex: (last?.sortIndex ?? -1) + 1)
         let record = FolderRecord(id: entry.id)
         record.apply(entry)
         context.insert(record)
@@ -254,6 +270,22 @@ final class LibraryStore {
 
     func setCloth(_ cloth: ClothColor, for folder: FolderRecord) {
         folder.clothRaw = cloth.rawValue
+        saveIndex()
+        writeFolders()
+    }
+
+    /// Reorders shelves in the sidebar.
+    func moveFolders(_ folders: [FolderRecord], from source: IndexSet, to destination: Int) {
+        var ordered = folders
+        ordered.move(fromOffsets: source, toOffset: destination)
+        for (index, folder) in ordered.enumerated() where folder.sortIndex != index { folder.sortIndex = index }
+        saveIndex()
+        writeFolders()
+    }
+
+    func sortFoldersByName(_ folders: [FolderRecord]) {
+        let sorted = folders.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        for (index, folder) in sorted.enumerated() where folder.sortIndex != index { folder.sortIndex = index }
         saveIndex()
         writeFolders()
     }
@@ -295,7 +327,9 @@ final class LibraryStore {
             context.insert(new)
             return new
         }()
+        let oldTitle = record.title
         var changed = record.apply(manifest, issues: record.issueCount) || existing == nil
+        if existing == nil || record.title != oldTitle { searchVersion &+= 1 }
         let folderID = manifest.library.folderID
         if record.folder?.id != folderID {
             record.folder = folderID.flatMap { id in try? context.fetch(FetchDescriptor<FolderRecord>(predicate: #Predicate { $0.id == id })).first }
@@ -304,9 +338,19 @@ final class LibraryStore {
         if changed { saveIndex() }
     }
 
+    /// Recognises handwriting and PDF text for pages whose text is out of date, in the background.
+    func indexHandwriting(package: NotebookPackage, pages: [NotebookPage]) {
+        let id = package.id
+        Task(priority: .utility) { [weak self] in
+            let text = await HandwritingIndexer.shared.index(HandwritingIndexer.Job(package: package, pages: pages))
+            self?.updateSearchText(text, for: id)
+        }
+    }
+
     func updateSearchText(_ text: String, for id: UUID) {
         guard let record = record(id), record.searchText != text else { return }
         record.searchText = text
+        searchVersion &+= 1
         saveIndex()
     }
 }

@@ -21,6 +21,7 @@ final class DesignTokenTests: XCTestCase {
         let pairs: [(String, UIColor, UIColor)] = [
             ("ink/paper", .ink, .paper), ("ink/desk", .ink, .desk), ("ink/surface", .ink, .surface),
             ("secondary/paper", .inkSecondary, .paper), ("secondary/desk", .inkSecondary, .desk), ("secondary/surface", .inkSecondary, .surface),
+            ("textSecondary/paper", .textSecondary, .paper), ("textSecondary/desk", .textSecondary, .desk), ("textSecondary/surface", .textSecondary, .surface),
             ("tint/paper", .accent, .paper), ("tint/desk", .accent, .desk), ("tint/surface", .accent, .surface),
             ("onTomato/tomato", .onTomato, .tomato), ("onMustard/mustard", .onMustard, .mustard),
             ("labelInk/labelCream", .labelInk, .labelCream), ("labelSecondary/labelCream", .labelInkSecondary, .labelCream),
@@ -39,12 +40,43 @@ final class DesignTokenTests: XCTestCase {
         print("CONTRAST\n" + report.joined(separator: "\n"))
     }
 
+    /// A focused sidebar row is filled with the sidebar tint under white text; its icons sit on the surface.
+    func testSidebarTintCarriesWhiteTextAndItsIconsShow() {
+        for style in [UIUserInterfaceStyle.light, .dark] {
+            for level in [UIAccessibilityContrast.normal, .high] {
+                let traits = UITraitCollection { $0.userInterfaceStyle = style; $0.accessibilityContrast = level }
+                let tint = UIColor.sidebarTint.resolvedColor(with: traits)
+                XCTAssertGreaterThanOrEqual(contrast(.white, tint), 4.5)
+                XCTAssertGreaterThanOrEqual(contrast(tint, UIColor.surface.resolvedColor(with: traits)), 3)
+            }
+        }
+    }
+
     /// The editor's page ribbon draws its text straight on the notebook's cloth.
     func testRibbonTextReachesAAOnEveryCloth() {
         for cloth in ClothColor.allCases {
             let ratio = contrast(UIColor(cloth.onCloth), cloth.uiColor)
             XCTAssertGreaterThanOrEqual(ratio, 4.5, "\(cloth.rawValue): \(String(format: "%.2f", ratio))")
         }
+    }
+
+    /// Small labels and metadata use the text token, which keeps 7:1 so anti-aliased small text still clears Apple's audit.
+    func testSmallTextTokenReachesSevenToOne() {
+        for style in [UIUserInterfaceStyle.light, .dark] {
+            for level in [UIAccessibilityContrast.normal, .high] {
+                let traits = UITraitCollection { $0.userInterfaceStyle = style; $0.accessibilityContrast = level }
+                for background in [UIColor.paper, .desk, .surface] {
+                    let ratio = contrast(UIColor.textSecondary.resolvedColor(with: traits), background.resolvedColor(with: traits))
+                    XCTAssertGreaterThanOrEqual(ratio, 7, "\(style == .dark ? "dark" : "light")\(level == .high ? "+IC" : ""): \(String(format: "%.2f", ratio))")
+                }
+                XCTAssertGreaterThan(contrast(UIColor.textSecondary.resolvedColor(with: traits), UIColor.desk.resolvedColor(with: traits)),
+                                     contrast(UIColor.inkSecondary.resolvedColor(with: traits), UIColor.desk.resolvedColor(with: traits)))
+            }
+        }
+        let normal = UITraitCollection { $0.userInterfaceStyle = .light }
+        let high = UITraitCollection { $0.userInterfaceStyle = .light; $0.accessibilityContrast = .high }
+        XCTAssertGreaterThan(contrast(UIColor.textSecondary.resolvedColor(with: high), UIColor.desk.resolvedColor(with: high)),
+                             contrast(UIColor.textSecondary.resolvedColor(with: normal), UIColor.desk.resolvedColor(with: normal)))
     }
 
     func testIncreaseContrastStrengthensSecondaryText() {
@@ -58,6 +90,7 @@ final class DesignTokenTests: XCTestCase {
         ScribeFonts.register()
         XCTAssertNotNil(UIFont(name: ScribeFonts.frauncesSemiBold, size: 20))
         XCTAssertNotNil(UIFont(name: ScribeFonts.frauncesRegular, size: 20))
+        XCTAssertNotNil(UIFont(name: ScribeFonts.frauncesBold, size: 20), "Bold Text uses the Bold instance")
         let title = ScribeFonts.printTitle(size: 30)
         XCTAssertEqual(CTFontCopyFamilyName(title) as String, "Bricolage Grotesque")
         let axes = CTFontCopyVariation(title) as? [NSNumber: NSNumber] ?? [:]

@@ -149,7 +149,6 @@ private final class PassThroughWindow: UIWindow {
 enum LibrarySeed {
     /// Writes `count` notebooks with a mix of cover styles and a few folders, for scrolling tests.
     static func write(count: Int, root: StorageRoot) async {
-        guard root.packageIDs().isEmpty else { return }
         var folderFile = FolderFile()
         let folders = ["Biology", "Studio", "Physics", "Journal"].enumerated().map { index, name in
             FolderEntry(id: UUID(), name: name, clothRaw: ClothColor.allCases[index * 2].rawValue, createdAt: .now, sortIndex: index)
@@ -179,7 +178,6 @@ enum LibrarySeed {
 
     /// One notebook made from a generated 300-page PDF, for scrolling and zoom tests in the editor.
     static func writeLongPDF(root: StorageRoot) async {
-        guard root.packageIDs().isEmpty else { return }
         let id = UUID()
         let package = NotebookPackage(root: root, id: id)
         let source = FileManager.default.temporaryDirectory.appending(path: "seed-\(id.uuidString).pdf")
@@ -200,6 +198,9 @@ enum LibrarySeed {
         cover.style = .firstPage
         try? await package.create(NotebookManifest(id: id, title: "Textbook", cover: cover,
                                                    defaults: PageDefaults(template: .blank, paperColor: .white, pageSize: .letter), pages: pages))
+        if LaunchOptions.arguments.contains("-indexSeed") {
+            _ = await HandwritingIndexer.shared.index(HandwritingIndexer.Job(package: package, pages: pages))
+        }
     }
 }
 #endif

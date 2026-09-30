@@ -68,6 +68,8 @@ final class NotebookDocument {
 
     @ObservationIgnored let undoManager = DocumentUndoManager()
     @ObservationIgnored weak var inkObserver: InkObserver?
+    /// The editor's recorder, so closing a window can stop a recording before the last save.
+    @ObservationIgnored weak var recorder: NotebookRecorder?
     /// Called after any change to the page list or a page's appearance, including undo and redo.
     @ObservationIgnored var onStructureChange: (() -> Void)?
     /// Called after a save that changed what the library shows while the notebook is open (title, pages,
@@ -376,14 +378,31 @@ final class NotebookDocument {
         undoManager.setActionName(String(localized: "Move Page"))
     }
 
-    func duplicatePage(at index: Int) async {
-        guard !isReadOnly, manifest.pages.indices.contains(index) else { return }
+    /// Returns where the copy went.
+    @discardableResult
+    func duplicatePage(at index: Int) async -> Int? {
+        guard !isReadOnly, manifest.pages.indices.contains(index) else { return nil }
         let original = manifest.pages[index]
         let drawing = await ink(original.id)
-        guard let position = self.index(of: original.id) else { return }
+        guard let position = self.index(of: original.id) else { return nil }
         var copy = original.duplicated()
         copy.inkHash = nil
         insertPages([copy], at: position + 1, ink: drawing.strokes.isEmpty ? [:] : [copy.id: drawing], actionName: String(localized: "Duplicate Page"))
+        return position + 1
+    }
+
+    /// A new page for inserting after `index`: it matches that page's paper when it's a template page,
+    /// and otherwise uses the notebook's defaults.
+    func newPage(after index: Int?, template: PaperTemplate? = nil) -> NotebookPage {
+        var page = manifest.defaults.newPage()
+        if let index, manifest.pages.indices.contains(index), manifest.pages[index].template != nil {
+            let anchor = manifest.pages[index]
+            page.size = anchor.size
+            page.paperColor = anchor.paperColor
+            page.background = anchor.background
+        }
+        if let template { page.background = .template(template) }
+        return page
     }
 
     func setTemplate(_ template: PaperTemplate, forPage pageID: UUID) {

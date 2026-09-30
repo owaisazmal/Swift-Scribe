@@ -55,6 +55,13 @@ extension ClothColor {
     }
 }
 
+extension View {
+    /// The filled button, with paper-coloured text: white fails on the dark-mode tint.
+    func prominentButton() -> some View {
+        buttonStyle(.borderedProminent).foregroundStyle(Color.paper)
+    }
+}
+
 extension RisoInk {
     var uiColor: UIColor { UIColor(hex: hex) }
 }

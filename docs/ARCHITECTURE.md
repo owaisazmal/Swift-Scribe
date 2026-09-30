@@ -69,6 +69,7 @@ A's one weakness is simulator footprint at 5×. We addressed it with the measure
 - **Zoom.**
   - During a pinch, the content view is magnified.
   - When the pinch ends, the zoom is *baked*: the layout is rebuilt at the new scale, and each canvas's `zoomScale` is set so PencilKit re-renders the ink sharply.
+  - Pages keep their true relative size: 1× fits the widest page to the window, so an A5 page between Letter pages is smaller. Fit Width (⌘0) and Fit Page (⌘9) fit the current page instead, which enlarges a smaller page.
   - The minimum zoom shows a whole page, and the maximum is 5×.
 - **Input.** The scroll view's pan and pinch accept direct touches only, so the Pencil never scrolls. With "Pencil and finger", scrolling takes two fingers.
 - **Ink stays on its page.** Each page slot clips its canvas, and every renderer (thumbnails, covers, OCR, export) draws only the page rectangle. Ink that runs past the edge is kept in the drawing but never shown. Nothing is masked at stroke end: doing that copied every stroke on the page per stroke, and clipped lasso-moved ink for good.
@@ -148,6 +149,10 @@ text/<pageID>.txt      recognised handwriting and PDF text, stamped with the ink
 3. It writes the manifest, then renames the folder into place.
 4. When every notebook has succeeded, it moves the v1 files to `Backups/v1/` unchanged.
 
+Migration tests run against `NotesAppTests/Fixtures/v1-library.json`, a library written by the real v1 code before it was removed. Migrated notebooks get first-page covers, as their v1 cards showed the first page, folders keep v1's A to Z order and a distinct cloth each, and their handwriting is recognised page by page in the background after launch.
+
+Folders keep a distinct cloth each; v1 purple becomes Plum. The migrator and its tests stay until at least the first stable public release.
+
 A rerun skips finished notebooks, including ones the user has deleted since (the log in `Library/migration-v1.json` remembers them), and restarts half-written ones. If the v1 database exists but can't be read, nothing is migrated or archived and the next launch tries again. Failures are shown in an alert at launch and in Settings.
 
 ## Background work and caches
@@ -157,7 +162,7 @@ A rerun skips finished notebooks, including ones the user has deleted since (the
   - covers (`CoverRenderer` and `CoverCache`: an 80 MB memory LRU plus `Caches/Covers`, kept under 150 MB). Renders stop when their cell scrolls away, disk hits are decoded before they reach the main thread, and the New Notebook preview never touches either cache;
   - PDF export (`NotebookExporter`): streamed to disk a page at a time, with progress; cancelling or dismissing the sheet stops it;
   - handwriting OCR (`HandwritingIndexer`, per page by ink hash). Rendering and Vision run off the indexer actor so an edit's cancel gets through, and a page already being read is never read twice;
-  - library search: debounced, matched by a SwiftData predicate on a background context;
+  - library search: debounced, matched by a SwiftData predicate on a background context, then each matching notebook's per-page text is read for page-level results (`PageSearch`) that open the editor at that page. Results refresh whenever the index is saved;
   - PDF parsing on import.
 - **Bounded caches:**
   - PDF documents: an LRU of 6;
@@ -172,7 +177,7 @@ A rerun skips finished notebooks, including ones the user has deleted since (the
 Same run for both columns.
 
 - **Environment:** "Scribe Bench" iPad Pro 11-inch (M5) simulator, iOS 27.0, Debug build in Swift 6 language mode, on an Apple M4 Mac mini at load average 3–4.
-- **Method:** XCTest in-process timings (`NotesAppTests/PerformanceBaselineTests`, run with `SCRIBE_PERF=1`), medians unless noted. v1 cases drive the v1 code, which is still compiled for this purpose.
+- **Method:** XCTest in-process timings (`NotesAppTests/PerformanceBaselineTests`, run with `SCRIBE_PERF=1`), medians unless noted. The v1 column was measured on the v1 code before it was removed in M6; the suite now runs the v2 cases only.
 - **Fixtures:** heavy is 100 Letter pages × 500 strokes with a 1,000-stroke first page for v2's stroke-end cases; typical is 20 × 400.
 
 None of these are device numbers. Pencil latency and hitches need the device checklist.
@@ -201,9 +206,18 @@ All three targets build in the Swift 6 language mode with no warnings. Two thing
 - `CATiledLayer` calls `draw(_:)` on background threads, so both tiled views mark it `nonisolated`.
 - `CanvasUndoProxy` keeps its notification tokens `nonisolated(unsafe)`: they're only read again in `deinit`, when nothing else can reach them.
 
+## Colour and accessibility
+
+- `inkSecondary` is for decoration, large text, borders and icons only. Small labels and metadata use `textSecondary`, which keeps 7:1 on paper, desk and surface in light, dark and Increase Contrast, so anti-aliased small text still clears Apple's audit (`DesignTokenTests`).
+- `AccessibilityAuditUITests` runs Apple's full audit over the empty and seeded library, search results, Recently Deleted, New Notebook, Settings, Change Cover (sheets at both ends of their scroll), the editor, the page navigator and Recordings, in light, dark and both with Increase Contrast (`-increaseContrast` sets the trait override), then Dynamic Type, clipping and contrast again at a large text size. A few issues are logged rather than failed: text on the system glass bars, PencilKit's tool picker handle, text behind a sheet that VoiceOver skips, unnamed contrast issues on a sheet scrolled so text sits under its glass bar, and Dynamic Type on the last row and footer of the Settings Form, which the audit flags whatever they contain (both scale fully at the largest size).
+- Layouts that change with text size use `AnyLayout`, not `ViewThatFits`: the audit can't follow text across `ViewThatFits`'s two copies and reports it as partly unscaled.
+- No text uses `caption2`: the audit reports it as partly unscaled, so the smallest style is `caption`.
+
 ## Known limits
 
 - Undo keeps whole-page drawings, up to 200 steps. Memory therefore grows with the number of distinct pages edited in a session, not just with the 24-page ink cache. The fix is a stroke budget that drops the oldest steps; it should be sized from a device memory trace.
-- Each library record carries its search text, so the shelf's query loads it. Moving search text into its own entity is a schema change for M6.
+- Each library record carries its search text, so the shelf's query loads it. Moving search text into its own entity is a schema change worth making before release.
+- Lasso and ruler are page-scoped in the first release: each page is its own canvas, so neither can span two pages, and ink past a page edge is hidden. v1's single canvas allowed both. Cross-page lasso is a future feature, to be built as a selection layer over the per-page canvases, not by returning to one canvas.
+- ⌘F is claimed by a first-responder view in the library (the toolbar search swallows it otherwise). In the iPadOS 27 simulator under XCUITest, ⌘F never reaches the app at all while ⌘G on the same view does, so it needs a check on a device.
 - Every figure above is from the simulator. The device checklist covers Pencil latency, hitches (Instruments), memory at 5× with the heavy fixture, palm rejection, and Pencil double-tap and squeeze.
 
