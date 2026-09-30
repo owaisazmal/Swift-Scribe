@@ -31,6 +31,12 @@ struct CoverEditorView: View {
                     .frame(maxWidth: .infinity)
                     .accessibilityHidden(false)
                     .accessibilityLabel(Text("Cover preview: \(spec.style.displayName) cover for \(record.title)"))
+                    ShuffleButton(style: spec.style) {
+                        var generator = SystemRandomNumberGenerator()
+                        spec = CoverShuffle.next(spec, using: &generator)
+                        inkPair = RisoInk.pairs.firstIndex { $0.0 == spec.inks.0 && $0.1 == spec.inks.1 } ?? inkPair
+                    }
+                    .frame(maxWidth: .infinity)
                     Picker("Cover", selection: $spec.style) {
                         ForEach(CoverStyle.allCases) { Text($0.displayName).tag($0) }
                     }
@@ -47,11 +53,6 @@ struct CoverEditorView: View {
                                                                 .init(color: Color(hex: RisoInk.pairs[index].1.hex), location: 0.5)],
                                                         startPoint: .topLeading, endPoint: .bottomTrailing))
                         }
-                        Button { spec.seed = UInt32.random(in: 0...UInt32.max) } label: {
-                            Label("Reprint pattern", systemImage: "arrow.triangle.2.circlepath")
-                                .frame(minHeight: 44)
-                        }
-                        .font(.subheadline.weight(.semibold))
                     }
                 }
                 .padding(Space.x6)

@@ -17,11 +17,12 @@ Swift Scribe is built entirely on Apple frameworks (SwiftUI, PencilKit, PDFKit, 
 
 **Notebooks & paper**
 - Continuous vertically scrolling pages
-- Paper templates: blank, narrow ruled, wide ruled, grid, dotted, Cornell, music staff
-- Paper colors: white, ivory, legal-pad yellow, gray, charcoal
+- Fourteen paper templates in four families: writing (blank, narrow ruled, wide ruled, penmanship, checklist), grids (grid, engineering, dotted, isometric), planning (Cornell, day planner, week planner) and creative (music staff, storyboard)
+- Paper colors: white, ivory, legal-pad yellow, kraft, sage, blush, gray, charcoal, and chalkboard, where the ink writes chalk-white
 - Page sizes: US Letter, A4, A5, widescreen
+- A paper drawer with real miniatures: add a page with any paper, or change a page's paper and color in place (undoable)
+- New Notebook starters (Journal, Lecture, Sketchbook, Planner, Music, Plain) and Shuffle for a fresh cover; your Quick Note paper only changes when you ask
 - Page navigator with thumbnails: jump, drag to reorder, insert, duplicate, delete, go to page
-- Change template or paper color per page
 
 **PDFs & images**
 - Import PDFs as new notebooks, or insert them into an existing one, and annotate them

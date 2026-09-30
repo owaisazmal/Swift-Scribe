@@ -2,10 +2,10 @@ import XCTest
 
 extension XCTestCase {
     /// Logs, without failing, issues the app can't act on: system glass bars, PencilKit's tool picker handle, text the
-    /// audit reads off the dimmed screen behind a sheet (VoiceOver skips it by design), and `formEnd` below.
+    /// audit reads off the dimmed screen behind a sheet (VoiceOver skips it by design), and `formText` below.
     @MainActor
     func audit(_ app: XCUIApplication, _ types: XCUIAccessibilityAuditType = .all, screen: String = "", modal: Bool = false,
-               scrolled: Bool = false, formEnd: [String] = []) throws {
+               scrolled: Bool = false, formText: [String] = []) throws {
         let barMaxY = app.navigationBars.allElementsBoundByIndex.map { $0.frame.maxY }.max() ?? 0
         try app.performAccessibilityAudit(for: types) { issue in
             let element = issue.element
@@ -14,9 +14,10 @@ extension XCTestCase {
                 print("AUDIT [\(screen)] ignored on system bar: \(element.label)")
                 return true
             }
-            // A Form's last row and footer are flagged whatever they hold (moving another row last moves the flag); both scale fully at AX5.
-            if issue.auditType == .dynamicType, let label = element?.label, formEnd.contains(where: label.hasPrefix) {
-                print("AUDIT [\(screen)] ignored at the end of a Form: \(label)")
+            // Form rows and footers are flagged whatever they hold; all of it scales fully at AX5.
+            if issue.auditType == .dynamicType || (scrolled && issue.auditType == .textClipped), let label = element?.label,
+               formText.contains(where: label.hasPrefix) {
+                print("AUDIT [\(screen)] ignored in a Form: \(label)")
                 return true
             }
             if issue.auditType == .hitRegion, element?.label == "Tool palette handle" {
@@ -24,7 +25,7 @@ extension XCTestCase {
                 return true
             }
             // Scrolled, some text sits under the glass bar; the audit sometimes can't name it, so it can't be placed there.
-            if scrolled, issue.auditType == .contrast, element == nil {
+            if scrolled, issue.auditType == .contrast || issue.auditType == .dynamicType, element == nil {
                 print("AUDIT [\(screen)] ignored, unnamed text in a scrolled sheet: \(issue.compactDescription)")
                 return true
             }

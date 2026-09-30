@@ -169,6 +169,7 @@ enum LibrarySeed {
                                                     pages: (0..<(1 + index % 6)).map { _ in .template(.narrowRuled, color: .white, size: .letter) })
                     manifest.modifiedAt = manifest.createdAt
                     manifest.library.isFavorite = index % 7 == 0
+                    if index == 0 { manifest.library.lastOpenedAt = .now }
                     manifest.library.folderID = index % 3 == 0 ? folders[index % folders.count].id : nil
                     try? await NotebookPackage(root: root, id: id).create(manifest)
                 }

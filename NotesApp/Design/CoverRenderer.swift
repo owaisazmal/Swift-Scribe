@@ -27,7 +27,13 @@ struct CoverRequest: Sendable, Hashable {
 
 /// Draws covers with Core Graphics. Pure and thread-safe: every cover is a function of its request.
 enum CoverRenderer {
-    static let version = 3
+    static let version = 4
+
+    /// How far the page block shows past the board on the fore-edge and the tail. Nothing below shelf sizes.
+    static func pageBlockInsets(for size: CGSize) -> (right: CGFloat, bottom: CGFloat) {
+        guard size.width >= 100 else { return (0, 0) }
+        return ((size.width * 0.028).rounded(), (size.height * 0.016).rounded())
+    }
 
     static func render(_ request: CoverRequest, firstPage: CGImage? = nil) -> UIImage {
         let size = request.size
@@ -37,15 +43,24 @@ enum CoverRenderer {
         return UIGraphicsImageRenderer(size: size, format: format).image { context in
             let ctx = context.cgContext
             let bounds = CGRect(origin: .zero, size: size)
-            let shape = coverPath(bounds)
-            ctx.addPath(shape.cgPath)
+            let inset = pageBlockInsets(for: size)
+            let isBound = inset.right > 0
+            let board = CGRect(x: 0, y: 0, width: size.width - inset.right, height: size.height - inset.bottom)
+            if isBound { drawPageBlock(request, in: ctx, bounds: bounds, board: board) }
+            ctx.saveGState()
+            ctx.addPath(coverPath(board).cgPath)
             ctx.clip()
             switch request.spec.style {
-            case .cloth: drawCloth(request, in: ctx, bounds: bounds)
-            case .print: drawPrint(request, in: ctx, bounds: bounds)
-            case .firstPage: drawFirstPage(request, image: firstPage, in: ctx, bounds: bounds)
+            case .cloth: drawCloth(request, in: ctx, bounds: board)
+            case .print: drawPrint(request, in: ctx, bounds: board)
+            case .firstPage: drawFirstPage(request, image: firstPage, in: ctx, bounds: board)
             }
-            if request.dark, request.spec.style != .cloth { dim(ctx, bounds) }
+            if isBound {
+                if request.spec.style == .print { drawStaples(request, in: ctx, board: board) } else { drawHinge(request, in: ctx, board: board) }
+                drawBoardEdge(request, in: ctx, board: board)
+            }
+            if request.dark, request.spec.style != .cloth { dim(ctx, board) }
+            ctx.restoreGState()
         }
     }
 
@@ -71,6 +86,96 @@ enum CoverRenderer {
         return path
     }
 
+    // MARK: Binding
+
+    /// Cream leaves past the fore-edge and tail. Drawn in thin strips: Core Graphics' cost follows each shape's bounding box.
+    private static func drawPageBlock(_ request: CoverRequest, in ctx: CGContext, bounds: CGRect, board: CGRect) {
+        let spine = bounds.width * 0.013, edge = bounds.width * 0.035, corner = board.width * 0.035
+        let (w, h) = (bounds.maxX, bounds.maxY)
+        let foreEdge = CGMutablePath()
+        foreEdge.move(to: CGPoint(x: board.maxX - corner, y: 0))
+        foreEdge.addLine(to: CGPoint(x: w - edge, y: 0))
+        foreEdge.addQuadCurve(to: CGPoint(x: w, y: edge), control: CGPoint(x: w, y: 0))
+        foreEdge.addLine(to: CGPoint(x: w, y: h - edge))
+        foreEdge.addQuadCurve(to: CGPoint(x: w - edge, y: h), control: CGPoint(x: w, y: h))
+        foreEdge.addLine(to: CGPoint(x: board.maxX - corner, y: h))
+        foreEdge.closeSubpath()
+        let tail = CGMutablePath()
+        tail.move(to: CGPoint(x: 0, y: board.maxY - corner))
+        tail.addLine(to: CGPoint(x: 0, y: h - spine))
+        tail.addQuadCurve(to: CGPoint(x: spine, y: h), control: CGPoint(x: 0, y: h))
+        tail.addLine(to: CGPoint(x: board.maxX, y: h))
+        tail.addLine(to: CGPoint(x: board.maxX, y: board.maxY - corner))
+        tail.closeSubpath()
+        ctx.setFillColor(UIColor(hex: request.dark ? 0xD9D1BF : 0xF7F1E3).cgColor)
+        for path in [foreEdge, tail] {
+            ctx.addPath(path)
+            ctx.fillPath()
+        }
+
+        func clearance(_ distance: CGFloat, round radius: CGFloat) -> CGFloat {
+            let t = 1 - (min(distance, radius) / radius).squareRoot()
+            return radius * t * t + 0.5
+        }
+        let line = max(0.5, bounds.width * 0.003)
+        var down: [CGRect] = [], across: [CGRect] = []
+        let turns = CGMutablePath()
+        for leaf in 1...3 {
+            let t = CGFloat(leaf) / 4
+            let turn = CGPoint(x: board.maxX + (w - board.maxX) * t, y: board.maxY + (h - board.maxY) * t)
+            let top = clearance(w - turn.x, round: edge), left = clearance(h - turn.y, round: spine)
+            down.append(CGRect(x: turn.x - line / 2, y: top, width: line, height: turn.y - corner - top))
+            across.append(CGRect(x: left, y: turn.y - line / 2, width: turn.x - corner - left, height: line))
+            turns.move(to: CGPoint(x: turn.x, y: turn.y - corner))
+            turns.addArc(tangent1End: turn, tangent2End: CGPoint(x: 0, y: turn.y), radius: corner)
+        }
+        let leafColor = UIColor(hex: 0x1B2230, alpha: request.highContrast ? 0.35 : 0.12).cgColor
+        ctx.setFillColor(leafColor)
+        ctx.fill(down)
+        ctx.fill(across)
+        ctx.addPath(turns)
+        ctx.setStrokeColor(leafColor)
+        ctx.setLineWidth(line)
+        ctx.strokePath()
+    }
+
+    /// A 1 px bevel round the board: lit along the head and spine, shaded along the fore-edge and tail.
+    private static func drawBoardEdge(_ request: CoverRequest, in ctx: CGContext, board: CGRect) {
+        let pixel = 1 / request.scale
+        ctx.setFillColor(UIColor(white: 1, alpha: 0.18).cgColor)
+        ctx.fill(CGRect(x: 0, y: 0, width: board.width - pixel, height: pixel))
+        ctx.fill(CGRect(x: 0, y: pixel, width: pixel, height: board.height - pixel * 2))
+        ctx.setFillColor(UIColor(white: 0, alpha: 0.2).cgColor)
+        ctx.fill(CGRect(x: board.maxX - pixel, y: 0, width: pixel, height: board.height))
+        ctx.fill(CGRect(x: 0, y: board.maxY - pixel, width: board.width - pixel, height: pixel))
+    }
+
+    /// The groove where the board bends at the joint.
+    private static func drawHinge(_ request: CoverRequest, in ctx: CGContext, board: CGRect) {
+        let pixel = 1 / request.scale
+        let x = (board.width * 0.11 * request.scale).rounded() / request.scale
+        ctx.setFillColor(UIColor(white: 0, alpha: 0.22).cgColor)
+        ctx.fill(CGRect(x: x, y: 0, width: pixel, height: board.height))
+        ctx.setFillColor(UIColor(white: 1, alpha: 0.1).cgColor)
+        ctx.fill(CGRect(x: x + pixel, y: 0, width: pixel, height: board.height))
+    }
+
+    /// Print covers are saddle-stitched: a fold at the spine edge and two staples through it.
+    private static func drawStaples(_ request: CoverRequest, in ctx: CGContext, board: CGRect) {
+        let pixel = 1 / request.scale
+        let fold = (board.width * 0.08 * request.scale).rounded() / request.scale - pixel
+        ctx.setFillColor(UIColor(white: 0, alpha: 0.18).cgColor)
+        ctx.fill(CGRect(x: fold, y: 0, width: pixel, height: board.height))
+        let size = CGSize(width: board.width * 0.012, height: board.height * 0.06)
+        let staples = [0.28, 0.72].map {
+            CGRect(x: board.width * 0.04 - size.width / 2, y: board.height * $0 - size.height / 2, width: size.width, height: size.height)
+        }
+        ctx.setFillColor(UIColor(hex: 0x8E8A80).cgColor)
+        ctx.fill(staples)
+        ctx.setFillColor(UIColor(hex: 0xB9B6AE).cgColor)
+        ctx.fill(staples.map { $0.insetBy(dx: pixel, dy: pixel) })
+    }
+
     // MARK: Cloth
 
     private static func drawCloth(_ request: CoverRequest, in ctx: CGContext, bounds: CGRect) {
@@ -78,7 +183,7 @@ enum CoverRenderer {
         ctx.setFillColor(request.spec.cloth.uiColor.cgColor)
         ctx.fill(bounds)
         if !request.highContrast { drawWeave(in: ctx, bounds: bounds) }
-        drawSpine(in: ctx, bounds: bounds, width: 0.08, color: UIColor(white: 0, alpha: 0.2))
+        drawSpine(in: ctx, bounds: bounds, width: 0.08, color: UIColor(white: 0, alpha: 0.2), rounded: request.width >= 100 && !request.highContrast)
         if request.dark { dim(ctx, bounds) }
 
         let labelX = w * 0.17, labelWidth = w * (1 - 0.17 - 0.09), padding = w * 0.045
@@ -141,10 +246,18 @@ enum CoverRenderer {
         ctx.restoreGState()
     }
 
-    private static func drawSpine(in ctx: CGContext, bounds: CGRect, width fraction: CGFloat, color: UIColor) {
+    private static func drawSpine(in ctx: CGContext, bounds: CGRect, width fraction: CGFloat, color: UIColor, rounded: Bool = false) {
         let spine = CGRect(x: 0, y: 0, width: bounds.width * fraction, height: bounds.height)
-        ctx.setFillColor(color.cgColor)
-        ctx.fill(spine)
+        if rounded, let gradient = CGGradient(colorsSpace: nil, colors: [0.28, 0.12, 0.22].map { UIColor(white: 0, alpha: $0).cgColor } as CFArray,
+                                              locations: [0, 0.6, 1]) {
+            ctx.saveGState()
+            ctx.clip(to: spine)
+            ctx.drawLinearGradient(gradient, start: .zero, end: CGPoint(x: spine.maxX, y: 0), options: [])
+            ctx.restoreGState()
+        } else {
+            ctx.setFillColor(color.cgColor)
+            ctx.fill(spine)
+        }
         ctx.setFillColor(UIColor(white: 1, alpha: 0.12).cgColor)
         ctx.fill(CGRect(x: spine.maxX, y: 0, width: max(0.5, bounds.width * 0.005), height: bounds.height))
     }
@@ -288,10 +401,11 @@ enum CoverRenderer {
 
     private static func drawFirstPage(_ request: CoverRequest, image: CGImage?, in ctx: CGContext, bounds: CGRect) {
         let w = bounds.width
-        ctx.setFillColor(UIColor.white.cgColor)
-        ctx.fill(bounds)
         let area = CGRect(x: w * 0.09, y: 0, width: w * 0.91, height: bounds.height)
+        let underSpine = CGRect(x: area.minX - 1, y: 0, width: area.width + 1, height: bounds.height)
         if let image {
+            ctx.setFillColor(UIColor.white.cgColor)
+            ctx.fill(underSpine)
             let aspect = CGFloat(image.width) / CGFloat(max(image.height, 1))
             let drawWidth = max(area.width, area.height * aspect)
             let rect = CGRect(x: area.minX, y: 0, width: drawWidth, height: drawWidth / aspect)
@@ -304,7 +418,7 @@ enum CoverRenderer {
             ctx.restoreGState()
         } else {
             ctx.setFillColor(UIColor(hex: 0xFFFDF8).cgColor)
-            ctx.fill(area)
+            ctx.fill(underSpine)
         }
         ctx.setFillColor(request.spec.cloth.uiColor.cgColor)
         ctx.fill(CGRect(x: 0, y: 0, width: w * 0.09, height: bounds.height))

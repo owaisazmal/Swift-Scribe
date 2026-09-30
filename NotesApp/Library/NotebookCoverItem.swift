@@ -4,6 +4,7 @@ import SwiftUI
 struct RecordCover: View {
     let record: NotebookRecord
     let width: CGFloat
+    var showsShadow = true
     @Environment(LibraryStore.self) private var store
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.colorSchemeContrast) private var contrast
@@ -12,7 +13,8 @@ struct RecordCover: View {
     var body: some View {
         let root = store.root
         let id = record.id
-        CoverView(request: record.coverRequest(width: width, scale: displayScale, colorScheme: colorScheme, contrast: contrast, root: root)) {
+        CoverView(request: record.coverRequest(width: width, scale: displayScale, colorScheme: colorScheme, contrast: contrast, root: root),
+                  showsShadow: showsShadow) {
             _ = await PageThumbnailer.ensureFirstPage(root: root, notebookID: id)
         }
     }
@@ -20,6 +22,7 @@ struct RecordCover: View {
 
 struct NotebookCoverItem: View {
     let record: NotebookRecord
+    let width: CGFloat
     let isSelecting: Bool
     let isSelected: Bool
     let zoomNamespace: Namespace.ID
@@ -29,20 +32,26 @@ struct NotebookCoverItem: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Space.x2) {
+        let renderWidth = ShelfMetrics.renderWidth(for: width)
+        let renderSize = CGSize(width: renderWidth, height: (renderWidth * 4 / 3).rounded())
+        VStack(alignment: .leading, spacing: ShelfLedge.height + Space.x2) {
             Button(action: action) {
-                RecordCover(record: record, width: CoverWidth.shelf)
-                    .overlay(alignment: .topTrailing) {
-                        if record.isFavorite {
-                            FavoriteRibbon()
-                                .padding(.trailing, Space.x5)
-                                .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
+                RecordCover(record: record, width: renderWidth)
+                    .frame(width: width)
+                    .overlay {
+                        ZStack(alignment: .topTrailing) {
+                            if record.isFavorite {
+                                FavoriteRibbon()
+                                    .padding(.trailing, Space.x5 + CoverRenderer.pageBlockInsets(for: renderSize).right * width / renderWidth)
+                                    .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
+                            }
                         }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                        .clipped()
+                        .animation(Motion.adaptive(Motion.ribbon, reduceMotion: reduceMotion), value: record.isFavorite)
                     }
-                    .clipped()
-                    .animation(Motion.adaptive(Motion.ribbon, reduceMotion: reduceMotion), value: record.isFavorite)
                     .overlay { if isSelected { StitchedSelection() } }
-                    .zoomSource(id: record.id, in: zoomNamespace)
+                    .zoomSource(id: "cover-\(record.id.uuidString)", in: zoomNamespace)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -78,7 +87,7 @@ struct NotebookCoverItem: View {
                 .foregroundStyle(Color.textSecondary)
         }
         .fixedSize(horizontal: false, vertical: true)
-        .frame(width: CoverWidth.shelf, alignment: .leading)
+        .frame(width: width, alignment: .leading)
     }
 }
 
@@ -90,7 +99,7 @@ struct StitchedSelection: View {
             .padding(-6)
             .overlay(alignment: .bottomTrailing) {
                 Image(systemName: "checkmark")
-                    .font(.caption.weight(.heavy))
+                    .font(.system(size: 12, weight: .heavy))
                     .foregroundStyle(Color.onMustard)
                     .frame(width: 24, height: 24)
                     .background(Color.mustard, in: Circle())
@@ -100,63 +109,9 @@ struct StitchedSelection: View {
     }
 }
 
-struct ContinueWritingSpread: View {
-    let record: NotebookRecord
-    let action: () -> Void
-    @Environment(LibraryStore.self) private var store
-    @State private var page: UIImage?
-
-    var body: some View {
-        Button(action: action) {
-            HStack(alignment: .bottom, spacing: 0) {
-                RecordCover(record: record, width: CoverWidth.spread)
-                    .frame(width: 140)
-                Group {
-                    if let page {
-                        Image(uiImage: page).resizable().aspectRatio(contentMode: .fill)
-                    } else {
-                        Color.white
-                    }
-                }
-                .frame(width: 140, height: 140 * 4 / 3)
-                .clipped()
-                .overlay { Rectangle().strokeBorder(Color.hairline, lineWidth: 1) }
-                .shadow(color: .black.opacity(0.1), radius: 2, y: 1)
-                VStack(alignment: .leading, spacing: Space.x1) {
-                    Text("Continue writing")
-                        .font(.footnote.weight(.bold).smallCaps())
-                        .tracking(0.8)
-                        .foregroundStyle(Color.accentColor)
-                    Text(record.title)
-                        .displayFont(26, relativeTo: .title2)
-                        .foregroundStyle(Color.ink)
-                        .lineLimit(2)
-                    Text("Page \(record.currentPage + 1) of \(record.pageCount) · edited \(record.modifiedAt.formatted(.relative(presentation: .named)))")
-                        .font(.subheadline.monospacedDigit())
-                        .foregroundStyle(Color.textSecondary)
-                }
-                .padding(.leading, Space.x6)
-                .padding(.bottom, Space.x2)
-                Spacer(minLength: 0)
-            }
-        }
-        .buttonStyle(.plain)
-        .hoverEffect(.highlight)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("Continue writing \(record.title), page \(record.currentPage + 1) of \(record.pageCount)"))
-        .accessibilityAddTraits(.isButton)
-        .task(id: "\(record.id)-\(record.currentPage)-\(record.modifiedAt.timeIntervalSince1970)") {
-            let package = NotebookPackage(root: store.root, id: record.id)
-            guard let manifest = try? await package.readManifest().manifest, !manifest.pages.isEmpty else { return }
-            let current = manifest.pages[min(record.currentPage, manifest.pages.count - 1)]
-            page = await PageThumbnailer.thumbnail(package: package, page: current)
-        }
-    }
-}
-
 extension View {
     /// The source of the zoom transition into the editor.
-    func zoomSource(id: UUID, in namespace: Namespace.ID) -> some View {
+    func zoomSource(id: String, in namespace: Namespace.ID) -> some View {
         matchedTransitionSource(id: id, in: namespace)
     }
 }

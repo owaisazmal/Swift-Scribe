@@ -27,14 +27,23 @@ struct CoverView: View {
     let request: CoverRequest
     /// False for the live preview, whose every keystroke would otherwise fill the caches.
     var persist = true
+    var showsShadow = true
     var prepareFirstPage: (@MainActor () async -> Void)?
     @State private var image: UIImage?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorSchemeContrast) private var contrast
 
-    init(request: CoverRequest, persist: Bool = true, prepareFirstPage: (@MainActor () async -> Void)? = nil) {
+    init(request: CoverRequest, persist: Bool = true, showsShadow: Bool = true, prepareFirstPage: (@MainActor () async -> Void)? = nil) {
         self.request = request
         self.persist = persist
+        self.showsShadow = showsShadow
         self.prepareFirstPage = prepareFirstPage
         _image = State(initialValue: CoverCache.shared.cached(request.key))
+    }
+
+    private var shape: UnevenRoundedRectangle {
+        UnevenRoundedRectangle(topLeadingRadius: Radius.coverSpine, bottomLeadingRadius: Radius.coverSpine,
+                               bottomTrailingRadius: Radius.coverEdge, topTrailingRadius: Radius.coverEdge)
     }
 
     var body: some View {
@@ -42,14 +51,13 @@ struct CoverView: View {
             .aspectRatio(3 / 4, contentMode: .fit)
             .overlay {
                 if let image {
-                    Image(uiImage: image).resizable().interpolation(.high)
+                    Image(uiImage: image).resizable().interpolation(.high).transition(.opacity)
                 } else {
-                    Rectangle().fill(placeholder)
+                    shape.fill(placeholder)
                 }
             }
-            .clipShape(UnevenRoundedRectangle(topLeadingRadius: Radius.coverSpine, bottomLeadingRadius: Radius.coverSpine,
-                                              bottomTrailingRadius: Radius.coverEdge, topTrailingRadius: Radius.coverEdge))
-            .shadow(color: .black.opacity(0.18), radius: 1.5, y: 1)
+            .overlay { if contrast == .increased { shape.strokeBorder(Color.hairline, lineWidth: 1) } }
+            .background { if showsShadow { CoverShadowView() } }
             .task(id: request.key) {
                 if let hit = CoverCache.shared.cached(request.key) { image = hit; return }
                 if !persist {
@@ -60,7 +68,9 @@ struct CoverView: View {
                    !FileManager.default.fileExists(atPath: file.path(percentEncoded: false)) {
                     await prepareFirstPage?()
                 }
-                if let rendered = await CoverCache.shared.image(for: request, persist: persist) { image = rendered }
+                if let rendered = await CoverCache.shared.image(for: request, persist: persist) {
+                    withAnimation(Motion.adaptive(Motion.quick, reduceMotion: reduceMotion)) { image = rendered }
+                }
             }
             .accessibilityHidden(true)
     }
@@ -94,7 +104,7 @@ extension NotebookRecord {
         let thumbKey = firstPageThumbKey ?? "none"
         let thumb = firstPageID.map { package.thumbURL($0, key: thumbKey) }
         return CoverRequest(notebookID: id, spec: spec, title: title.isEmpty ? String(localized: "Untitled") : title,
-                            meta: folder?.name ?? pageCountText, width: width, scale: scale,
+                            meta: folder?.name ?? createdAt.formatted(.dateTime.month(.abbreviated).year()), width: width, scale: scale,
                             dark: colorScheme == .dark, highContrast: contrast == .increased, firstPage: thumb,
                             firstPageKey: spec.style == .firstPage ? "\(firstPageID?.uuidString ?? "")-\(thumbKey)" : nil,
                             firstPageIsPDF: firstPageIsPDF)

@@ -110,6 +110,7 @@ private struct EditorContent: View {
     @State private var titleText = ""
     @State private var errorMessage: String?
     @State private var ribbonWidth: CGFloat = 44
+    @State private var paperMode: PaperDrawer.Mode?
 
     private var document: NotebookDocument { session.document }
     private var cloth: ClothColor { document.manifest.cover.cloth }
@@ -183,7 +184,7 @@ private struct EditorContent: View {
     }
 
     private var isPresentingModal: Bool {
-        showingPages || showingRecordings || export != nil || importingPDF || showingPhotoPicker || renaming || goToPage
+        showingPages || showingRecordings || export != nil || importingPDF || showingPhotoPicker || renaming || goToPage || paperMode != nil
     }
 
     // MARK: Chrome
@@ -305,11 +306,7 @@ private struct EditorContent: View {
         Menu {
             Button { session.addPage(after: session.currentPage) } label: { Label("Page After Current", systemImage: "doc.badge.plus") }
             Button { session.addPage() } label: { Label("Page at End", systemImage: "arrow.down.doc") }
-            Menu {
-                ForEach(PaperTemplate.allCases) { template in
-                    Button(template.displayName) { session.addPage(after: session.currentPage, template: template) }
-                }
-            } label: { Label("Page with Template", systemImage: "square.grid.3x3") }
+            Button { paperMode = .add(after: session.currentPage) } label: { Label("Choose Paper…", systemImage: "square.grid.3x3") }
             Divider()
             Button { importingPDF = true } label: { Label("Insert PDF…", systemImage: "doc.richtext") }
             Button { showingPhotoPicker = true } label: { Label("Insert Photo…", systemImage: "photo") }
@@ -317,6 +314,11 @@ private struct EditorContent: View {
             Label("Add", systemImage: "plus")
         }
         .disabled(document.isReadOnly)
+        .popover(item: Binding(get: { paperMode?.isAdding == true ? paperMode : nil }, set: { paperMode = $0 })) { mode in
+            PaperDrawer(session: session, mode: mode)
+                .presentationCompactAdaptation(.sheet)
+                .presentationBackground(Color.surface)
+        }
     }
 
     private var moreMenu: some View {
@@ -324,15 +326,8 @@ private struct EditorContent: View {
             Button { export = ExportJob(document: document) } label: { Label("Export as PDF", systemImage: "square.and.arrow.up") }
             Divider()
             let current = document.pages.indices.contains(session.currentPage) ? document.pages[session.currentPage] : nil
-            if let current, let template = current.template, !document.isReadOnly {
-                Picker(selection: Binding(get: { template }, set: { document.setTemplate($0, forPage: current.id) })) {
-                    ForEach(PaperTemplate.allCases) { Text($0.displayName).tag($0) }
-                } label: { Label("Page Template", systemImage: "square.grid.3x3") }
-                .pickerStyle(.menu)
-                Picker(selection: Binding(get: { current.paperColor }, set: { document.setPaperColor($0, forPage: current.id) })) {
-                    ForEach(PaperColor.allCases) { Text($0.displayName).tag($0) }
-                } label: { Label("Paper Colour", systemImage: "paintpalette") }
-                .pickerStyle(.menu)
+            if let current, current.template != nil, !document.isReadOnly {
+                Button { paperMode = .change(pageID: current.id) } label: { Label("Change Paper…", systemImage: "paintpalette") }
             }
             Group {
                 Button { Task { await session.duplicatePage(at: session.currentPage) } } label: {
@@ -351,6 +346,11 @@ private struct EditorContent: View {
             .pickerStyle(.menu)
         } label: {
             Label("More", systemImage: "ellipsis.circle")
+        }
+        .popover(item: Binding(get: { paperMode?.isAdding == false ? paperMode : nil }, set: { paperMode = $0 })) { mode in
+            PaperDrawer(session: session, mode: mode)
+                .presentationCompactAdaptation(.sheet)
+                .presentationBackground(Color.surface)
         }
     }
 

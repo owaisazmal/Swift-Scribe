@@ -4,6 +4,14 @@ import SwiftData
 struct OpenNotebook: Identifiable, Hashable {
     let id: UUID
     var pageID: UUID?
+    /// What the editor zooms out of and back into: the cover unless the open started somewhere else.
+    var zoomSource: String
+
+    init(id: UUID, pageID: UUID? = nil, zoomSource: String? = nil) {
+        self.id = id
+        self.pageID = pageID
+        self.zoomSource = zoomSource ?? "cover-\(id.uuidString)"
+    }
 }
 
 struct LibraryRootView: View {
@@ -36,7 +44,8 @@ struct LibraryRootView: View {
             } detail: {
                 NavigationStack {
                     ShelfView(scope: scope ?? .all, zoomNamespace: zoom, onOpen: { openNotebook($0.id) },
-                              onOpenPage: { openNotebook($0.id, pageID: $1) }, onCreate: { creating = true },
+                              onOpenPage: { openNotebook($0.id, pageID: $1) },
+                              onOpenZoomed: { openNotebook($0.id, pageID: $1, zoomSource: $2) }, onCreate: { creating = true },
                               onQuickNote: quickNote, isSearching: $isSearching, isCovered: open != nil || creating || showingSettings)
                 }
             }
@@ -55,7 +64,7 @@ struct LibraryRootView: View {
         .animation(.easeInOut(duration: 0.18), value: open)
         .fullScreenCover(item: Binding(get: { usesZoom ? open : nil }, set: { open = $0 })) { item in
             EditorScreen(notebookID: item.id, initialPageID: item.pageID, sceneID: sceneID) { open = nil }
-                .zoomTransition(id: item.id, in: zoom)
+                .zoomTransition(id: item.zoomSource, in: zoom)
         }
         .sheet(isPresented: $creating) {
             NewNotebookView(folder: folder) { id in
@@ -104,18 +113,18 @@ struct LibraryRootView: View {
     private var editorCoversLibrary: Bool { !usesZoom && open != nil }
 
     /// Only one editor per window: while one is open, the library can't switch it to another notebook.
-    private func openNotebook(_ id: UUID, pageID: UUID? = nil) {
+    private func openNotebook(_ id: UUID, pageID: UUID? = nil, zoomSource: String? = nil) {
         guard open == nil else { return }
         if DocumentRegistry.shared.activateExistingEditor(for: id, from: sceneID) {
             if let pageID { NotificationCenter.default.post(name: .scribeShowPage, object: id, userInfo: ["page": pageID]) }
             return
         }
-        open = OpenNotebook(id: id, pageID: pageID)
+        open = OpenNotebook(id: id, pageID: pageID, zoomSource: zoomSource)
     }
 }
 
 extension View {
-    func zoomTransition(id: UUID, in namespace: Namespace.ID) -> some View {
+    func zoomTransition(id: String, in namespace: Namespace.ID) -> some View {
         navigationTransition(.zoom(sourceID: id, in: namespace))
     }
 

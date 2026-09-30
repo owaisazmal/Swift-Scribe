@@ -465,6 +465,15 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         }
         let page = currentPage
         if pendingPage == nil, page != session.currentPage { session.pageDidChange(page) }
+        updateInkAppearance()
+    }
+
+    /// The picker's swatches show ink as the current page will: light on Chalkboard.
+    private func updateInkAppearance() {
+        let index = pendingPage ?? session.currentPage
+        guard pages.indices.contains(index) else { return }
+        let style = pages[index].effectivePaperColor.inkAppearance
+        if toolPicker.colorUserInterfaceStyle != style { toolPicker.colorUserInterfaceStyle = style }
     }
 
     private func makeSlot(_ page: NotebookPage, at index: Int) -> PageSlotView {
@@ -561,6 +570,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         let canvas = pool.popLast() ?? makeCanvas()
         syncTool(canvas)
         canvas.pageID = page.id
+        canvas.overrideUserInterfaceStyle = page.effectivePaperColor.inkAppearance
         let number = (index(of: page.id) ?? 0) + 1
         canvas.accessibilityLabel = String(localized: "Page \(number), handwriting")
         canvas.accessibilityIdentifier = "page.canvas.\(number)"
@@ -605,6 +615,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         canvas.removeFromSuperview()
         canvas.pageID = nil
         canvas.isLoaded = false
+        canvas.overrideUserInterfaceStyle = .light
         slots[id]?.canvas = nil
         isApplyingDrawing = true
         canvas.drawing = PKDrawing()

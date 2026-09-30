@@ -31,6 +31,7 @@ final class AccessibilityAuditUITests: XCTestCase {
         empty.launchArguments = ["-storageRoot", "audit-empty", "-resetStorage"] + extra
         empty.launch()
         XCTAssertTrue(empty.buttons["Import PDF"].firstMatch.waitForExistence(timeout: 30))
+        XCTAssertTrue(empty.staticTexts["Your shelf is ready."].exists)
         try audit(empty, checks, screen: "\(mode) empty library")
         empty.terminate()
 
@@ -41,22 +42,22 @@ final class AccessibilityAuditUITests: XCTestCase {
         XCTAssertTrue(textbook.waitForExistence(timeout: 90))
         sleep(1)
 
-        func check(_ screen: String, modal: Bool = false, scrolled: Bool = false, formEnd: [String] = []) throws {
+        func check(_ screen: String, modal: Bool = false, scrolled: Bool = false, formText: [String] = []) throws {
             let attachment = XCTAttachment(screenshot: app.screenshot())
             attachment.name = "\(mode) \(screen)"
             attachment.lifetime = .keepAlways
             add(attachment)
-            try audit(app, checks, screen: "\(mode) \(screen)", modal: modal, scrolled: scrolled, formEnd: formEnd)
+            try audit(app, checks, screen: "\(mode) \(screen)", modal: modal, scrolled: scrolled, formText: formText)
         }
 
         /// Audits a sheet at the top, then again scrolled to the end, so text below the fold is checked while it's on screen.
-        func checkSheet(_ screen: String, scrolling container: XCUIElement, formEnd: [String] = []) throws {
-            try check(screen, modal: true, formEnd: formEnd)
+        func checkSheet(_ screen: String, scrolling container: XCUIElement, formText: [String] = []) throws {
+            try check(screen, modal: true, formText: formText)
             guard container.exists else { return }
             container.swipeUp(velocity: .fast)
             container.swipeUp(velocity: .fast)
             sleep(3)
-            try check("\(screen) (end)", modal: true, scrolled: true, formEnd: formEnd)
+            try check("\(screen) (end)", modal: true, scrolled: true, formText: formText)
         }
 
         func dismissKeyboard() {
@@ -106,7 +107,8 @@ final class AccessibilityAuditUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 10))
         sleep(1)
         try checkSheet("settings", scrolling: app.collectionViews.firstMatch,
-                       formEnd: ["Report a Problem or Request a Feature", "Swift Scribe is free and open source"])
+                       formText: ["Cobalt", "Tomato", "Moss", "Oxblood", "Mustard", "Print",
+                                  "Report a Problem or Request a Feature", "Swift Scribe is free and open source"])
         app.buttons["Done"].firstMatch.tap()
 
         textbook.press(forDuration: 1.2)
@@ -122,6 +124,19 @@ final class AccessibilityAuditUITests: XCTestCase {
         XCTAssertTrue(app.buttons["editor.ribbon"].waitForExistence(timeout: 20))
         sleep(1)
         try check("editor")
+        app.buttons["Add"].firstMatch.tap()
+        let choosePaper = app.buttons["Choose Paper…"].firstMatch
+        XCTAssertTrue(choosePaper.waitForExistence(timeout: 5))
+        choosePaper.tap()
+        XCTAssertTrue(app.navigationBars["Paper"].waitForExistence(timeout: 10))
+        sleep(1)
+        // At AX-L the drawer is a long list, and the audit misreads rows it scrolls back into view, so only its top is audited.
+        if mode == "AX-L" {
+            try check("paper drawer", modal: true)
+        } else {
+            try checkSheet("paper drawer", scrolling: app.scrollViews["paper.drawer"])
+        }
+        app.buttons["Done"].firstMatch.tap()
         app.buttons["Pages"].firstMatch.tap()
         XCTAssertTrue(app.buttons["Done"].firstMatch.waitForExistence(timeout: 10))
         sleep(1)

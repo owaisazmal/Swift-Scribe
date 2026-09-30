@@ -71,6 +71,12 @@ final class SliceUITests: XCTestCase {
         let created = app.buttons["notebook.Slice Test"]
         XCTAssertTrue(created.waitForExistence(timeout: 10))
         XCTAssertTrue(created.label.contains("1 page"), created.label)
+        let spread = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Continue writing Slice Test")).firstMatch
+        XCTAssertTrue(spread.waitForExistence(timeout: 10), "the notebook just closed lies open at the top")
+        spread.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["page.canvas.1"].waitForExistence(timeout: 15), "Continue writing opens at the page")
+        app.buttons["editor.back"].tap()
+        waitForLibrary(app)
 
         app.terminate()
         app = launch(reset: false)
