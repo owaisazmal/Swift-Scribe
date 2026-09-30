@@ -164,10 +164,12 @@ A rerun skips finished notebooks, including ones the user has deleted since (the
   - handwriting OCR (`HandwritingIndexer`, per page by ink hash). Rendering and Vision run off the indexer actor so an edit's cancel gets through, and a page already being read is never read twice;
   - library search: debounced, matched by a SwiftData predicate on a background context, then each matching notebook's per-page text is read for page-level results (`PageSearch`) that open the editor at that page. Results refresh whenever the index is saved;
   - PDF parsing on import.
+- **Tile culling.** Paper templates draw only the rules that reach the context's clip (`TemplateRules`), so a 512 px tile at 5× strokes its own few lines, not the page's; planner labels are cached Core Text lines. Diagonal rules are laid in short pieces on a fixed grid, because Core Graphics rasterises a long diagonal slightly differently depending on where the clip starts. `PaperParityTests` holds the original papers pixel-identical and every template equal in tiles, thumbnails and export.
 - **Bounded caches:**
   - PDF documents: an LRU of 6;
   - page images: an LRU of 12;
   - thumbnails: an LRU of 120;
+  - paper miniatures for the paper drawer and New Notebook: an LRU of 64;
   - loaded ink: 24 clean pages. Unsaved pages are never evicted.
 - **Signposts** (`OSSignposter`, subsystem `com.owais.NotesApp`):
   - "Open to first ink", "Save", "Thumbnail", "OCR page", "Export", "Cover render", "Launch".
@@ -209,9 +211,10 @@ All three targets build in the Swift 6 language mode with no warnings. Two thing
 ## Colour and accessibility
 
 - `inkSecondary` is for decoration, large text, borders and icons only. Small labels and metadata use `textSecondary`, which keeps 7:1 on paper, desk and surface in light, dark and Increase Contrast, so anti-aliased small text still clears Apple's audit (`DesignTokenTests`).
-- `AccessibilityAuditUITests` runs Apple's full audit over the empty and seeded library, search results, Recently Deleted, New Notebook, Settings, Change Cover (sheets at both ends of their scroll), the editor, the page navigator and Recordings, in light, dark and both with Increase Contrast (`-increaseContrast` sets the trait override), then Dynamic Type, clipping and contrast again at a large text size. A few issues are logged rather than failed: text on the system glass bars, PencilKit's tool picker handle, text behind a sheet that VoiceOver skips, unnamed contrast issues on a sheet scrolled so text sits under its glass bar, and Dynamic Type on the last row and footer of the Settings Form, which the audit flags whatever they contain (both scale fully at the largest size).
+- `AccessibilityAuditUITests` runs Apple's full audit over the empty and seeded library, search results, Recently Deleted, New Notebook, Settings, Change Cover (sheets at both ends of their scroll), the editor, the paper drawer (only its top at the large text size, where the audit misreads rows it scrolls back into view), the page navigator and Recordings, in light, dark and both with Increase Contrast (`-increaseContrast` sets the trait override), then Dynamic Type, clipping and contrast again at a large text size. A few issues are logged rather than failed: text on the system glass bars, PencilKit's tool picker handle, text behind a sheet that VoiceOver skips, unnamed contrast issues on a sheet scrolled so text sits under its glass bar, and Dynamic Type on the last row and footer of the Settings Form, which the audit flags whatever they contain (both scale fully at the largest size).
 - Layouts that change with text size use `AnyLayout`, not `ViewThatFits`: the audit can't follow text across `ViewThatFits`'s two copies and reports it as partly unscaled.
 - No text uses `caption2`: the audit reports it as partly unscaled, so the smallest style is `caption`.
+- A button holding both text and a light image (a paper miniature, a light cloth) is read as low-contrast text, so captions sit outside their button, as a cover's meta line does, and paper colour chips are filled with their own colour.
 
 ## Known limits
 

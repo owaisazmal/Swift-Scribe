@@ -22,6 +22,7 @@ enum Radius {
 
 enum Motion {
     static let standard = Animation.easeOut(duration: 0.18)
+    static let quick = Animation.easeOut(duration: 0.15)
     static let ribbon = Animation.spring(response: 0.34, dampingFraction: 0.62)
 
     /// Everything becomes a short cross-fade when Reduce Motion is on.

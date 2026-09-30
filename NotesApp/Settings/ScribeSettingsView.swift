@@ -29,7 +29,11 @@ struct ScribeSettingsView: View {
 
                 Section {
                     Picker("Template", selection: $template) {
-                        ForEach(PaperTemplate.allCases) { Text($0.displayName).tag($0) }
+                        ForEach(PaperFamily.allCases) { family in
+                            Section(family.displayName) {
+                                ForEach(family.templates) { Text($0.displayName).tag($0) }
+                            }
+                        }
                     }
                     Picker("Paper Colour", selection: $color) {
                         ForEach(PaperColor.allCases) { Text($0.displayName).tag($0) }
@@ -39,6 +43,14 @@ struct ScribeSettingsView: View {
                     }
                 } header: {
                     SettingsNote("New Notebooks")
+                }
+
+                if UIApplication.shared.supportsAlternateIcons {
+                    Section {
+                        AppIconPicker()
+                    } header: {
+                        SettingsNote("App Icon")
+                    }
                 }
 
                 if let problem = app.migrationProblem {

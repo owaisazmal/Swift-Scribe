@@ -2,6 +2,7 @@ import XCTest
 import PencilKit
 import PDFKit
 import SwiftData
+import SwiftUI
 @testable import NotesApp
 
 /// Coverage for the features ported from v1 in M6, and the search and keyboard additions from the brief.
@@ -29,6 +30,14 @@ final class ParityTests: XCTestCase {
         XCTAssertNil(PageSearch.snippet(in: text, for: "chloroplast"))
         XCTAssertNil(PageSearch.snippet(in: text, for: "abc"), "the ink header is never searched")
         XCTAssertEqual(PageSearch.snippet(in: "#ink:none\nCafé notes", for: "cafe"), "Café notes", "diacritic- and case-insensitive")
+    }
+
+    func testHighlightedSnippetMarksEveryMatch() {
+        let text = PageSearch.highlighted("Café and cafe", query: "cafe")
+        XCTAssertEqual(String(text.characters), "Café and cafe", "the characters are unchanged")
+        let marked = text.runs.filter { $0[AttributeScopes.SwiftUIAttributes.BackgroundColorAttribute.self] != nil }.map { String(text[$0.range].characters) }
+        XCTAssertEqual(marked, ["Café", "cafe"])
+        XCTAssertEqual(PageSearch.highlighted("no match here", query: "cafe").runs.count, 1)
     }
 
     func testPageHitsListTheMatchingPagesInOrder() async throws {

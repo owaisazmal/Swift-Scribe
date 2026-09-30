@@ -38,13 +38,36 @@ enum PageSearch {
         let excerpt = body[start..<end].trimmingCharacters(in: .whitespacesAndNewlines)
         return (start > body.startIndex ? "…" : "") + excerpt + (end < body.endIndex ? "…" : "")
     }
+
+    /// Mustard under ink at night; on light paper the audit reads a pale band as faint text, so it deepens to ochre under cream.
+    private static let highlighter = Color(uiColor: UIColor { $0.userInterfaceStyle == .dark ? .mustard : UIColor(hex: 0x806113) })
+    private static let onHighlighter = Color(uiColor: UIColor { $0.userInterfaceStyle == .dark ? .onMustard : .labelCream })
+
+    /// The snippet with every match in bold on a mustard band, so a match never relies on colour alone.
+    static func highlighted(_ snippet: String, query: String) -> AttributedString {
+        var text = AttributedString(snippet)
+        let needle = query.trimmingCharacters(in: .whitespaces)
+        guard !needle.isEmpty else { return text }
+        var remaining = snippet.startIndex..<snippet.endIndex
+        while let match = snippet.range(of: needle, options: [.caseInsensitive, .diacriticInsensitive], range: remaining) {
+            if let range = Range(match, in: text) {
+                text[range].backgroundColor = highlighter
+                text[range].foregroundColor = onHighlighter
+                text[range].font = .subheadline.bold()
+            }
+            remaining = match.upperBound..<snippet.endIndex
+        }
+        return text
+    }
 }
 
 /// "Pages" results under the matching notebooks: each hit shows its page and the text around the match.
 struct PageHitsSection: View {
     let records: [NotebookRecord]
     let hits: [UUID: [PageHit]]
-    let onOpen: (NotebookRecord, UUID) -> Void
+    let query: String
+    let zoomNamespace: Namespace.ID
+    let onOpen: (NotebookRecord, UUID, String) -> Void
 
     var body: some View {
         LazyVStack(alignment: .leading, spacing: Space.x5) {
@@ -55,7 +78,7 @@ struct PageHitsSection: View {
                     ScrollView(.horizontal, showsIndicators: false) {
                         LazyHStack(alignment: .top, spacing: Space.x4) {
                             ForEach(hits[record.id] ?? []) { hit in
-                                PageHitCard(hit: hit) { onOpen(record, hit.page.id) }
+                                PageHitCard(hit: hit, query: query, zoomNamespace: zoomNamespace) { onOpen(record, hit.page.id, "hit-\(hit.id)") }
                                     .accessibilityLabel(Text("\(record.title), page \(hit.index + 1): \(hit.snippet)"))
                                     .accessibilityHint(Text("Opens the notebook at this page"))
                             }
@@ -70,6 +93,8 @@ struct PageHitsSection: View {
 
 private struct PageHitCard: View {
     let hit: PageHit
+    let query: String
+    let zoomNamespace: Namespace.ID
     let action: () -> Void
     @Environment(LibraryStore.self) private var store
     @State private var image: UIImage?
@@ -89,7 +114,7 @@ private struct PageHitCard: View {
                 .overlay { Rectangle().strokeBorder(Color.hairline, lineWidth: 1) }
                 VStack(alignment: .leading, spacing: Space.x1) {
                     Text("Page \(hit.index + 1)").metaStyle(.caption)
-                    Text(hit.snippet)
+                    Text(PageSearch.highlighted(hit.snippet, query: query))
                         .font(.subheadline)
                         .foregroundStyle(Color.ink)
                         .lineLimit(3)
@@ -100,6 +125,7 @@ private struct PageHitCard: View {
             .padding(Space.x3)
             .background(Color.surface, in: RoundedRectangle(cornerRadius: Radius.control))
             .overlay { RoundedRectangle(cornerRadius: Radius.control).strokeBorder(Color.hairline) }
+            .zoomSource(id: "hit-\(hit.id)", in: zoomNamespace)
         }
         .buttonStyle(.plain)
         .hoverEffect(.lift)

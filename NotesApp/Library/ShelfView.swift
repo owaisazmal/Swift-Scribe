@@ -6,6 +6,7 @@ struct Shelf: Identifiable {
     let id: String
     let title: String
     let records: [NotebookRecord]
+    var cloth: ClothColor?
 }
 
 struct ShelfView: View {
@@ -13,6 +14,7 @@ struct ShelfView: View {
     let zoomNamespace: Namespace.ID
     let onOpen: (NotebookRecord) -> Void
     let onOpenPage: (NotebookRecord, UUID) -> Void
+    let onOpenZoomed: (NotebookRecord, UUID?, String) -> Void
     let onCreate: () -> Void
     let onQuickNote: () -> Void
     @Binding var isSearching: Bool
@@ -21,6 +23,7 @@ struct ShelfView: View {
     @Environment(LibraryStore.self) private var store
     @Environment(\.modelContext) private var context
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Query private var records: [NotebookRecord]
     @Query(sort: \FolderRecord.sortIndex) private var folders: [FolderRecord]
     @AppStorage(SettingsKey.librarySort) private var sort: LibrarySortOrder = .opened
@@ -39,6 +42,7 @@ struct ShelfView: View {
     @State private var renameText = ""
     @State private var confirmingEmptyTrash = false
     @State private var errorMessage: String?
+    @State private var shelfWidth: CGFloat?
 
     private var folder: FolderRecord? {
         if case .folder(let id) = scope { return folders.first { $0.id == id } }
@@ -96,7 +100,7 @@ struct ShelfView: View {
         let ordered = visible.map(\.id).filter(found.contains)
         let hits = await PageSearch.hits(for: query, in: ordered, root: store.root)
         guard !Task.isCancelled else { return }
-        pageHits = hits
+        withAnimation(Motion.adaptive(Motion.standard, reduceMotion: reduceMotion)) { pageHits = hits }
         hitsQuery = query
     }
 
@@ -155,31 +159,48 @@ struct ShelfView: View {
                         .accessibilityAddTraits(.isHeader)
                     Text(subtitle(visible.count)).metaStyle(.footnote)
                 }
-                if scope == .all, searchText.isEmpty, !isSelecting, let recent = records.filter({ !$0.isTrashed && $0.lastOpenedAt != nil })
-                    .max(by: { ($0.lastOpenedAt ?? .distantPast) < ($1.lastOpenedAt ?? .distantPast) }) {
-                    ContinueWritingSpread(record: recent) { onOpen(recent) }
+                if let recent = continueCandidate {
+                    OpenBookSpread(record: recent, zoomNamespace: zoomNamespace) { onOpenZoomed(recent, nil, $0) }
+                        .id("spread-\(recent.id.uuidString)")
                 }
                 if !searchText.isEmpty, !pageHits.isEmpty, scope != .trash {
-                    PageHitsSection(records: visible, hits: pageHits, onOpen: onOpenPage)
+                    PageHitsSection(records: visible, hits: pageHits, query: hitsQuery, zoomNamespace: zoomNamespace, onOpen: onOpenZoomed)
+                        .transition(.opacity)
                 }
                 ForEach(groups(visible)) { shelf in
-                    VStack(alignment: .leading, spacing: Space.x4) {
-                        ShelfLabel(title: shelf.title)
+                    ShelfLabel(title: shelf.title, cloth: shelf.cloth)
+                        .padding(.top, Space.x2)
+                    if let shelfWidth {
+                        let metrics = ShelfMetrics.fit(width: shelfWidth)
+                        ForEach(shelf.records.chunked(into: metrics.columns), id: \.rowID) { row in
+                            ShelfRow(items: row, metrics: metrics) { record in item(record, width: metrics.coverWidth) }
+                                .padding(.bottom, Space.x2)
+                        }
+                    } else {
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 148, maximum: 188), spacing: Space.x6, alignment: .top)],
                                   alignment: .leading, spacing: Space.x8) {
-                            ForEach(shelf.records) { record in item(record) }
+                            ForEach(shelf.records) { record in item(record, width: CoverWidth.shelf) }
                         }
                     }
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { shelfWidth = $0 }
             .padding(.horizontal, Space.x8)
             .padding(.vertical, Space.x6)
         }
         .scrollDismissesKeyboard(.immediately)
     }
 
-    private func item(_ record: NotebookRecord) -> some View {
-        NotebookCoverItem(record: record, isSelecting: isSelecting, isSelected: selection.contains(record.id),
+    /// The notebook to reopen at the top of All notebooks: the last one opened.
+    private var continueCandidate: NotebookRecord? {
+        guard scope == .all, searchText.isEmpty, !isSelecting else { return nil }
+        return records.filter { !$0.isTrashed && $0.lastOpenedAt != nil }
+            .max { ($0.lastOpenedAt ?? .distantPast) < ($1.lastOpenedAt ?? .distantPast) }
+    }
+
+    private func item(_ record: NotebookRecord, width: CGFloat) -> some View {
+        NotebookCoverItem(record: record, width: width, isSelecting: isSelecting, isSelected: selection.contains(record.id),
                           zoomNamespace: zoomNamespace, showsFolder: scope == .all || scope == .favorites) {
             if isSelecting { toggle(record) } else if !record.isTrashed { onOpen(record) }
         }
@@ -191,12 +212,27 @@ struct ShelfView: View {
 
     private func accessibleList(_ visible: [NotebookRecord]) -> some View {
         List {
+            if let recent = continueCandidate {
+                Button { onOpen(recent) } label: {
+                    HStack(spacing: Space.x4) {
+                        RecordCover(record: recent, width: CoverWidth.row, showsShadow: false).frame(width: 48)
+                        VStack(alignment: .leading, spacing: Space.x1) {
+                            Text("Continue writing").font(.footnote.weight(.bold).smallCaps()).tracking(0.8).foregroundStyle(Color.accentColor)
+                            Text(recent.title).font(.headline).foregroundStyle(Color.ink)
+                            Text("Page \(recent.currentPage + 1) of \(recent.pageCount)").font(.subheadline).foregroundStyle(Color.textSecondary)
+                        }
+                    }
+                }
+                .accessibilityLabel(Text("Continue writing \(recent.title), page \(recent.currentPage + 1) of \(recent.pageCount)"))
+                .accessibilityHint(Text("Opens at this page"))
+                .listRowBackground(Color.surface)
+            }
             ForEach(visible) { record in
                 Button {
                     if isSelecting { toggle(record) } else if !record.isTrashed { onOpen(record) }
                 } label: {
                     HStack(spacing: Space.x4) {
-                        RecordCover(record: record, width: CoverWidth.row).frame(width: 48)
+                        RecordCover(record: record, width: CoverWidth.row, showsShadow: false).frame(width: 48)
                         VStack(alignment: .leading, spacing: Space.x1) {
                             Text(record.title).font(.headline).foregroundStyle(Color.ink)
                             Text(record.metaLine).font(.subheadline).foregroundStyle(Color.textSecondary)
@@ -223,7 +259,7 @@ struct ShelfView: View {
                         Button { onOpenPage(record, hit.page.id) } label: {
                             VStack(alignment: .leading, spacing: Space.x1) {
                                 Text("\(record.title), page \(hit.index + 1)").font(.headline).foregroundStyle(Color.ink)
-                                Text(hit.snippet).font(.subheadline).foregroundStyle(Color.textSecondary)
+                                Text(PageSearch.highlighted(hit.snippet, query: hitsQuery)).font(.subheadline).foregroundStyle(Color.textSecondary)
                             }
                         }
                         .accessibilityLabel(Text("\(record.title), page \(hit.index + 1): \(hit.snippet)"))
@@ -252,7 +288,7 @@ struct ShelfView: View {
         if grouping == .folder, case .folder = scope {} else if grouping == .folder {
             var shelves: [Shelf] = folders.compactMap { folder in
                 let items = visible.filter { $0.folder?.id == folder.id }
-                return items.isEmpty ? nil : Shelf(id: folder.id.uuidString, title: folder.name, records: items)
+                return items.isEmpty ? nil : Shelf(id: folder.id.uuidString, title: folder.name, records: items, cloth: folder.cloth)
             }
             let loose = visible.filter { $0.folder == nil }
             if !loose.isEmpty { shelves.append(Shelf(id: "loose", title: String(localized: "Not on a shelf"), records: loose)) }
@@ -260,21 +296,11 @@ struct ShelfView: View {
         }
         let calendar = Calendar.current
         let now = Date.now
-        let week = calendar.dateInterval(of: .weekOfYear, for: now)
-        let month = calendar.dateInterval(of: .month, for: now)
         var buckets: [(key: String, date: Date, records: [NotebookRecord])] = []
         var positions: [String: Int] = [:]
         for record in visible {
             let date = sort.date(of: record)
-            let key: String
-            if week?.contains(date) == true {
-                key = "week"
-            } else if month?.contains(date) == true {
-                key = "month"
-            } else {
-                let parts = calendar.dateComponents([.year, .month], from: date)
-                key = "\(parts.year ?? 0)-\(parts.month ?? 0)"
-            }
+            let key = ShelfGrouping.bucket(for: date, now: now, calendar: calendar)
             if let index = positions[key] {
                 buckets[index].records.append(record)
             } else {
@@ -284,6 +310,8 @@ struct ShelfView: View {
         }
         return buckets.map { bucket in
             let title = switch bucket.key {
+            case "today": String(localized: "Today")
+            case "yesterday": String(localized: "Yesterday")
             case "week": String(localized: "This week")
             case "month": String(localized: "Earlier this month")
             default: bucket.date.formatted(.dateTime.month(.wide).year())
@@ -420,12 +448,22 @@ struct ShelfView: View {
         } else if scope == .trash {
             EmptyShelf(title: String(localized: "Nothing in the bin"), message: String(localized: "Deleted notebooks stay here for 30 days."))
         } else if scope == .favorites {
-            EmptyShelf(title: String(localized: "No favourites yet"), message: String(localized: "Touch and hold a notebook, then choose Favourite."))
+            EmptyShelf(title: String(localized: "No favourites yet"), message: String(localized: "Touch and hold a notebook, then choose Favourite."),
+                       illustration: { RibbonIllustration() })
+        } else if case .folder = scope, let name = folder?.name {
+            EmptyShelf(title: String(localized: "Nothing on \(name) yet."),
+                       message: String(localized: "Drag notebooks onto \(name) in the sidebar, or start one here.")) {
+                Button("New Notebook", action: onCreate).prominentButton()
+            } illustration: {
+                ShelfIllustration(cloth: nil)
+            }
         } else {
-            EmptyShelf(title: String(localized: "Every notebook starts with a blank page."),
+            EmptyShelf(title: String(localized: "Your shelf is ready."),
                        message: String(localized: "Create a notebook to start writing, or import a PDF to annotate.")) {
                 Button("New Notebook", action: onCreate).prominentButton()
                 Button("Import PDF") { importingPDF = true }.buttonStyle(.bordered)
+            } illustration: {
+                ShelfIllustration()
             }
         }
     }
@@ -463,24 +501,29 @@ extension Array where Element == NotebookRecord {
 
 struct ShelfLabel: View {
     let title: String
+    var cloth: ClothColor?
     var body: some View {
         HStack(spacing: Space.x3) {
+            if let cloth { SpineChip(cloth: cloth) }
             Text(title).metaStyle(.footnote).fixedSize().accessibilityAddTraits(.isHeader)
             Rectangle().fill(Color.hairline).frame(height: 1).accessibilityHidden(true)
         }
     }
 }
 
-struct EmptyShelf<Actions: View>: View {
+struct EmptyShelf<Actions: View, Illustration: View>: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let title: String
     let message: String
     @ViewBuilder var actions: Actions
+    @ViewBuilder var illustration: Illustration
 
-    init(title: String, message: String, @ViewBuilder actions: () -> Actions = { EmptyView() }) {
+    init(title: String, message: String, @ViewBuilder actions: () -> Actions = { EmptyView() },
+         @ViewBuilder illustration: () -> Illustration = { EmptyView() }) {
         self.title = title
         self.message = message
         self.actions = actions()
+        self.illustration = illustration()
     }
 
     var body: some View {
@@ -494,10 +537,12 @@ struct EmptyShelf<Actions: View>: View {
 
     private var content: some View {
         VStack(spacing: Space.x4) {
+            illustration
             Text(title)
                 .displayFont(30, relativeTo: .title)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(Color.ink)
+                .accessibilityAddTraits(.isHeader)
             Text(message)
                 .displayTextFont(17, relativeTo: .body)
                 .multilineTextAlignment(.center)

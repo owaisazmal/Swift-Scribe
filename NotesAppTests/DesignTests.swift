@@ -1,5 +1,6 @@
 import XCTest
 import SwiftUI
+import SwiftData
 @testable import NotesApp
 
 @MainActor
@@ -101,10 +102,26 @@ final class DesignTokenTests: XCTestCase {
 
 final class CoverRendererTests: XCTestCase {
     private func request(_ style: CoverStyle, id: UUID = UUID(uuidString: "3F2504E0-4F89-11D3-9A0C-0305E82C3301")!, seed: UInt32 = 42,
-                         cloth: ClothColor = .moss, inks: (RisoInk, RisoInk) = (.teal, .pink), dark: Bool = false, highContrast: Bool = false) -> CoverRequest {
+                         cloth: ClothColor = .moss, inks: (RisoInk, RisoInk) = (.teal, .pink), dark: Bool = false, highContrast: Bool = false,
+                         width: CGFloat = 150) -> CoverRequest {
         CoverRequest(notebookID: id, spec: CoverSpec(style: style, cloth: cloth, inks: inks, seed: seed), title: "Cell Biology",
-                     meta: "24 pages", width: 150, scale: 2, dark: dark, highContrast: highContrast, firstPage: nil,
+                     meta: "Sep 2026", width: width, scale: 2, dark: dark, highContrast: highContrast, firstPage: nil,
                      firstPageKey: nil, firstPageIsPDF: style == .firstPage)
+    }
+
+    /// The sRGB colour of one point of a rendered cover.
+    private func pixel(_ image: UIImage, at point: CGPoint) throws -> (r: Int, g: Int, b: Int) {
+        let cgImage = try XCTUnwrap(image.cgImage)
+        var data = [UInt8](repeating: 0, count: 4)
+        let context = try XCTUnwrap(CGContext(data: &data, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+                                              space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        let x = Int(point.x * image.scale), y = Int(point.y * image.scale)
+        context.draw(cgImage, in: CGRect(x: -x, y: y - cgImage.height + 1, width: cgImage.width, height: cgImage.height))
+        return (Int(data[0]), Int(data[1]), Int(data[2]))
+    }
+
+    private func isClose(_ pixel: (r: Int, g: Int, b: Int), to hex: UInt32, tolerance: Int = 6) -> Bool {
+        abs(pixel.r - Int((hex >> 16) & 0xFF)) <= tolerance && abs(pixel.g - Int((hex >> 8) & 0xFF)) <= tolerance && abs(pixel.b - Int(hex & 0xFF)) <= tolerance
     }
 
     func testCoversAreThreeByFourAndDeterministic() {
@@ -112,6 +129,45 @@ final class CoverRendererTests: XCTestCase {
             let a = CoverRenderer.render(request(style)), b = CoverRenderer.render(request(style))
             XCTAssertEqual(a.size, CGSize(width: 150, height: 200))
             XCTAssertEqual(a.pngData(), b.pngData(), "\(style) must render identically from the same request")
+        }
+    }
+
+    @MainActor
+    func testCoverKeyIgnoresPageCount() throws {
+        let schema = Schema(versionedSchema: LibraryIndexSchemaV1.self)
+        let container = try ModelContainer(for: schema, configurations: ModelConfiguration(schema: schema, isStoredInMemoryOnly: true))
+        let root = temporaryRoot(self)
+        let id = UUID()
+        let records = [3, 40].map { pages in
+            let record = NotebookRecord(id: id)
+            record.title = "Cell Biology"
+            record.createdAt = Date(timeIntervalSince1970: 1_790_000_000)
+            record.pageCount = pages
+            container.mainContext.insert(record)
+            return record
+        }
+        let keys = records.map { $0.coverRequest(width: CoverWidth.shelf, scale: 2, colorScheme: .light, contrast: .standard, root: root).key }
+        XCTAssertEqual(keys[0], keys[1], "adding a page must not re-render the cover")
+        XCTAssertFalse(records[0].coverRequest(width: CoverWidth.shelf, scale: 2, colorScheme: .light, contrast: .standard, root: root).meta.contains("3"))
+    }
+
+    func testPageBlockOnlyAtShelfWidths() throws {
+        let shelf = CoverRenderer.render(request(.cloth, width: 176))
+        XCTAssertTrue(isClose(try pixel(shelf, at: CGPoint(x: shelf.size.width - 2, y: shelf.size.height / 2)), to: 0xF7F1E3), "cream fore-edge")
+        let row = CoverRenderer.render(request(.cloth, width: 64))
+        XCTAssertFalse(isClose(try pixel(row, at: CGPoint(x: row.size.width - 2, y: row.size.height / 2)), to: 0xF7F1E3, tolerance: 40))
+        XCTAssertEqual(CoverRenderer.pageBlockInsets(for: row.size).right, 0)
+    }
+
+    func testPrintCoversHaveStaples() throws {
+        let cover = request(.print)
+        let image = CoverRenderer.render(cover)
+        let inset = CoverRenderer.pageBlockInsets(for: cover.size)
+        let board = CGSize(width: cover.size.width - inset.right, height: cover.size.height - inset.bottom)
+        for y in [0.28, 0.72] {
+            let staple = try pixel(image, at: CGPoint(x: board.width * 0.04, y: board.height * y))
+            XCTAssertFalse(isClose(staple, to: RisoInk.paperStock), "a staple at \(y)")
+            XCTAssertTrue(isClose(staple, to: 0xB9B6AE), "staple metal at \(y): \(staple)")
         }
     }
 
@@ -144,25 +200,42 @@ final class CoverRendererTests: XCTestCase {
     }
 
     /// Renders a contact sheet of every style for visual review; attached to the test result.
+    /// The last four rows are shelf-size covers on their shadow plates, light and dark, each with Increase Contrast.
     func testContactSheet() throws {
-        let width: CGFloat = 150, gap: CGFloat = 16
-        var rows: [[CoverRequest]] = []
-        rows.append(ClothColor.allCases.map { request(.cloth, id: UUID(), cloth: $0) })
-        rows.append(RisoInk.pairs.enumerated().map { request(.print, id: UUID(), seed: UInt32($0.offset * 31), inks: $0.element) }
-                    + [request(.firstPage, cloth: .slate)] + (0..<3).map { request(.print, id: UUID(), seed: UInt32($0), inks: RisoInk.pairs[$0], highContrast: true) })
-        rows.append(ClothColor.allCases.prefix(5).map { request(.cloth, id: UUID(), cloth: $0, dark: true) }
-                    + RisoInk.pairs.prefix(3).map { request(.print, id: UUID(), inks: $0, dark: true) }
-                    + [request(.cloth, cloth: .cobalt, highContrast: true), request(.cloth, cloth: .oat, dark: true, highContrast: true)])
-        let columns = rows.map(\.count).max() ?? 1
-        let size = CGSize(width: gap + CGFloat(columns) * (width + gap), height: gap + CGFloat(rows.count) * (width * 4 / 3 + gap))
+        let gap: CGFloat = 24
+        let paper = UIColor(hex: 0xF1EDE4), night = UIColor(hex: 0x181613)
+        var rows: [(ground: UIColor, shadow: Bool, covers: [CoverRequest])] = []
+        rows.append((paper, false, ClothColor.allCases.map { request(.cloth, id: UUID(), cloth: $0) }))
+        rows.append((paper, false, RisoInk.pairs.enumerated().map { request(.print, id: UUID(), seed: UInt32($0.offset * 31), inks: $0.element) }
+                     + [request(.firstPage, cloth: .slate)] + (0..<3).map { request(.print, id: UUID(), seed: UInt32($0), inks: RisoInk.pairs[$0], highContrast: true) }))
+        rows.append((night, false, ClothColor.allCases.prefix(5).map { request(.cloth, id: UUID(), cloth: $0, dark: true) }
+                     + RisoInk.pairs.prefix(3).map { request(.print, id: UUID(), inks: $0, dark: true) }
+                     + [request(.cloth, cloth: .cobalt, highContrast: true), request(.cloth, cloth: .oat, dark: true, highContrast: true)]))
+        for (ground, dark) in [(paper, false), (night, true)] {
+            for highContrast in [false, true] {
+                rows.append((ground, true, [request(.cloth, cloth: .cobalt, dark: dark, highContrast: highContrast, width: 176),
+                                            request(.cloth, cloth: .oat, dark: dark, highContrast: highContrast, width: 176),
+                                            request(.print, inks: (.blue, .pink), dark: dark, highContrast: highContrast, width: 176),
+                                            request(.firstPage, cloth: .oxblood, dark: dark, highContrast: highContrast, width: 176)]))
+            }
+        }
+        let cell = CGSize(width: 176, height: 235)
+        let columns = rows.map(\.covers.count).max() ?? 1
+        let size = CGSize(width: gap + CGFloat(columns) * (cell.width + gap), height: gap + CGFloat(rows.count) * (cell.height + gap))
         let sheet = UIGraphicsImageRenderer(size: size).image { context in
-            UIColor(hex: 0xF1EDE4).setFill()
-            context.fill(CGRect(origin: .zero, size: CGSize(width: size.width, height: size.height * 2 / 3)))
-            UIColor(hex: 0x181613).setFill()
-            context.fill(CGRect(x: 0, y: size.height * 2 / 3, width: size.width, height: size.height / 3))
             for (r, row) in rows.enumerated() {
-                for (c, item) in row.enumerated() {
-                    CoverRenderer.render(item).draw(at: CGPoint(x: gap + CGFloat(c) * (width + gap), y: gap + CGFloat(r) * (width * 4 / 3 + gap)))
+                row.ground.setFill()
+                context.fill(CGRect(x: 0, y: CGFloat(r) * (cell.height + gap), width: size.width, height: cell.height + gap * (r == rows.count - 1 ? 2 : 1)))
+            }
+            for (r, row) in rows.enumerated() {
+                for (c, item) in row.covers.enumerated() {
+                    let frame = CGRect(origin: CGPoint(x: gap + CGFloat(c) * (cell.width + gap), y: gap + CGFloat(r) * (cell.height + gap)), size: item.size)
+                    if row.shadow {
+                        CoverShadowPlate.image(dark: item.dark, highContrast: item.highContrast)
+                            .resizableImage(withCapInsets: UIEdgeInsets(top: 28, left: 28, bottom: 28, right: 28), resizingMode: .stretch)
+                            .draw(in: frame.insetBy(dx: -16, dy: -16))
+                    }
+                    CoverRenderer.render(item).draw(in: frame)
                 }
             }
         }

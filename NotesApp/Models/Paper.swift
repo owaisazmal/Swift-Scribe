@@ -3,6 +3,7 @@ import CoreGraphics
 
 enum PaperTemplate: String, Codable, CaseIterable, Identifiable {
     case blank, narrowRuled, wideRuled, grid, dotted, cornell, music
+    case engineering, isometric, checklist, penmanship, dayPlanner, weekPlanner, storyboard
 
     var id: String { rawValue }
 
@@ -15,12 +16,46 @@ enum PaperTemplate: String, Codable, CaseIterable, Identifiable {
         case .dotted: "Dotted"
         case .cornell: "Cornell"
         case .music: "Music Staff"
+        case .engineering: "Engineering"
+        case .isometric: "Isometric"
+        case .checklist: "Checklist"
+        case .penmanship: "Penmanship"
+        case .dayPlanner: "Day Planner"
+        case .weekPlanner: "Week Planner"
+        case .storyboard: "Storyboard"
+        }
+    }
+
+    var family: PaperFamily { PaperFamily.allCases.first { $0.templates.contains(self) } ?? .writing }
+}
+
+/// How paper is grouped wherever it's listed.
+enum PaperFamily: String, CaseIterable, Identifiable {
+    case writing, grids, planning, creative
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .writing: "Writing"
+        case .grids: "Grids"
+        case .planning: "Planning"
+        case .creative: "Creative"
+        }
+    }
+
+    var templates: [PaperTemplate] {
+        switch self {
+        case .writing: [.blank, .narrowRuled, .wideRuled, .penmanship, .checklist]
+        case .grids: [.grid, .engineering, .dotted, .isometric]
+        case .planning: [.cornell, .dayPlanner, .weekPlanner]
+        case .creative: [.music, .storyboard]
         }
     }
 }
 
 enum PaperColor: String, Codable, CaseIterable, Identifiable {
-    case white, ivory, yellow, gray, charcoal
+    case white, ivory, yellow, kraft, sage, blush, gray, charcoal, chalkboard
 
     var id: String { rawValue }
 
@@ -31,6 +66,10 @@ enum PaperColor: String, Codable, CaseIterable, Identifiable {
         case .yellow: "Legal Pad"
         case .gray: "Gray"
         case .charcoal: "Charcoal"
+        case .kraft: "Kraft"
+        case .sage: "Sage"
+        case .blush: "Blush"
+        case .chalkboard: "Chalkboard"
         }
     }
 
@@ -41,10 +80,14 @@ enum PaperColor: String, Codable, CaseIterable, Identifiable {
         case .yellow: (1, 0.973, 0.765)
         case .gray: (0.925, 0.929, 0.937)
         case .charcoal: (0.165, 0.169, 0.184)
+        case .kraft: (0.851, 0.769, 0.627)
+        case .sage: (0.867, 0.898, 0.843)
+        case .blush: (0.965, 0.894, 0.878)
+        case .chalkboard: (0.169, 0.243, 0.212)
         }
     }
 
-    var isDark: Bool { self == .charcoal }
+    var isDark: Bool { self == .charcoal || self == .chalkboard }
 }
 
 enum PageSize: String, Codable, CaseIterable, Identifiable {

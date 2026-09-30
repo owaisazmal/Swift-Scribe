@@ -42,7 +42,7 @@ enum NotebookExporter {
                     let ink = input.inMemoryInk[page.id] ?? savedInk(page, in: input.package)
                     if !ink.strokes.isEmpty {
                         var image: UIImage?
-                        UITraitCollection(userInterfaceStyle: .light).performAsCurrent {
+                        UITraitCollection(userInterfaceStyle: page.effectivePaperColor.inkAppearance).performAsCurrent {
                             image = ink.image(from: bounds, scale: 3)
                         }
                         image?.draw(in: bounds)
