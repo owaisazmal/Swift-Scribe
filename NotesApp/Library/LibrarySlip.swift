@@ -170,7 +170,7 @@ struct LibrarySlipView: View {
         layout {
             HStack(alignment: .firstTextBaseline, spacing: Space.x3) {
                 Image(systemName: change.symbol)
-                    .foregroundStyle(Color.inkSecondary)
+                    .foregroundStyle(Color.textSecondary)
                     .accessibilityHidden(true)
                 Text(change.message)
                     .font(.subheadline)
@@ -180,11 +180,9 @@ struct LibrarySlipView: View {
             }
             .frame(minHeight: 44)
             .accessibilityElement(children: .combine)
-            .accessibilityAction(named: Text("Undo"), undo)
             HStack(spacing: Space.x1) {
                 Button("Undo", action: undo)
-                    .buttonStyle(.bordered)
-                    .tint(Color.accentColor)
+                    .prominentButton()
                 Button(action: dismiss) {
                     Image(systemName: "xmark")
                         .font(.caption.weight(.bold))
@@ -192,7 +190,7 @@ struct LibrarySlipView: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(Color.inkSecondary)
+                .foregroundStyle(Color.textSecondary)
                 .accessibilityLabel(Text("Dismiss"))
             }
         }

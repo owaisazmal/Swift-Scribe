@@ -72,7 +72,7 @@ struct ScribeSettingsView: View {
 
                 Section {
                     Toggle("Keep Writing History", isOn: Bindable(activity).isEnabled)
-                    Button("Clear Writing History…", role: .destructive) { confirmingHistoryClear = true }
+                    Button("Clear Writing History…") { confirmingHistoryClear = true }
                         .disabled(!activity.hasHistory)
                         .confirmationDialog("Clear your writing history?", isPresented: $confirmingHistoryClear, titleVisibility: .visible) {
                             Button("Clear Writing History", role: .destructive) { Task { await activity.clear() } }
