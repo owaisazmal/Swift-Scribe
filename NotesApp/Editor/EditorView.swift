@@ -63,10 +63,10 @@ final class EditorSession {
     }
 
     /// Inserts after `index` (or at the end) and makes the new page current.
-    func addPage(after index: Int? = nil, template: PaperTemplate? = nil) {
+    func addPage(after index: Int? = nil) {
         guard !document.isReadOnly else { return }
         let position = (index ?? document.pages.count - 1) + 1
-        document.insertPages([document.newPage(after: index, template: template)], at: position)
+        document.insertPages([document.newPage(after: index)], at: position)
         go(to: position)
     }
 
@@ -97,6 +97,7 @@ private struct EditorContent: View {
 
     @Environment(LibraryStore.self) private var store
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var showingPages = false
     @State private var showingRecordings = false
     @State private var importingPDF = false
@@ -111,6 +112,8 @@ private struct EditorContent: View {
     @State private var errorMessage: String?
     @State private var ribbonWidth: CGFloat = 44
     @State private var paperMode: PaperDrawer.Mode?
+    @State private var editingCover: NotebookRecord?
+    @State private var knownPages: Set<UUID> = []
 
     private var document: NotebookDocument { session.document }
     private var cloth: ClothColor { document.manifest.cover.cloth }
@@ -137,6 +140,7 @@ private struct EditorContent: View {
             PageNavigator(session: session)
         }
         .sheet(item: $export) { job in ExportSheet(job: job) }
+        .sheet(item: $editingCover) { record in CoverEditorView(record: record) }
         .fileImporter(isPresented: $importingPDF, allowedContentTypes: [.pdf]) { result in
             let position = session.currentPage + 1
             document.perform { await insertPDF(result, at: position) }
@@ -173,6 +177,14 @@ private struct EditorContent: View {
             Text(errorMessage ?? session.recorder.errorMessage ?? "")
         }
         .onChange(of: isPresentingModal) { _, presenting in session.canvas?.setToolPickerSuppressed(presenting) }
+        .onChange(of: session.recorder.isRecording) { _, recording in
+            announce(recording ? String(localized: "Recording started") : String(localized: "Recording saved"))
+        }
+        .onChange(of: document.pages.count) { old, new in announcePages(from: old, to: new) }
+        .onAppear {
+            knownPages = Set(document.pages.map(\.id))
+            document.noteCurrentPage(session.currentPage)
+        }
         .onReceive(NotificationCenter.default.publisher(for: .NSUndoManagerDidCloseUndoGroup)) { _ in session.refreshUndoState() }
         .onReceive(NotificationCenter.default.publisher(for: .NSUndoManagerDidUndoChange)) { _ in session.refreshUndoState() }
         .onReceive(NotificationCenter.default.publisher(for: .NSUndoManagerDidRedoChange)) { _ in session.refreshUndoState() }
@@ -185,6 +197,25 @@ private struct EditorContent: View {
 
     private var isPresentingModal: Bool {
         showingPages || showingRecordings || export != nil || importingPDF || showingPhotoPicker || renaming || goToPage || paperMode != nil
+            || editingCover != nil
+    }
+
+    private func announce(_ message: String) {
+        AccessibilityNotification.Announcement(message).post()
+    }
+
+    private func announcePages(from old: Int, to new: Int) {
+        let ids = document.pages.map(\.id), total = document.pageCountText
+        if new == old + 1, let added = ids.firstIndex(where: { !knownPages.contains($0) }) {
+            announce(String(localized: "Page \(added + 1) added. \(total)"))
+        } else if new > old {
+            announce(String(localized: "\(new - old) pages added. \(total)"))
+        } else if new == old - 1 {
+            announce(String(localized: "Page deleted. \(total)"))
+        } else if new < old {
+            announce(String(localized: "\(old - new) pages deleted. \(total)"))
+        }
+        knownPages = Set(ids)
     }
 
     // MARK: Chrome
@@ -196,17 +227,7 @@ private struct EditorContent: View {
                 .keyboardShortcut("w", modifiers: .command)
                 .accessibilityIdentifier("editor.back")
         }
-        ToolbarItem(placement: .principal) {
-            Button { titleText = document.title; renaming = true } label: {
-                HStack(spacing: Space.x2) {
-                    SpineChip(cloth: cloth)
-                    Text(document.title).font(.headline).foregroundStyle(Color.ink).lineLimit(1)
-                }
-            }
-            .buttonStyle(.plain)
-            .disabled(document.isReadOnly)
-            .accessibilityLabel(Text(document.isReadOnly ? "\(document.title)" : "\(document.title). Rename"))
-        }
+        ToolbarItem(placement: .principal) { titleMenu }
         ToolbarItemGroup(placement: .topBarTrailing) {
             Button { document.undoManager.undo() } label: { Label("Undo", systemImage: "arrow.uturn.backward") }
                 .keyboardShortcut(isPresentingModal ? nil : KeyboardShortcut("z", modifiers: .command))
@@ -218,8 +239,6 @@ private struct EditorContent: View {
                 .accessibilityIdentifier("editor.redo")
         }
         ToolbarItemGroup(placement: .topBarTrailing) {
-            Button { showingPages = true } label: { Label("Pages", systemImage: "square.grid.2x2") }
-                .keyboardShortcut("p", modifiers: [.command, .shift])
             addMenu
             recordButton
             recordingsButton
@@ -230,6 +249,25 @@ private struct EditorContent: View {
             .disabled(document.isReadOnly)
             moreMenu
         }
+    }
+
+    private var titleMenu: some View {
+        Menu {
+            Button { titleText = document.title; renaming = true } label: { Label("Rename…", systemImage: "pencil") }
+                .disabled(document.isReadOnly)
+            if !document.isReadOnly {
+                Button { editingCover = store.record(document.id) } label: { Label("Change Cover…", systemImage: "book.closed") }
+            }
+            Button { export = ExportJob(document: document) } label: { Label("Export as PDF…", systemImage: "square.and.arrow.up") }
+        } label: {
+            HStack(spacing: Space.x2) {
+                SpineChip(cloth: cloth)
+                Text(document.title).font(.headline).foregroundStyle(Color.ink).lineLimit(1)
+                Image(systemName: "chevron.down").font(.caption.weight(.semibold)).foregroundStyle(Color.textSecondary)
+            }
+        }
+        .accessibilityLabel(Text("\(document.title), notebook options"))
+        .accessibilityIdentifier("editor.title")
     }
 
     private var recordingsButton: some View {
@@ -243,24 +281,30 @@ private struct EditorContent: View {
     }
 
     private var ribbon: some View {
-        Button { showingPages = true } label: {
+        let page = min(session.currentPage + 1, document.pages.count), count = document.pages.count
+        return Button { showingPages = true } label: {
             VStack(spacing: 0) {
-                Text(min(session.currentPage + 1, document.pages.count), format: .number)
+                Text(page, format: .number)
                     .font(.subheadline.weight(.bold).monospacedDigit())
-                Text("of \(document.pages.count)")
+                    .contentTransition(reduceMotion ? .opacity : .numericText(value: Double(page)))
+                Text("of \(count)")
                     .font(.caption.weight(.medium).monospacedDigit())
+                    .contentTransition(reduceMotion ? .opacity : .numericText(value: Double(count)))
             }
+            .animation(Motion.adaptive(Motion.standard, reduceMotion: reduceMotion), value: page)
+            .animation(Motion.adaptive(Motion.standard, reduceMotion: reduceMotion), value: count)
             .foregroundStyle(cloth.onCloth)
             .padding(.horizontal, Space.x2)
             .padding(.top, Space.x2)
             .frame(minWidth: 44)
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { ribbonWidth = $0 }
             .padding(.bottom, Space.x2 + ribbonWidth * RibbonShape.notch)
-            .background(cloth.color)
+            .background { cloth.color }
             .clipShape(RibbonShape())
             .shadow(color: .black.opacity(0.15), radius: 1, y: 1)
         }
         .buttonStyle(.plain)
+        .keyboardShortcut(isPresentingModal ? nil : KeyboardShortcut("p", modifiers: [.command, .shift]))
         .simultaneousGesture(LongPressGesture(minimumDuration: 0.4).onEnded { _ in goToText = ""; goToPage = true })
         .padding(.trailing, Space.x8)
         .accessibilityLabel(Text("Page \(session.currentPage + 1) of \(document.pages.count)"))
@@ -272,19 +316,6 @@ private struct EditorContent: View {
     @ViewBuilder
     private var banners: some View {
         VStack(spacing: Space.x2) {
-            if session.recorder.isRecording {
-                HStack(spacing: Space.x2) {
-                    Circle().fill(Color.onTomato).frame(width: 8, height: 8)
-                    Text("REC \(Duration.seconds(session.recorder.elapsed).formatted(.time(pattern: .minuteSecond)))")
-                        .font(.footnote.weight(.bold).monospacedDigit())
-                    Button("Stop") { session.recorder.stopRecording() }.font(.footnote.weight(.semibold))
-                }
-                .foregroundStyle(Color.onTomato)
-                .padding(.horizontal, Space.x4)
-                .padding(.vertical, Space.x2)
-                .background(Color.tomato, in: Capsule())
-                .accessibilityElement(children: .combine)
-            }
             ForEach(document.notices) { notice in
                 NoticeBanner(notice: notice) { document.dismissNotice(notice) }
             }
@@ -293,13 +324,34 @@ private struct EditorContent: View {
         .animation(Motion.adaptive(Motion.standard, reduceMotion: reduceMotion), value: document.notices)
     }
 
+    @ViewBuilder
     private var recordButton: some View {
-        Button { session.recorder.toggleRecording() } label: {
-            Label(session.recorder.isRecording ? "Stop Recording" : "Record Audio",
-                  systemImage: session.recorder.isRecording ? "stop.circle.fill" : "mic")
+        let recorder = session.recorder
+        if recorder.isRecording {
+            let seconds = Int(recorder.elapsed)
+            Button { recorder.stopRecording() } label: {
+                HStack(spacing: Space.x2) {
+                    Image(systemName: "stop.fill")
+                        .symbolEffect(.breathe, options: .repeating, isActive: !reduceMotion)
+                    if sizeClass != .compact {
+                        Text(Duration.seconds(seconds).formatted(.time(pattern: .minuteSecond)))
+                            .monospacedDigit()
+                            .contentTransition(reduceMotion ? .opacity : .numericText(value: Double(seconds)))
+                            .animation(Motion.adaptive(Motion.standard, reduceMotion: reduceMotion), value: seconds)
+                    }
+                }
+                .foregroundStyle(Color.onTomato)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(Color.tomato)
+            .accessibilityLabel(Text("Stop Recording"))
+            .accessibilityValue(Text(Duration.seconds(seconds).formatted(.units(allowed: [.minutes, .seconds], width: .wide))))
+            .accessibilityIdentifier("editor.record")
+        } else {
+            Button { recorder.startRecording() } label: { Label("Record Audio", systemImage: "mic") }
+                .disabled(document.isReadOnly)
+                .accessibilityIdentifier("editor.record")
         }
-        .tint(session.recorder.isRecording ? Color.tomato : nil)
-        .disabled(document.isReadOnly)
     }
 
     private var addMenu: some View {
@@ -323,8 +375,6 @@ private struct EditorContent: View {
 
     private var moreMenu: some View {
         Menu {
-            Button { export = ExportJob(document: document) } label: { Label("Export as PDF", systemImage: "square.and.arrow.up") }
-            Divider()
             let current = document.pages.indices.contains(session.currentPage) ? document.pages[session.currentPage] : nil
             if let current, current.template != nil, !document.isReadOnly {
                 Button { paperMode = .change(pageID: current.id) } label: { Label("Change Paper…", systemImage: "paintpalette") }

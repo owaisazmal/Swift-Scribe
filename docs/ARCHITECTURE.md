@@ -134,6 +134,14 @@ text/<pageID>.txt      recognised handwriting and PDF text, stamped with the ink
 - Background jobs (OCR text, thumbnails) never recreate a deleted package.
 - Deleting permanently renames the package into `Deleting/` and removes it in the background; leftovers are swept at launch.
 
+### Writing history
+
+- `Library/activity.json` is the private writing log behind the library's This-week strip and the writing calendar: `{version, days: {"yyyy-MM-dd": {notebooks: {<notebook id>: [<page id>]}, otherPages}}}`.
+- It is recorded after a save, not at stroke end: `NotebookDocument.onInkSaved` reports the pages the save left holding ink, and `WritingActivity` writes the file off the main thread, debounced by 3 s and flushed when the app leaves the foreground.
+- Day keys are Gregorian dates in the local time zone. Page lists older than 400 days, and pages of permanently deleted notebooks, are kept only as counts in `otherPages`.
+- It is read tolerantly like a manifest: unknown keys and unreadable days are written back, a file that isn't a JSON object is quarantined, and a newer version is never rewritten. Manifests and the SwiftData index are untouched, so older builds ignore it.
+- Settings › Writing History turns recording off or clears the file.
+
 ### Library index
 
 - SwiftData holds the library index (`LibraryIndexSchemaV1`): records, folders, search text and cover fields.

@@ -75,6 +75,8 @@ final class NotebookDocument {
     /// Called after a save that changed what the library shows while the notebook is open (title, pages,
     /// cover, favourite, trash, folder). Ink-only saves skip it; closing the editor indexes everything.
     @ObservationIgnored var onSaved: ((NotebookManifest) -> Void)?
+    /// Called after a save that wrote ink, with the pages left holding ink and when they were written.
+    @ObservationIgnored var onInkSaved: (([UUID], Date) -> Void)?
     @ObservationIgnored var retryBase: Duration = .seconds(1)
     @ObservationIgnored var saveDelay: Duration = .seconds(1.2)
     /// However often edits push the debounce back, a pending save starts within this long.
@@ -620,6 +622,8 @@ final class NotebookDocument {
             if let written = pending.inkModifiedAt {
                 if manifest.modifiedAt < written { manifest.modifiedAt = written }
                 if inkModifiedAt == written { inkModifiedAt = nil }
+                let inked = pending.versions.keys.filter { (receipt.inkHashes[$0] ?? nil) != nil }
+                if !inked.isEmpty { onInkSaved?(inked, written) }
             }
             if manifestVersion == pending.manifestVersion { savedManifestVersion = pending.manifestVersion }
             failures = 0

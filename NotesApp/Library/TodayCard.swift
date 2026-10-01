@@ -1,0 +1,396 @@
+import SwiftUI
+import Combine
+import PencilKit
+
+/// Today's page (or the offer to start a journal) and On This Day, under Continue writing.
+struct DeskCards: View {
+    let records: [NotebookRecord]
+    let zoomNamespace: Namespace.ID
+    var asRows = false
+    let onOpen: (NotebookRecord, UUID?, String) -> Void
+
+    @Environment(LibraryStore.self) private var store
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.scenePhase) private var scenePhase
+    @AppStorage(SettingsKey.dailyJournalID) private var journalID = ""
+    @AppStorage(SettingsKey.dailyJournalPromptHidden) private var promptHidden = false
+    @AppStorage(SettingsKey.showsOnThisDay) private var showsOnThisDay = true
+    @AppStorage(SettingsKey.onThisDayHiddenDay) private var hiddenDay = ""
+    @State private var today = DailyJournal.dayKey(for: .now)
+    @State private var manifest: NotebookManifest?
+    @State private var resurfaced: Resurfaced?
+    @State private var width: CGFloat = 0
+    @State private var newJournalID = UUID()
+    @State private var failure: String?
+    @State private var isOpening = false
+
+    private var journal: NotebookRecord? {
+        guard let id = UUID(uuidString: journalID) else { return nil }
+        return records.first { $0.id == id && !$0.isTrashed }
+    }
+
+    var body: some View {
+        let journal = journal
+        let offersJournal = journal == nil && !promptHidden && records.contains { !$0.isTrashed }
+        let memory = memory(journal: journal)
+        if asRows {
+            todaySlot(journal, offersJournal: offersJournal).listRowBackground(Color.surface)
+            if let memory { memoryCard(memory).listRowBackground(Color.surface) }
+        } else if journal != nil || offersJournal || memory != nil {
+            let sideBySide = sizeClass == .regular && !dynamicTypeSize.isAccessibilitySize && width >= 680
+            let layout = sideBySide ? AnyLayout(HStackLayout(alignment: .top, spacing: Space.x4))
+                                    : AnyLayout(VStackLayout(alignment: .leading, spacing: Space.x3))
+            layout {
+                todaySlot(journal, offersJournal: offersJournal)
+                if let memory { memoryCard(memory) }
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+        }
+    }
+
+    @ViewBuilder
+    private func todaySlot(_ journal: NotebookRecord?, offersJournal: Bool) -> some View {
+        if let journal {
+            TodayCard(record: journal, manifest: manifest?.id == journal.id ? manifest : nil, today: today,
+                      zoomNamespace: zoomNamespace, asRow: asRows) { openToday(journal) }
+                .task(id: "\(journal.id)|\(journal.modifiedAt.timeIntervalSince1970)|\(journal.pageCount)|\(today)|\(records.count)") {
+                    await load(journal)
+                }
+                .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged).receive(on: DispatchQueue.main)) { _ in
+                    today = DailyJournal.dayKey(for: .now)
+                }
+                .onChange(of: scenePhase) { _, phase in
+                    if phase == .active { today = DailyJournal.dayKey(for: .now) }
+                }
+        } else if offersJournal {
+            StartJournalCard(today: today, zoomID: "today-\(newJournalID.uuidString)", zoomNamespace: zoomNamespace, asRow: asRows,
+                             action: startJournal) { promptHidden = true }
+                .alert("The journal couldn't be created", isPresented: Binding(get: { failure != nil }, set: { if !$0 { failure = nil } })) {
+                    Button("OK", role: .cancel) {}
+                } message: {
+                    Text(failure ?? "")
+                }
+        }
+    }
+
+    private func memoryCard(_ memory: DeskMemory) -> some View {
+        OnThisDayCard(memory: memory, zoomNamespace: zoomNamespace, asRow: asRows) {
+            onOpen(memory.record, memory.page?.id, "onthisday-\(memory.record.id.uuidString)")
+        } onHide: {
+            hiddenDay = DailyJournal.dayKey(for: .now)
+        } onTurnOff: {
+            showsOnThisDay = false
+        }
+    }
+
+    /// Without a journal there's nothing to read, so anniversaries are found here.
+    private func memory(journal: NotebookRecord?) -> DeskMemory? {
+        guard showsOnThisDay, hiddenDay != DailyJournal.dayKey(for: .now) else { return nil }
+        let found = journal == nil ? Resurfaced.candidate(today: .now, calendar: .current, journal: nil, notebooks: notebooks) : resurfaced
+        guard let found, let record = records.first(where: { $0.id == found.notebookID && !$0.isTrashed }) else { return nil }
+        guard let pageID = found.pageID else { return DeskMemory(resurfaced: found, record: record, page: nil, number: nil) }
+        guard let manifest, manifest.id == record.id, let index = manifest.pages.firstIndex(where: { $0.id == pageID }) else { return nil }
+        return DeskMemory(resurfaced: found, record: record, page: manifest.pages[index], number: index + 1)
+    }
+
+    private var notebooks: [(id: UUID, createdAt: Date, isTrashed: Bool)] {
+        records.map { ($0.id, $0.createdAt, $0.isTrashed) }
+    }
+
+    private func load(_ journal: NotebookRecord) async {
+        let package = NotebookPackage(root: store.root, id: journal.id)
+        guard let loaded = try? await package.readManifest().manifest, !Task.isCancelled else { return }
+        if loaded != manifest { manifest = loaded }
+        let found = Resurfaced.candidate(today: .now, calendar: .current, journal: (journal.id, loaded.pages), notebooks: notebooks)
+        if found != resurfaced { resurfaced = found }
+    }
+
+    private func openToday(_ journal: NotebookRecord) {
+        guard !isOpening else { return }
+        isOpening = true
+        Task {
+            defer { isOpening = false }
+            let page = await store.prepareTodayPage(journal.id)
+            onOpen(journal, page, "today-\(journal.id.uuidString)")
+        }
+    }
+
+    private func startJournal() {
+        guard !isOpening else { return }
+        isOpening = true
+        let id = newJournalID
+        Task {
+            defer { isOpening = false }
+            do {
+                try await store.createDailyJournal(id: id)
+                guard let journal = store.record(id) else { return }
+                onOpen(journal, journal.firstPageID, "today-\(id.uuidString)")
+                newJournalID = UUID()
+            } catch {
+                failure = error.localizedDescription
+            }
+        }
+    }
+}
+
+struct DeskMemory {
+    let resurfaced: Resurfaced
+    let record: NotebookRecord
+    let page: NotebookPage?
+    let number: Int?
+}
+
+struct TodayCard: View {
+    let record: NotebookRecord
+    let manifest: NotebookManifest?
+    let today: String
+    let zoomNamespace: Namespace.ID
+    var asRow = false
+    let action: () -> Void
+    @Environment(LibraryStore.self) private var store
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var image: UIImage?
+
+    private var title: String { record.title.isEmpty ? String(localized: "Untitled") : record.title }
+    private var todayIndex: Int? { manifest?.pages.lastIndex { $0.day == today } }
+    private var date: Date { DailyJournal.date(fromKey: today) ?? .now }
+    private var dayText: String { date.formatted(.dateTime.weekday(.wide).day().month(.wide)) }
+
+    /// Today's page, or the one tapping will add.
+    private var preview: NotebookPage? {
+        guard let manifest else { return nil }
+        if let todayIndex { return manifest.pages[todayIndex] }
+        return DailyJournal.makeTodayPage(after: manifest.pages, defaults: manifest.defaults, key: today, id: record.id)
+    }
+
+    private var isWritten: Bool { todayIndex.flatMap { manifest?.pages[$0].inkHash } != nil }
+
+    private var place: String {
+        guard let todayIndex else { return String(localized: "\(title) · a fresh page") }
+        return isWritten ? String(localized: "\(title) · page \(todayIndex + 1) · written") : String(localized: "\(title) · page \(todayIndex + 1)")
+    }
+
+    var body: some View {
+        let preview = preview
+        Button(action: action) {
+            DeskCardLayout(asRow: asRow) {
+                DeskPage(image: image, page: preview, ribbon: record.cloth, width: asRow ? 44 : 56)
+                    .zoomSource(id: "today-\(record.id.uuidString)", in: zoomNamespace)
+            } text: {
+                Text("Today")
+                    .font(.footnote.weight(.bold).smallCaps())
+                    .tracking(0.8)
+                    .foregroundStyle(Color.accentColor)
+                Text(dayText)
+                    .modifier(DeskTitle(asRow: asRow, lines: 1))
+                Text(place)
+                    .font(.subheadline.monospacedDigit())
+                    .foregroundStyle(Color.textSecondary)
+            } accessory: {
+                Image(systemName: isWritten ? "checkmark" : "pencil.line")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(Color.accentColor)
+                    .frame(width: 36, height: 36)
+                    .background(Color.accentColor.opacity(0.12), in: Circle())
+                    .contentTransition(.symbolEffect(.replace))
+            }
+        }
+        .buttonStyle(DeskCardButtonStyle())
+        .hoverEffect(.highlight)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(todayIndex == nil ? Text("Start today's page in \(title)")
+                            : isWritten ? Text("Today's page in \(title), \(dayText), written") : Text("Today's page in \(title), \(dayText)"))
+        .accessibilityHint(Text("Opens the notebook at today's page"))
+        .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier("desk.today")
+        .task(id: "\(preview?.id.uuidString ?? "")|\(preview?.thumbnailKey ?? "")") { await loadImage(preview) }
+    }
+
+    private func loadImage(_ page: NotebookPage?) async {
+        guard let page else { return }
+        let loaded = todayIndex == nil
+            ? await BlankPages.image(page)
+            : await PageThumbnailer.thumbnail(package: NotebookPackage(root: store.root, id: record.id), page: page)
+        guard !Task.isCancelled, let loaded else { return }
+        withAnimation(Motion.adaptive(Motion.quick, reduceMotion: reduceMotion)) { image = loaded }
+    }
+}
+
+struct StartJournalCard: View {
+    let today: String
+    let zoomID: String
+    let zoomNamespace: Namespace.ID
+    var asRow = false
+    let action: () -> Void
+    let onDismiss: () -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var image: UIImage?
+
+    private var preview: NotebookPage {
+        var page = NotebookPage.template(NotebookStarter.journal.template, color: NotebookStarter.journal.paperColor, size: .letter)
+        page.day = today
+        return page
+    }
+
+    var body: some View {
+        let preview = preview
+        Button(action: action) {
+            DeskCardLayout(asRow: asRow, quiet: true) {
+                DeskPage(image: image, page: preview, ribbon: .moss, width: asRow ? 44 : 56)
+                    .zoomSource(id: zoomID, in: zoomNamespace)
+            } text: {
+                Text("Start a daily journal")
+                    .modifier(DeskTitle(asRow: asRow))
+                Text("A page printed with each day's date, one tap away.")
+                    .font(.subheadline)
+                    .foregroundStyle(Color.textSecondary)
+            } accessory: {
+                Image(systemName: "plus")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(Color.accentColor)
+                    .frame(width: 36, height: 36)
+                    .overlay { Circle().strokeBorder(Color.accentColor.opacity(0.35), lineWidth: 1) }
+            }
+        }
+        .buttonStyle(DeskCardButtonStyle())
+        .hoverEffect(.highlight)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Start a daily journal"))
+        .accessibilityHint(Text("Creates a journal and opens today's page"))
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction(named: Text("Don't Show Again"), onDismiss)
+        .contextMenu {
+            Button(action: onDismiss) { Label("Don't Show Again", systemImage: "eye.slash") }
+        }
+        .task(id: preview.thumbnailKey) {
+            let loaded = await BlankPages.image(preview)
+            withAnimation(Motion.adaptive(Motion.quick, reduceMotion: reduceMotion)) { image = loaded }
+        }
+    }
+}
+
+struct DeskCardLayout<Thumbnail: View, Content: View, Accessory: View>: View {
+    var asRow: Bool
+    var quiet = false
+    @ViewBuilder var thumbnail: Thumbnail
+    @ViewBuilder var text: Content
+    @ViewBuilder var accessory: Accessory
+
+    var body: some View {
+        HStack(spacing: Space.x4) {
+            thumbnail
+            VStack(alignment: .leading, spacing: 2) { text }
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+            if !asRow {
+                Spacer(minLength: Space.x2)
+                accessory
+            }
+        }
+        .padding(.vertical, asRow ? Space.x1 : Space.x2 + 2)
+        .padding(.leading, asRow ? 0 : Space.x3)
+        .padding(.trailing, asRow ? 0 : Space.x4)
+        .frame(maxWidth: asRow ? nil : 520, maxHeight: asRow ? nil : .infinity, alignment: .leading)
+        .background {
+            if !asRow {
+                let shape = RoundedRectangle(cornerRadius: Radius.control)
+                if quiet {
+                    shape.strokeBorder(Color.hairline, style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
+                } else {
+                    shape.fill(Color.surface).overlay { shape.strokeBorder(Color.hairline, lineWidth: 1) }
+                }
+            }
+        }
+        .contentShape(RoundedRectangle(cornerRadius: Radius.control))
+    }
+}
+
+struct DeskTitle: ViewModifier {
+    let asRow: Bool
+    var lines = 2
+
+    func body(content: Content) -> some View {
+        Group {
+            if asRow {
+                content.font(.headline)
+            } else {
+                content.displayFont(21, relativeTo: .title3).lineLimit(lines).minimumScaleFactor(lines == 1 ? 0.75 : 0.85)
+            }
+        }
+        .foregroundStyle(Color.ink)
+    }
+}
+
+struct DeskPage: View {
+    let image: UIImage?
+    let page: NotebookPage?
+    var ribbon: ClothColor?
+    var width: CGFloat = 56
+
+    var body: some View {
+        let aspect = page.map { $0.size.width / max($0.size.height, 1) } ?? PageSize.letter.points.width / PageSize.letter.points.height
+        let height = min((width / aspect).rounded(), 76)
+        let pageWidth = min(width, (height * aspect).rounded())
+        ZStack {
+            if let image {
+                Image(uiImage: image).resizable().aspectRatio(contentMode: .fill).transition(.opacity)
+            } else {
+                Color(uiColor: PageRenderer.paperColor(page?.effectivePaperColor ?? .ivory))
+            }
+        }
+        .frame(width: pageWidth, height: height)
+        .clipped()
+        .overlay { Rectangle().strokeBorder(Color.hairline, lineWidth: 1) }
+        .overlay(alignment: .topTrailing) {
+            if let ribbon {
+                RibbonShape()
+                    .fill(ribbon.color)
+                    .overlay { RibbonShape().stroke(Color.labelCream, lineWidth: 1) }
+                    .frame(width: 9, height: height * 0.46)
+                    .shadow(color: .black.opacity(0.2), radius: 0.5, y: 0.5)
+                    .padding(.trailing, Space.x2)
+                    .offset(y: -2)
+            }
+        }
+        .background(alignment: .topLeading) {
+            ZStack(alignment: .topLeading) {
+                leaf.offset(x: 4, y: 4)
+                leaf.offset(x: 2, y: 2)
+            }
+        }
+        .padding(.trailing, 4)
+        .padding(.bottom, 4)
+        .accessibilityHidden(true)
+    }
+
+    private var leaf: some View {
+        Color.labelCream.overlay { Rectangle().strokeBorder(Color.hairline, lineWidth: 1) }
+    }
+}
+
+struct DeskCardButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.98 : 1)
+            .opacity(configuration.isPressed ? 0.85 : 1)
+            .animation(Motion.adaptive(Motion.quick, reduceMotion: reduceMotion), value: configuration.isPressed)
+    }
+}
+
+enum BlankPages {
+    private static let images = LRUCache<PageThumbnailer.SharedUIImage>(capacity: 8)
+
+    static func image(_ page: NotebookPage) async -> UIImage? {
+        let key = page.appearanceKey
+        if let hit = images.value(key, create: { nil }) { return hit.image }
+        let image = await Task.detached(priority: .utility) {
+            PageThumbnailer.render(page: page, ink: PKDrawing(), assets: FileManager.default.temporaryDirectory)
+        }.value
+        return images.value(key) { PageThumbnailer.SharedUIImage(image: image) }?.image
+    }
+}

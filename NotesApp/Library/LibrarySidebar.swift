@@ -52,7 +52,10 @@ struct LibrarySidebar: View {
     @Binding var scope: LibraryScope?
     @Binding var showingSettings: Bool
     @Environment(LibraryStore.self) private var store
+    @Environment(LibraryChangeCenter.self) private var changes
+    @Environment(\.undoManager) private var undoManager
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Query(sort: \FolderRecord.sortIndex) private var folders: [FolderRecord]
     @Query(filter: #Predicate<NotebookRecord> { $0.deletedAt == nil }) private var notebooks: [NotebookRecord]
     @State private var editingFolder: FolderRecord?
@@ -76,7 +79,7 @@ struct LibrarySidebar: View {
             Section {
                 row(String(localized: "All notebooks"), icon: "books.vertical", count: notebooks.count).tag(LibraryScope.all)
                 row(String(localized: "Favourites"), icon: "star", count: counts.favorites).tag(LibraryScope.favorites)
-                row(String(localized: "Recently deleted"), icon: "trash", count: nil).tag(LibraryScope.trash)
+                row(String(localized: "Recently deleted"), icon: "trash", count: nil, bounces: changes.trashBumps).tag(LibraryScope.trash)
             }
             Section {
                 ForEach(folders) { folder in
@@ -85,7 +88,7 @@ struct LibrarySidebar: View {
                         .dropDestination(for: NotebookReference.self) { items, _ in
                             let ids = Set(items.map(\.id))
                             let moved = notebooks.filter { ids.contains($0.id) }
-                            store.move(moved, to: folder)
+                            changes.move(moved, to: folder, in: store, undoManager: undoManager)
                             return !moved.isEmpty
                         }
                         .contextMenu { folderMenu(folder) }
@@ -128,12 +131,18 @@ struct LibrarySidebar: View {
         }
     }
 
-    private func row(_ title: String, icon: String, count: Int?) -> some View {
+    private func row(_ title: String, icon: String, count: Int?, bounces: Int = 0) -> some View {
         HStack {
             if dynamicTypeSize.isAccessibilitySize {
                 Text(title)
             } else {
-                Label(title, systemImage: icon)
+                Label {
+                    Text(title)
+                } icon: {
+                    Image(systemName: icon)
+                        .symbolEffect(.bounce, value: bounces)
+                        .symbolEffectsRemoved(reduceMotion)
+                }
             }
             Spacer()
             if let count, count > 0, !dynamicTypeSize.isAccessibilitySize {

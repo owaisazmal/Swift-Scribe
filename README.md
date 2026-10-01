@@ -12,7 +12,7 @@ Swift Scribe is built entirely on Apple frameworks (SwiftUI, PencilKit, PDFKit, 
 - Pinch to zoom up to 5× with crisp ink and backgrounds at every zoom level
 - Pages keep their true relative size; Fit Width (⌘0) and Fit Page (⌘9) enlarge a smaller page
 - Undo / redo (toolbar, tool palette, ⌘Z / ⇧⌘Z), including page operations
-- Hardware keyboard: arrows, space and Page Up/Down to scroll, ⌘↑/⌘↓ for the first and last page, ⌘N for a new page
+- Hardware keyboard: arrows, space and Page Up/Down to scroll, ⌘↑/⌘↓ for the first and last page, ⌘N for a new page, ⇧⌘P for the page navigator, and ⌘Z to undo library changes too
 - Choose to draw with Apple Pencil only, finger and pencil, or follow the system setting
 
 **Notebooks & paper**
@@ -32,9 +32,15 @@ Swift Scribe is built entirely on Apple frameworks (SwiftUI, PencilKit, PDFKit, 
 **Audio**
 - Record lectures or meetings alongside a notebook, and play them back later
 
+**Writing history**
+- A This-week strip in the library: seven small sheets, inked on the days you wrote
+- A writing calendar laid out like a printed diary; choose a day to see, and open, the exact pages you wrote
+- No streaks, badges or reminders
+
 **Organization & search**
 - Cloth, Print (riso) and first-page notebook covers, changeable at any time
 - Quick Note (⇧⌘N) for a new notebook with your default paper
+- A daily journal: Today's page (⌘T) is printed with the date, "On this day" brings back the page from a month or a year ago, and the app reopens the notebook you left open
 - Folders with spine colours, drag notebooks onto folders in the sidebar, reorder folders
 - Favorites, sorting (last opened, modified, created, title), duplicate, rename
 - Recently Deleted with 30-day auto-purge
@@ -45,6 +51,10 @@ Swift Scribe is built entirely on Apple frameworks (SwiftUI, PencilKit, PDFKit, 
 - Xcode 16 or later (folder-synchronized groups, Swift 6 language mode)
 - iPadOS 18 or later
 - Runs on iPad and on Apple silicon Macs ("Designed for iPad")
+
+## Privacy
+
+Swift Scribe has no accounts and no analytics. The writing history behind the week strip and calendar is a small file on your device (`Library/activity.json`) listing the days you wrote and which pages. It is never shared, and Settings › Writing History turns it off or clears it.
 
 ## Getting started
 

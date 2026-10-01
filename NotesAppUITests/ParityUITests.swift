@@ -39,6 +39,11 @@ final class ParityUITests: XCTestCase {
         let ribbon = app.buttons["editor.ribbon"]
         XCTAssertTrue(ribbon.waitForExistence(timeout: 20))
         XCTAssertEqual(ribbon.label, "Page 142 of 300", "the notebook opens at the matching page")
+        ribbon.tap()
+        let current = app.buttons["Page 142 of 300, current"]
+        let hittable = expectation(for: NSPredicate(format: "hittable == true"), evaluatedWith: current)
+        wait(for: [hittable], timeout: 5)
+        app.buttons["Done"].firstMatch.tap()
         app.buttons["editor.back"].tap()
         XCTAssertTrue(textbook.waitForExistence(timeout: 20))
         field.tap()

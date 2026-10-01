@@ -29,6 +29,7 @@ struct NotebookCoverItem: View {
     var showsFolder = false
     let action: () -> Void
     @Environment(LibraryStore.self) private var store
+    @Environment(LibraryChangeCenter.self) private var changes
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -63,7 +64,7 @@ struct NotebookCoverItem: View {
             .accessibilityActions {
                 if record.isTrashed, !isSelecting {
                     Button("Restore") { store.restore([record]) }
-                    Button("Delete Permanently") { store.deletePermanently([record]) }
+                    Button("Delete Permanently") { changes.requestPermanentDelete([record.id]) }
                 }
             }
             .accessibilityIdentifier("notebook.\(record.title)")

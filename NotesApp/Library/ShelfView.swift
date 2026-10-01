@@ -24,10 +24,14 @@ struct ShelfView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
+    @Environment(\.undoManager) private var undoManager
+    @Environment(LibraryChangeCenter.self) private var changes
     @Query private var records: [NotebookRecord]
     @Query(sort: \FolderRecord.sortIndex) private var folders: [FolderRecord]
     @AppStorage(SettingsKey.librarySort) private var sort: LibrarySortOrder = .opened
     @AppStorage("libraryGrouping") private var grouping: LibraryGrouping = .recency
+    @AppStorage(SettingsKey.dailyJournalID) private var journalID = ""
     @State private var searchText = ""
     @State private var matches: Set<UUID>?
     @State private var pageHits: [UUID: [PageHit]] = [:]
@@ -43,6 +47,7 @@ struct ShelfView: View {
     @State private var confirmingEmptyTrash = false
     @State private var errorMessage: String?
     @State private var shelfWidth: CGFloat?
+    @State private var showsBarTitle = false
 
     private var folder: FolderRecord? {
         if case .folder(let id) = scope { return folders.first { $0.id == id } }
@@ -145,6 +150,20 @@ struct ShelfView: View {
         .task(id: "\(store.searchVersion)|\(records.count)|\(scope)|\(searchText)") { await runSearch() }
         .sheet(item: $export) { job in ExportSheet(job: job) }
         .sheet(item: $editingCover) { record in CoverEditorView(record: record) }
+        .alert(permanentDeleteTitle, isPresented: Binding(get: { !changes.pendingPermanentDelete.isEmpty },
+                                                          set: { if !$0 { changes.pendingPermanentDelete = [] } })) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete Permanently", role: .destructive) { confirmPermanentDelete() }
+        } message: {
+            Text("This can't be undone.")
+        }
+        .overlay(alignment: .bottom) { slip }
+        .task(id: changes.current?.id) {
+            guard changes.current != nil, !voiceOver else { return }
+            try? await Task.sleep(for: .seconds(6))
+            if !Task.isCancelled { changes.dismiss() }
+        }
+        .onChange(of: isCovered) { _, covered in if covered { changes.dismiss() } }
     }
 
     // MARK: Shelves
@@ -152,17 +171,12 @@ struct ShelfView: View {
     private func shelves(_ visible: [NotebookRecord]) -> some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: Space.x6) {
-                VStack(alignment: .leading, spacing: Space.x1) {
-                    Text(title)
-                        .displayFont(40, relativeTo: .largeTitle)
-                        .foregroundStyle(Color.ink)
-                        .accessibilityAddTraits(.isHeader)
-                    Text(subtitle(visible.count)).metaStyle(.footnote)
-                }
+                LibraryHeader(title: title, summary: subtitle(visible), showsRhythm: showsRhythm, onOpenPage: onOpenPage)
                 if let recent = continueCandidate {
                     OpenBookSpread(record: recent, zoomNamespace: zoomNamespace) { onOpenZoomed(recent, nil, $0) }
                         .id("spread-\(recent.id.uuidString)")
                 }
+                if scope == .all, searchText.isEmpty, !isSelecting { DeskCards(records: records, zoomNamespace: zoomNamespace, onOpen: onOpenZoomed) }
                 if !searchText.isEmpty, !pageHits.isEmpty, scope != .trash {
                     PageHitsSection(records: visible, hits: pageHits, query: hitsQuery, zoomNamespace: zoomNamespace, onOpen: onOpenZoomed)
                         .transition(.opacity)
@@ -190,12 +204,13 @@ struct ShelfView: View {
             .padding(.vertical, Space.x6)
         }
         .scrollDismissesKeyboard(.immediately)
+        .onScrollGeometryChange(for: Bool.self) { $0.contentOffset.y + $0.contentInsets.top > 56 } action: { showsBarTitle = $1 }
     }
 
     /// The notebook to reopen at the top of All notebooks: the last one opened.
     private var continueCandidate: NotebookRecord? {
         guard scope == .all, searchText.isEmpty, !isSelecting else { return nil }
-        return records.filter { !$0.isTrashed && $0.lastOpenedAt != nil }
+        return records.filter { !$0.isTrashed && $0.lastOpenedAt != nil && $0.id.uuidString != journalID }
             .max { ($0.lastOpenedAt ?? .distantPast) < ($1.lastOpenedAt ?? .distantPast) }
     }
 
@@ -212,6 +227,7 @@ struct ShelfView: View {
 
     private func accessibleList(_ visible: [NotebookRecord]) -> some View {
         List {
+            if showsRhythm { WeekSummarySection(onOpenPage: onOpenPage) }
             if let recent = continueCandidate {
                 Button { onOpen(recent) } label: {
                     HStack(spacing: Space.x4) {
@@ -227,6 +243,7 @@ struct ShelfView: View {
                 .accessibilityHint(Text("Opens at this page"))
                 .listRowBackground(Color.surface)
             }
+            if scope == .all, searchText.isEmpty, !isSelecting { DeskCards(records: records, zoomNamespace: zoomNamespace, asRows: true, onOpen: onOpenZoomed) }
             ForEach(visible) { record in
                 Button {
                     if isSelecting { toggle(record) } else if !record.isTrashed { onOpen(record) }
@@ -274,12 +291,17 @@ struct ShelfView: View {
         .scrollContentBackground(.hidden)
     }
 
-    private func subtitle(_ count: Int) -> String {
+    private func subtitle(_ visible: [NotebookRecord]) -> String {
         if isSelecting { return String(localized: "Select notebooks to move, favourite or delete") }
         if scope == .trash { return String(localized: "Deleted notebooks stay here for 30 days") }
+        let count = visible.count, pageCount = visible.reduce(0) { $0 + $1.pageCount }
         let notebooks = count == 1 ? String(localized: "1 notebook") : String(localized: "\(count) notebooks")
-        return "\(notebooks) · \(sort.summary)"
+        let pages = pageCount == 1 ? String(localized: "1 page") : String(localized: "\(pageCount) pages")
+        return "\(notebooks) · \(pages) · \(sort.summary)"
     }
+
+    /// This week's writing shows at the top of All notebooks, but not while searching or selecting.
+    private var showsRhythm: Bool { scope == .all && searchText.isEmpty && !isSelecting }
 
     private func groups(_ visible: [NotebookRecord]) -> [Shelf] {
         guard !visible.isEmpty else { return [] }
@@ -337,20 +359,25 @@ struct ShelfView: View {
     private func selectionBar(_ visible: [NotebookRecord]) -> some ToolbarContent {
         ToolbarItemGroup(placement: .bottomBar) {
             if scope == .trash {
-                Button("Restore") { store.restore(selected(visible)); endSelection() }.disabled(selection.isEmpty)
-                Spacer()
-                Button("Delete", role: .destructive) { store.deletePermanently(selected(visible)); endSelection() }.disabled(selection.isEmpty)
-            } else {
-                Button { store.setFavorite(true, for: selected(visible)); endSelection() } label: { Label("Favourite", systemImage: "star") }
+                Button("Restore") { changes.restore(selected(visible), in: store, undoManager: undoManager); endSelection() }
                     .disabled(selection.isEmpty)
+                Spacer()
+                Button("Delete", role: .destructive) { changes.requestPermanentDelete(selected(visible).map(\.id)) }.disabled(selection.isEmpty)
+            } else {
+                Button { changes.setFavorite(true, for: selected(visible), in: store, undoManager: undoManager); endSelection() } label: {
+                    Label("Favourite", systemImage: "star")
+                }
+                .disabled(selection.isEmpty)
                 Menu {
-                    Button("Not on a shelf") { store.move(selected(visible), to: nil); endSelection() }
-                    ForEach(folders) { folder in Button(folder.name) { store.move(selected(visible), to: folder); endSelection() } }
+                    Button("Not on a shelf") { move(selected(visible), to: nil); endSelection() }
+                    ForEach(folders) { folder in Button(folder.name) { move(selected(visible), to: folder); endSelection() } }
                 } label: { Label("Move", systemImage: "folder") }
                     .disabled(selection.isEmpty)
                 Spacer()
-                Button(role: .destructive) { store.moveToTrash(selected(visible)); endSelection() } label: { Label("Delete", systemImage: "trash") }
-                    .disabled(selection.isEmpty)
+                Button(role: .destructive) { changes.moveToTrash(selected(visible), in: store, undoManager: undoManager); endSelection() } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+                .disabled(selection.isEmpty)
             }
         }
     }
@@ -359,6 +386,15 @@ struct ShelfView: View {
 
     @ToolbarContentBuilder
     private func toolbar(_ visible: [NotebookRecord]) -> some ToolbarContent {
+        ToolbarItem(placement: .principal) {
+            let shows = showsBarTitle || dynamicTypeSize.isAccessibilitySize
+            Text(title)
+                .font(.headline)
+                .foregroundStyle(Color.ink)
+                .opacity(shows ? 1 : 0)
+                .accessibilityHidden(!shows)
+                .animation(Motion.adaptive(Motion.standard, reduceMotion: reduceMotion), value: shows)
+        }
         ToolbarItemGroup(placement: .primaryAction) {
             if isSelecting {
                 Button("Done") { endSelection() }
@@ -399,16 +435,16 @@ struct ShelfView: View {
     @ViewBuilder
     private func trashActions(for record: NotebookRecord) -> some View {
         if record.isTrashed {
-            Button("Restore") { store.restore([record]) }
-            Button("Delete Permanently") { store.deletePermanently([record]) }
+            Button("Restore") { changes.restore([record], in: store, undoManager: undoManager) }
+            Button("Delete Permanently") { changes.requestPermanentDelete([record.id]) }
         }
     }
 
     @ViewBuilder
     private func menu(for record: NotebookRecord) -> some View {
         if record.isTrashed {
-            Button { store.restore([record]) } label: { Label("Restore", systemImage: "arrow.uturn.backward") }
-            Button(role: .destructive) { store.deletePermanently([record]) } label: { Label("Delete Permanently", systemImage: "trash") }
+            Button { changes.restore([record], in: store, undoManager: undoManager) } label: { Label("Restore", systemImage: "arrow.uturn.backward") }
+            Button(role: .destructive) { changes.requestPermanentDelete([record.id]) } label: { Label("Delete Permanently", systemImage: "trash") }
         } else if record.isReadOnly {
             Button { onOpen(record) } label: { Label("Open", systemImage: "book") }
             Button {
@@ -418,13 +454,13 @@ struct ShelfView: View {
         } else {
             Button { onOpen(record) } label: { Label("Open", systemImage: "book") }
             Button { renameText = record.title; renaming = record } label: { Label("Rename", systemImage: "pencil") }
-            Button { store.setFavorite(!record.isFavorite, for: [record]) } label: {
+            Button { changes.setFavorite(!record.isFavorite, for: [record], in: store, undoManager: undoManager) } label: {
                 Label(record.isFavorite ? "Unfavourite" : "Favourite", systemImage: record.isFavorite ? "star.slash" : "star")
             }
             Menu {
-                Button { store.move([record], to: nil) } label: { Label("Not on a shelf", systemImage: record.folder == nil ? "checkmark" : "tray") }
+                Button { move([record], to: nil) } label: { Label("Not on a shelf", systemImage: record.folder == nil ? "checkmark" : "tray") }
                 ForEach(folders) { folder in
-                    Button { store.move([record], to: folder) } label: {
+                    Button { move([record], to: folder) } label: {
                         Label(folder.name, systemImage: record.folder?.id == folder.id ? "checkmark" : "folder")
                     }
                 }
@@ -436,9 +472,44 @@ struct ShelfView: View {
             Button {
                 Task { do { export = try await ExportJob.forNotebook(record.id, root: store.root) } catch { errorMessage = error.localizedDescription } }
             } label: { Label("Export as PDF", systemImage: "square.and.arrow.up") }
+            Toggle(isOn: Binding(get: { journalID == record.id.uuidString }, set: { journalID = $0 ? record.id.uuidString : "" })) {
+                Label("Use as Daily Journal", systemImage: "calendar")
+            }
             Divider()
-            Button(role: .destructive) { store.moveToTrash([record]) } label: { Label("Delete", systemImage: "trash") }
+            Button(role: .destructive) { changes.moveToTrash([record], in: store, undoManager: undoManager) } label: { Label("Delete", systemImage: "trash") }
         }
+    }
+
+    // MARK: Safety net
+
+    private func move(_ records: [NotebookRecord], to folder: FolderRecord?) {
+        changes.move(records, to: folder, in: store, undoManager: undoManager)
+    }
+
+    private var permanentDeleteTitle: String {
+        let ids = changes.pendingPermanentDelete
+        guard let first = ids.first else { return "" }
+        if ids.count > 1 { return String(localized: "Delete \(ids.count) notebooks permanently?") }
+        let title = records.first { $0.id == first }?.title ?? ""
+        return String(localized: "Delete “\(title)” permanently?")
+    }
+
+    private func confirmPermanentDelete() {
+        let ids = Set(changes.pendingPermanentDelete)
+        changes.confirmPermanentDelete(in: store)
+        selection.subtract(ids)
+        if isSelecting, selection.isEmpty { endSelection() }
+    }
+
+    private var slip: some View {
+        ZStack {
+            if let change = changes.current {
+                LibrarySlipView(change: change) { changes.dismiss() }
+                    .padding(.bottom, Space.x4)
+                    .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(Motion.adaptive(Motion.standard, reduceMotion: reduceMotion), value: changes.current?.id)
     }
 
     @ViewBuilder
@@ -565,12 +636,14 @@ struct EmptyShelf<Actions: View, Illustration: View>: View {
 private struct SearchActivator: UIViewRepresentable {
     @Binding var isRequested: Bool
     let isCovered: Bool
+    @Environment(\.undoManager) private var undoManager
 
     func makeUIView(context: Context) -> ActivatorView { ActivatorView() }
 
     /// Acts only on changes, so ordinary library updates never move first responder.
     func updateUIView(_ view: ActivatorView, context: Context) {
         view.onFind = { isRequested = true; view.activate() }
+        view.libraryUndoManager = undoManager
         if isCovered != view.wasCovered {
             view.wasCovered = isCovered
             view.isCovered = isCovered
@@ -588,22 +661,35 @@ private struct SearchActivator: UIViewRepresentable {
         var wasRequested = false
         var wasCovered = false
         var isCovered = false
+        weak var libraryUndoManager: UndoManager?
 
         override var canBecomeFirstResponder: Bool { !isCovered }
 
         override var keyCommands: [UIKeyCommand]? {
             guard !isCovered else { return [] }
-            let find = UIKeyCommand(title: String(localized: "Search Library"), action: #selector(findRequested), input: "f", modifierFlags: .command)
-            find.wantsPriorityOverSystemBehavior = true
-            return [find]
+            let commands = [
+                UIKeyCommand(title: String(localized: "Search Library"), action: #selector(findRequested), input: "f", modifierFlags: .command),
+                UIKeyCommand(title: String(localized: "Undo"), action: #selector(undoLibraryChange), input: "z", modifierFlags: .command),
+                UIKeyCommand(title: String(localized: "Redo"), action: #selector(redoLibraryChange), input: "z", modifierFlags: [.command, .shift]),
+            ]
+            for command in commands { command.wantsPriorityOverSystemBehavior = true }
+            return commands
         }
 
         @objc private func findRequested() { if !isCovered { onFind?() } }
 
+        @objc private func undoLibraryChange() { libraryUndoManager?.undo() }
+
+        @objc private func redoLibraryChange() { libraryUndoManager?.redo() }
+
         override func find(_ sender: Any?) { findRequested() }
 
         override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
-            (action == #selector(find(_:)) && !isCovered) || super.canPerformAction(action, withSender: sender)
+            switch action {
+            case #selector(undoLibraryChange): !isCovered && libraryUndoManager?.canUndo == true
+            case #selector(redoLibraryChange): !isCovered && libraryUndoManager?.canRedo == true
+            default: (action == #selector(find(_:)) && !isCovered) || super.canPerformAction(action, withSender: sender)
+            }
         }
 
         override func didMoveToWindow() {

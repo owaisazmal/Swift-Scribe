@@ -8,6 +8,7 @@ struct EditorScreen: View {
     let onClose: () -> Void
 
     @Environment(LibraryStore.self) private var store
+    @Environment(WritingActivity.self) private var activity
     @State private var document: NotebookDocument?
     @State private var failure: String?
     @State private var isClosing = false
@@ -44,8 +45,10 @@ struct EditorScreen: View {
 
     private func open() async {
         do {
-            let opened = try await DocumentRegistry.shared.open(notebookID, root: store.root, scene: sceneID) { [weak store] document in
+            let opened = try await DocumentRegistry.shared.open(notebookID, root: store.root, scene: sceneID) { [weak store, weak activity] document in
+                let id = document.id
                 document.onSaved = { manifest in store?.index(manifest) }
+                document.onInkSaved = { pages, date in activity?.record(notebook: id, pages: pages, at: date) }
                 store?.reapplyChangesInFlight(to: document)
             }
             opened.noteOpened()

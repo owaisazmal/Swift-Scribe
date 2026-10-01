@@ -64,6 +64,7 @@ enum PageRenderer {
         switch page.background {
         case .template:
             drawTemplate(page.template ?? .blank, color: page.paperColor, in: ctx, size: size)
+            if let day = page.day { PageMasthead.draw(day: day, template: page.template ?? .blank, paper: page.paperColor, in: ctx, size: size) }
         case .pdf(let file, let index):
             let url = assets.appending(path: file)
             guard let pdf = pdfs.value(url.path(percentEncoded: false), create: {

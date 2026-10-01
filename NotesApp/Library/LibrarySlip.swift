@@ -1,0 +1,180 @@
+import SwiftUI
+import SwiftData
+
+/// The window's library changes: each one is undoable (the slip, ⌘Z), and permanent deletes wait for a confirmation.
+@MainActor
+@Observable
+final class LibraryChangeCenter {
+    struct Change: Identifiable {
+        let id = UUID()
+        let message: String
+        let symbol: String
+        let undo: @MainActor () -> Void
+    }
+
+    private(set) var current: Change?
+    var pendingPermanentDelete: [UUID] = []
+    private(set) var trashBumps = 0
+
+    func post(_ message: String, symbol: String = "arrow.uturn.backward", isTrash: Bool = false, undo: @escaping @MainActor () -> Void) {
+        current = Change(message: message, symbol: symbol, undo: undo)
+        if isTrash { trashBumps += 1 }
+        AccessibilityNotification.Announcement(message).post()
+    }
+
+    func dismiss() {
+        current = nil
+    }
+
+    func requestPermanentDelete(_ ids: [UUID]) {
+        pendingPermanentDelete = ids
+    }
+
+    func confirmPermanentDelete(in store: LibraryStore) {
+        let ids = pendingPermanentDelete
+        pendingPermanentDelete = []
+        store.deletePermanently(ids.compactMap(store.record))
+    }
+
+    // MARK: Changes
+
+    func moveToTrash(_ records: [NotebookRecord], in store: LibraryStore, undoManager: UndoManager?) {
+        perform(records, in: store, undoManager: undoManager, action: String(localized: "Delete"), symbol: "trash", isTrash: true,
+                message: { $0.count == 1 ? String(localized: "Moved “\($0[0].title)” to Recently Deleted")
+                                         : String(localized: "Moved \($0.count) notebooks to Recently Deleted") },
+                apply: { store.moveToTrash($0) }, inverse: { store.restore($0) })
+    }
+
+    func restore(_ records: [NotebookRecord], in store: LibraryStore, undoManager: UndoManager?) {
+        perform(records, in: store, undoManager: undoManager, action: String(localized: "Restore"), symbol: "arrow.uturn.backward",
+                message: { $0.count == 1 ? String(localized: "Restored “\($0[0].title)”") : String(localized: "Restored \($0.count) notebooks") },
+                apply: { store.restore($0) }, inverse: { store.moveToTrash($0) })
+    }
+
+    func setFavorite(_ favorite: Bool, for records: [NotebookRecord], in store: LibraryStore, undoManager: UndoManager?) {
+        let previous = Dictionary(records.map { ($0.id, $0.isFavorite) }, uniquingKeysWith: { first, _ in first })
+        let message: ([NotebookRecord]) -> String = { records in
+            switch (favorite, records.count) {
+            case (true, 1): String(localized: "Added “\(records[0].title)” to Favourites")
+            case (true, _): String(localized: "Added \(records.count) notebooks to Favourites")
+            case (false, 1): String(localized: "Removed “\(records[0].title)” from Favourites")
+            case (false, _): String(localized: "Removed \(records.count) notebooks from Favourites")
+            }
+        }
+        perform(records, in: store, undoManager: undoManager, action: favorite ? String(localized: "Favourite") : String(localized: "Unfavourite"),
+                symbol: favorite ? "star" : "star.slash", message: message,
+                apply: { store.setFavorite(favorite, for: $0) },
+                inverse: { records in
+                    for value in [true, false] {
+                        let group = records.filter { previous[$0.id] == value }
+                        if !group.isEmpty { store.setFavorite(value, for: group) }
+                    }
+                })
+    }
+
+    /// Undo returns each notebook to the shelf it was on, or off the shelves if that shelf has since been deleted.
+    func move(_ records: [NotebookRecord], to folder: FolderRecord?, in store: LibraryStore, undoManager: UndoManager?) {
+        let previous = Dictionary(records.map { ($0.id, $0.folder?.id) }, uniquingKeysWith: { first, _ in first })
+        let folderID = folder?.id, name = folder?.name ?? ""
+        let message: ([NotebookRecord]) -> String = { records in
+            switch (folderID == nil, records.count) {
+            case (false, 1): String(localized: "Moved “\(records[0].title)” to \(name)")
+            case (false, _): String(localized: "Moved \(records.count) notebooks to \(name)")
+            case (true, 1): String(localized: "Took “\(records[0].title)” off its shelf")
+            case (true, _): String(localized: "Took \(records.count) notebooks off their shelves")
+            }
+        }
+        perform(records.filter { $0.folder?.id != folderID }, in: store, undoManager: undoManager, action: String(localized: "Move to Shelf"),
+                symbol: "folder", message: message,
+                apply: { store.move($0, to: Self.folder(folderID, in: store)) },
+                inverse: { records in
+                    for (id, group) in Dictionary(grouping: records, by: { previous[$0.id] ?? nil }) {
+                        store.move(group, to: Self.folder(id, in: store))
+                    }
+                })
+    }
+
+    private static func folder(_ id: UUID?, in store: LibraryStore) -> FolderRecord? {
+        guard let id else { return nil }
+        return try? store.context.fetch(FetchDescriptor<FolderRecord>(predicate: #Predicate { $0.id == id })).first
+    }
+
+    private func perform(_ records: [NotebookRecord], in store: LibraryStore, undoManager: UndoManager?, action: String, symbol: String,
+                         isTrash: Bool = false, message: ([NotebookRecord]) -> String,
+                         apply: @escaping @MainActor ([NotebookRecord]) -> Void, inverse: @escaping @MainActor ([NotebookRecord]) -> Void) {
+        let records = records.filter { !$0.isReadOnly }
+        guard !records.isEmpty else { return }
+        let text = message(records)
+        apply(records)
+        if let undoManager { register(records.map(\.id), in: store, undoManager: undoManager, action: action, undo: inverse, redo: apply) }
+        post(text, symbol: symbol, isTrash: isTrash) { [weak undoManager] in
+            if undoManager?.canUndo == true { undoManager?.undo() }
+        }
+    }
+
+    /// Undo registers the redo, which registers the undo again, as NotebookDocument's page operations do.
+    private func register(_ ids: [UUID], in store: LibraryStore, undoManager: UndoManager, action: String,
+                          undo: @escaping @MainActor ([NotebookRecord]) -> Void, redo: @escaping @MainActor ([NotebookRecord]) -> Void) {
+        undoManager.registerUndo(withTarget: store) { [weak self, weak undoManager] store in
+            self?.dismiss()
+            undo(ids.compactMap(store.record))
+            guard let self, let undoManager else { return }
+            self.register(ids, in: store, undoManager: undoManager, action: action, undo: redo, redo: undo)
+        }
+        undoManager.setActionName(action)
+    }
+}
+
+/// A paper slip at the foot of the library naming the last change, with Undo.
+struct LibrarySlipView: View {
+    let change: LibraryChangeCenter.Change
+    let dismiss: () -> Void
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    var body: some View {
+        let stacked = dynamicTypeSize.isAccessibilitySize
+        let layout = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: Space.x2)) : AnyLayout(HStackLayout(spacing: Space.x3))
+        layout {
+            HStack(alignment: .firstTextBaseline, spacing: Space.x3) {
+                Image(systemName: change.symbol)
+                    .foregroundStyle(Color.inkSecondary)
+                    .accessibilityHidden(true)
+                Text(change.message)
+                    .font(.subheadline)
+                    .foregroundStyle(Color.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityAction(named: Text("Undo"), undo)
+            HStack(spacing: Space.x1) {
+                Button("Undo", action: undo)
+                    .buttonStyle(.bordered)
+                    .tint(Color.accentColor)
+                Button(action: dismiss) {
+                    Image(systemName: "xmark")
+                        .font(.caption.weight(.bold))
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(Color.inkSecondary)
+                .accessibilityLabel(Text("Dismiss"))
+            }
+        }
+        .padding(.leading, Space.x4)
+        .padding(.trailing, Space.x1)
+        .padding(.vertical, stacked ? Space.x3 : Space.x1)
+        .frame(maxWidth: 520)
+        .background(Color.surface, in: RoundedRectangle(cornerRadius: Radius.control))
+        .overlay { RoundedRectangle(cornerRadius: Radius.control).strokeBorder(Color.hairline) }
+        .shadow(color: .black.opacity(0.08), radius: 6, y: 2)
+        .padding(.horizontal, Space.x4)
+        .accessibilityElement(children: .contain)
+    }
+
+    private func undo() {
+        change.undo()
+        dismiss()
+    }
+}

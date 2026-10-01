@@ -36,7 +36,7 @@ final class AccessibilityAuditUITests: XCTestCase {
         empty.terminate()
 
         let app = XCUIApplication()
-        app.launchArguments = ["-storageRoot", "audit", "-resetStorage", "-seedLibrary", "6", "-seedLongPDF", "-indexSeed", "-drawingInput", "anyInput"] + extra
+        app.launchArguments = ["-storageRoot", "audit", "-resetStorage", "-seedLibrary", "6", "-seedLongPDF", "-seedJournal", "-indexSeed", "-seedActivity", "-drawingInput", "anyInput"] + extra
         app.launch()
         let textbook = app.buttons["notebook.Textbook"]
         XCTAssertTrue(textbook.waitForExistence(timeout: 90))
@@ -95,6 +95,22 @@ final class AccessibilityAuditUITests: XCTestCase {
         sleep(1)
         try check("recently deleted")
         sidebar("All notebooks").tap()
+        app.buttons["writing.week"].firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["Writing Calendar"].waitForExistence(timeout: 10))
+        sleep(1)
+        try checkSheet("writing calendar", scrolling: app.scrollViews.firstMatch)
+        app.buttons["Done"].firstMatch.tap()
+
+        let biology = app.buttons["notebook.Cell Biology 1"]
+        XCTAssertTrue(biology.waitForExistence(timeout: 10))
+        biology.press(forDuration: 1.2)
+        app.buttons["Delete"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["Undo"].waitForExistence(timeout: 5))
+        try check("library undo slip")
+        if app.buttons["Undo"].exists {
+            app.buttons["Undo"].tap()
+            XCTAssertTrue(biology.waitForExistence(timeout: 5), "Undo puts the notebook back")
+        }
 
         app.buttons["New"].firstMatch.tap()
         XCTAssertTrue(app.textFields["Title"].waitForExistence(timeout: 30))
@@ -137,7 +153,7 @@ final class AccessibilityAuditUITests: XCTestCase {
             try checkSheet("paper drawer", scrolling: app.scrollViews["paper.drawer"])
         }
         app.buttons["Done"].firstMatch.tap()
-        app.buttons["Pages"].firstMatch.tap()
+        app.buttons["editor.ribbon"].tap()
         XCTAssertTrue(app.buttons["Done"].firstMatch.waitForExistence(timeout: 10))
         sleep(1)
         try check("page navigator", modal: true)

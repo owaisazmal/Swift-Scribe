@@ -31,6 +31,7 @@ struct ScribeRoot: View {
         .background(Color.paper.ignoresSafeArea())
         .environment(app)
         .environment(app.library)
+        .environment(app.activity)
         .modelContainer(app.container)
         .task {
             #if DEBUG
@@ -39,7 +40,10 @@ struct ScribeRoot: View {
             await app.start()
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase != .active { app.flushOpenDocuments() }
+            if phase != .active {
+                app.flushOpenDocuments()
+                app.activity.flush()
+            }
         }
         .alert("Some notebooks weren't moved", isPresented: $app.showsMigrationProblem) {
             Button("OK", role: .cancel) {}
