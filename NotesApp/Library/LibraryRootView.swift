@@ -27,6 +27,10 @@ struct LibraryRootView: View {
     @Environment(AppModel.self) private var app
     @State private var sceneID: String?
     @State private var isSearching = false
+    @State private var changes = LibraryChangeCenter()
+    @State private var openingToday = false
+    @State private var triedRestore = false
+    @SceneStorage("scribe.openNotebook") private var restoredNotebook = ""
     @Namespace private var zoom
 
     /// With Reduce Motion the editor cross-fades in over the library instead of zooming out of the cover.
@@ -50,6 +54,7 @@ struct LibraryRootView: View {
                 }
             }
             .tint(Color.accentColor)
+            .environment(changes)
             .accessibilityHidden(editorCoversLibrary)
             .disabled(editorCoversLibrary)
 
@@ -87,8 +92,49 @@ struct LibraryRootView: View {
                     .keyboardShortcut("n", modifiers: [.command, .shift])
                     .hidden()
                     .accessibilityHidden(true)
+                Button("Today's Page", action: openToday)
+                    .keyboardShortcut("t", modifiers: .command)
+                    .hidden()
+                    .accessibilityHidden(true)
             }
         }
+        .onChange(of: open) { restoredNotebook = $1?.id.uuidString ?? "" }
+        .task(id: app.phase) { await restoreOpenNotebook() }
+    }
+
+    /// ⌘T, starting a journal first if there isn't one.
+    private func openToday() {
+        guard libraryInFront, !openingToday else { return }
+        openingToday = true
+        Task {
+            defer { openingToday = false }
+            do {
+                var id = store.dailyJournal?.id
+                if id == nil { id = try await store.createDailyJournal() }
+                guard let id else { return }
+                let page = await store.prepareTodayPage(id)
+                openNotebook(id, pageID: page, zoomSource: scope == .all ? "today-\(id.uuidString)" : nil)
+            } catch {
+                quickNoteError = error.localizedDescription
+            }
+        }
+    }
+
+    /// Skipped once if the last restore crashed.
+    private func restoreOpenNotebook() async {
+        guard app.phase == .ready, open == nil, !triedRestore else { return }
+        triedRestore = true
+        let defaults = UserDefaults.standard, flag = "scribe.restoreInFlight"
+        if defaults.bool(forKey: flag) {
+            defaults.removeObject(forKey: flag)
+            restoredNotebook = ""
+            return
+        }
+        guard let id = UUID(uuidString: restoredNotebook), let record = store.record(id), !record.isTrashed else { return }
+        defaults.set(true, forKey: flag)
+        openNotebook(id)
+        try? await Task.sleep(for: .seconds(3))
+        defaults.removeObject(forKey: flag)
     }
 
     /// Library shortcuts only act when nothing else is in front of the library.

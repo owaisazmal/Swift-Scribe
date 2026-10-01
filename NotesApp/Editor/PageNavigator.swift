@@ -16,8 +16,12 @@ struct PageReference: Codable, Transferable, Hashable {
 struct PageNavigator: View {
     let session: EditorSession
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var pendingDelete: UUID?
     @State private var goToPage = ""
+    @State private var dragging: UUID?
+    @State private var dropTarget: UUID?
     @FocusState private var goToFocused: Bool
 
     private var document: NotebookDocument { session.document }
@@ -25,36 +29,25 @@ struct PageNavigator: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 130, maximum: 180), spacing: Space.x5)], spacing: Space.x6) {
-                    ForEach(Array(document.pages.enumerated()), id: \.element.id) { index, page in
-                        Button {
-                            dismiss()
-                            session.go(to: index)
-                        } label: {
-                            PageThumbnailCell(document: document, page: page, index: index, isCurrent: index == currentPage)
-                        }
-                        .buttonStyle(.plain)
-                        .hoverEffect(.lift)
-                        .contextMenu { menu(for: page, at: index) }
-                        .draggable(PageReference(id: page.id))
-                        .dropDestination(for: PageReference.self) { items, _ in
-                            guard !document.isReadOnly, let item = items.first, let from = document.index(of: item.id), from != index else { return false }
-                            document.movePage(from: from, to: index)
-                            return true
-                        }
-                        .accessibilityLabel(Text("Page \(index + 1) of \(document.pages.count)\(index == currentPage ? ", current" : "")"))
-                        .accessibilityHint(Text("Opens this page"))
-                        .accessibilityActions {
-                            if !document.isReadOnly, index > 0 { Button("Move earlier") { document.movePage(from: index, to: index - 1) } }
-                            if !document.isReadOnly, index < document.pages.count - 1 { Button("Move later") { document.movePage(from: index, to: index + 1) } }
-                        }
+            ScrollViewReader { proxy in
+                ScrollView {
+                    if dynamicTypeSize.isAccessibilitySize {
+                        LazyVStack(spacing: Space.x3) { cells }
+                            .padding(Space.x4)
+                    } else {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 130, maximum: 180), spacing: Space.x5, alignment: .top)],
+                                  spacing: Space.x6) { cells }
+                            .padding(Space.x5)
                     }
                 }
-                .padding(Space.x5)
+                .onAppear {
+                    guard document.pages.indices.contains(currentPage) else { return }
+                    proxy.scrollTo(document.pages[currentPage].id, anchor: .center)
+                }
             }
             .background(Color.desk)
-            .navigationTitle(Text("\(document.pages.count) pages"))
+            .sensoryFeedback(.alignment, trigger: dropTarget) { _, target in target != nil }
+            .navigationTitle(Text(document.pageCountText))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
@@ -82,6 +75,77 @@ struct PageNavigator: View {
         }
     }
 
+    private var cells: some View {
+        ForEach(Array(document.pages.enumerated()), id: \.element.id) { index, page in
+            cell(page, at: index)
+        }
+    }
+
+    private func cell(_ page: NotebookPage, at index: Int) -> some View {
+        let isCurrent = index == currentPage
+        return Button {
+            dismiss()
+            session.go(to: index)
+        } label: {
+            PageThumbnailCell(document: document, page: page, index: index, isCurrent: isCurrent)
+        }
+        .buttonStyle(.plain)
+        .hoverEffect(.lift)
+        .overlay { if dropTarget == page.id { insertionBar(after: dropsAfter(index)) } }
+        .contextMenu { menu(for: page, at: index) }
+        .onDrag {
+            dragging = page.id
+            let provider = NSItemProvider()
+            provider.register(PageReference(id: page.id))
+            return provider
+        }
+        .dropDestination(for: PageReference.self) { items, _ in
+            dropTarget = nil
+            guard !document.isReadOnly, let item = items.first, let destination = document.index(of: page.id) else { return false }
+            return move(item.id, to: destination)
+        } isTargeted: { targeted in
+            if targeted { dropTarget = page.id } else if dropTarget == page.id { dropTarget = nil }
+        }
+        .accessibilityLabel(Text("Page \(index + 1) of \(document.pages.count)\(isCurrent ? ", current" : "")"))
+        .accessibilityHint(Text("Opens this page"))
+        .accessibilityActions {
+            if !document.isReadOnly, index > 0 { Button("Move earlier") { move(page.id, to: index - 1) } }
+            if !document.isReadOnly, index < document.pages.count - 1 { Button("Move later") { move(page.id, to: index + 1) } }
+        }
+        .id(page.id)
+    }
+
+    /// A page dropped on a later page takes its place and lands after it; on an earlier one, before it.
+    private func dropsAfter(_ index: Int) -> Bool {
+        guard let dragging, let from = document.index(of: dragging) else { return false }
+        return from < index
+    }
+
+    /// Sits in the gap on the side the page will land.
+    private func insertionBar(after: Bool) -> some View {
+        let vertical = !dynamicTypeSize.isAccessibilitySize
+        let shift = ((vertical ? Space.x5 : Space.x3) / 2 + 1.5) * (after ? 1 : -1)
+        let alignment: Alignment = vertical ? (after ? .trailing : .leading) : (after ? .bottom : .top)
+        return InsertionRule(vertical: vertical)
+            .stroke(Color.mustard, style: StrokeStyle(lineWidth: 3, lineCap: .round, dash: [6, 5]))
+            .frame(width: vertical ? 3 : nil, height: vertical ? nil : 3)
+            .offset(x: vertical ? shift : 0, y: vertical ? 0 : shift)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: alignment)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+
+    @discardableResult
+    private func move(_ pageID: UUID, to destination: Int) -> Bool {
+        guard !document.isReadOnly, let from = document.index(of: pageID), from != destination,
+              document.pages.indices.contains(destination) else { return false }
+        withAnimation(Motion.adaptive(Motion.standard, reduceMotion: reduceMotion)) {
+            document.movePage(from: from, to: destination)
+        }
+        AccessibilityNotification.Announcement(String(localized: "Moved to page \(destination + 1)")).post()
+        return true
+    }
+
     private func go() {
         guard let number = Int(goToPage), (1...document.pages.count).contains(number) else { return }
         dismiss()
@@ -102,48 +166,122 @@ struct PageNavigator: View {
             Label("Duplicate", systemImage: "plus.square.on.square")
         }
         if index > 0 {
-            Button { document.movePage(from: index, to: index - 1) } label: { Label("Move Earlier", systemImage: "arrow.backward") }
+            Button { move(page.id, to: index - 1) } label: { Label("Move Earlier", systemImage: "arrow.backward") }
         }
         if index < document.pages.count - 1 {
-            Button { document.movePage(from: index, to: index + 1) } label: { Label("Move Later", systemImage: "arrow.forward") }
+            Button { move(page.id, to: index + 1) } label: { Label("Move Later", systemImage: "arrow.forward") }
         }
         Divider()
         Button(role: .destructive) { pendingDelete = page.id } label: { Label("Delete", systemImage: "trash") }
     }
 }
 
+/// The dashed rule marking where a dragged page will land.
+private struct InsertionRule: Shape {
+    let vertical: Bool
+
+    func path(in rect: CGRect) -> Path {
+        Path { path in
+            path.move(to: vertical ? CGPoint(x: rect.midX, y: rect.minY) : CGPoint(x: rect.minX, y: rect.midY))
+            path.addLine(to: vertical ? CGPoint(x: rect.midX, y: rect.maxY) : CGPoint(x: rect.maxX, y: rect.midY))
+        }
+    }
+}
+
+/// A grid tile, or a row at accessibility sizes; the current page is stitched and wears the notebook's ribbon.
 private struct PageThumbnailCell: View {
     let document: NotebookDocument
     let page: NotebookPage
     let index: Int
     let isCurrent: Bool
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var image: UIImage?
+    @State private var ribbonDropped = false
 
     var body: some View {
-        VStack(spacing: Space.x2) {
-            Group {
-                if let image {
-                    Image(uiImage: image).resizable()
-                } else {
-                    Rectangle().fill(Color(uiColor: PageRenderer.paperColor(page.effectivePaperColor)))
-                }
-            }
-            .aspectRatio(page.size.width / max(page.size.height, 1), contentMode: .fit)
-            .overlay { Rectangle().strokeBorder(Color.hairline, lineWidth: 1) }
-            .padding(4)
-            .overlay { RoundedRectangle(cornerRadius: 6).strokeBorder(Color.accentColor, lineWidth: isCurrent ? 3 : 0) }
-            Text(index + 1, format: .number)
-                .font(.caption.weight(isCurrent ? .bold : .regular).monospacedDigit())
-                .foregroundStyle(isCurrent ? Color.accentColor : Color.textSecondary)
+        Group {
+            if dynamicTypeSize.isAccessibilitySize { row } else { tile }
         }
         .contentShape(Rectangle())
         .task(id: "\(page.id)-\(page.inkHash ?? "")-\(page.background)-\(page.paperColorRaw)") {
             image = await document.thumbnail(for: page)
         }
     }
+
+    private var tile: some View {
+        VStack(spacing: Space.x2) {
+            thumbnail
+            VStack(spacing: 0) {
+                Text(index + 1, format: .number)
+                    .font(.caption.weight(isCurrent ? .bold : .regular).monospacedDigit())
+                    .foregroundStyle(isCurrent ? Color.ink : Color.textSecondary)
+                if isCurrent { Text("Current").metaStyle(.caption) }
+            }
+        }
+    }
+
+    private var row: some View {
+        HStack(spacing: Space.x4) {
+            thumbnail.frame(width: 80)
+            VStack(alignment: .leading, spacing: Space.x1) {
+                Text("Page \(index + 1) of \(document.pages.count)")
+                    .font(.headline.weight(isCurrent ? .bold : .semibold))
+                    .foregroundStyle(Color.ink)
+                if isCurrent { Text("Current").metaStyle(.subheadline) }
+                Text(paperName).font(.subheadline).foregroundStyle(Color.textSecondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(Space.x3)
+        .background(Color.surface, in: RoundedRectangle(cornerRadius: Radius.control))
+    }
+
+    private var thumbnail: some View {
+        Group {
+            if let image {
+                Image(uiImage: image).resizable()
+            } else {
+                Rectangle().fill(Color(uiColor: PageRenderer.paperColor(page.effectivePaperColor)))
+            }
+        }
+        .aspectRatio(page.size.width / max(page.size.height, 1), contentMode: .fit)
+        .overlay { Rectangle().strokeBorder(Color.hairline, lineWidth: 1) }
+        .overlay { if isCurrent { StitchedSelection() } }
+        .overlay(alignment: .topTrailing) { if isCurrent { ribbon } }
+        .padding(4)
+    }
+
+    private var ribbon: some View {
+        let cloth = document.manifest.cover.cloth
+        return RibbonShape()
+            .fill(cloth.color)
+            .overlay { RibbonShape().stroke(Color.labelCream, lineWidth: contrast == .increased ? 1.5 : 0) }
+            .shadow(color: .black.opacity(0.2), radius: 0.5, y: 0.5)
+            .frame(width: 12, height: 30)
+            .padding(.trailing, 10)
+            .offset(y: ribbonDropped || reduceMotion ? -4 : -22)
+            .opacity(ribbonDropped || reduceMotion ? 1 : 0)
+            .onAppear { withAnimation(Motion.ribbon.delay(0.2)) { ribbonDropped = true } }
+    }
+
+    private var paperName: String {
+        switch page.background {
+        case .template: "\(page.template?.displayName ?? PaperTemplate.blank.displayName), \(page.paperColor.displayName)"
+        case .pdf: String(localized: "PDF page")
+        case .image: String(localized: "Photo")
+        case .unknown: String(localized: "Page")
+        }
+    }
 }
 
 extension NotebookDocument {
+    /// "1 page", "12 pages".
+    var pageCountText: String {
+        pages.count == 1 ? String(localized: "1 page") : String(localized: "\(pages.count) pages")
+    }
+
     /// Thumbnail reflecting unsaved ink when the page is in memory, otherwise the cached saved one.
     func thumbnail(for page: NotebookPage) async -> UIImage? {
         if hasUnsavedInk(page.id), let ink = loadedInk(page.id) {

@@ -13,6 +13,7 @@ final class AppModel {
     let root: StorageRoot
     let container: ModelContainer
     let library: LibraryStore
+    let activity: WritingActivity
     private(set) var phase: Phase = .starting
     private(set) var migrationReport: MigrationReport?
     var showsMigrationProblem = false
@@ -27,6 +28,8 @@ final class AppModel {
         self.container = container
         indexWasRecovered = recovered
         library = LibraryStore(root: root, context: container.mainContext)
+        activity = WritingActivity(root: root)
+        library.onPermanentlyDeleted = { [activity] in activity.forget(notebooks: $0) }
     }
 
     func start() async {
@@ -38,7 +41,9 @@ final class AppModel {
         if root.packageIDs().isEmpty {
             if let count = LaunchOptions.value("-seedLibrary").flatMap(Int.init) { await LibrarySeed.write(count: count, root: root) }
             if LaunchOptions.arguments.contains("-seedLongPDF") { await LibrarySeed.writeLongPDF(root: root) }
+            await DailyJournal.seedForTests(root: root)
         }
+        if LaunchOptions.arguments.contains("-seedActivity") { await WritingActivity.seedForTests(root: root) }
         if LaunchOptions.arguments.contains("-increaseContrast") {
             for case let scene as UIWindowScene in UIApplication.shared.connectedScenes { scene.traitOverrides.accessibilityContrast = .high }
         }
@@ -54,6 +59,7 @@ final class AppModel {
         }
         await LibraryIndex.refresh(root: root, context: container.mainContext,
                                    full: indexWasRecovered || !(migrationReport?.migrated.isEmpty ?? true))
+        await activity.load()
         library.purgeExpiredTrash()
         phase = .ready
         let pending = await Task.detached(priority: .utility) { Self.notebooksWithLegacyText(root: root) }.value
@@ -107,6 +113,7 @@ final class AppModel {
         }
         Task {
             for document in documents { await document.flush() }
+            activity.flush()
             if task != .invalid { UIApplication.shared.endBackgroundTask(task) }
         }
     }

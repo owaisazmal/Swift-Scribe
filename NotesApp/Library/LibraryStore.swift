@@ -32,6 +32,8 @@ final class LibraryStore {
     @ObservationIgnored private let log = Logger(subsystem: "com.owais.NotesApp", category: "library")
     @ObservationIgnored private var changesInFlight: [UUID: [UUID: @Sendable (inout NotebookManifest) -> Void]] = [:]
     @ObservationIgnored private var folderWrite: Task<Void, Never>?
+    /// Called with the notebooks a permanent delete actually removed.
+    @ObservationIgnored var onPermanentlyDeleted: (([UUID]) -> Void)?
 
     init(root: StorageRoot, context: ModelContext) {
         self.root = root
@@ -177,12 +179,14 @@ final class LibraryStore {
     func deletePermanently(_ records: [NotebookRecord]) {
         let registry = DocumentRegistry.shared
         var moved: [URL] = []
+        var deleted: [UUID] = []
         for record in records where record.isTrashed && registry.document(for: record.id) == nil && !registry.isOpening(record.id) {
             let tombstone = root.deleting.appending(path: "\(record.id.uuidString)-\(UUID().uuidString)", directoryHint: .isDirectory)
             do {
                 try FileManager.default.createDirectory(at: root.deleting, withIntermediateDirectories: true)
                 try FileManager.default.moveItem(at: root.package(record.id), to: tombstone)
                 moved.append(tombstone)
+                deleted.append(record.id)
                 context.delete(record)
             } catch {
                 lastError = "“\(record.title)” couldn't be deleted: \(error.localizedDescription)"
@@ -193,6 +197,7 @@ final class LibraryStore {
         Task.detached(priority: .utility) {
             for url in moved { try? FileManager.default.removeItem(at: url) }
         }
+        onPermanentlyDeleted?(deleted)
     }
 
     /// Finishes deletes interrupted by the app quitting.
@@ -352,6 +357,58 @@ final class LibraryStore {
         record.searchText = text
         searchVersion &+= 1
         saveIndex()
+    }
+
+    // MARK: Daily journal
+
+    /// Nil once the journal has been deleted or moved to the bin.
+    var dailyJournal: NotebookRecord? {
+        guard let id = UserDefaults.standard.string(forKey: SettingsKey.dailyJournalID).flatMap(UUID.init(uuidString:)),
+              let journal = record(id), !journal.isTrashed else { return nil }
+        return journal
+    }
+
+    @discardableResult
+    func createDailyJournal(id: UUID = UUID(), now: Date = .now, calendar: Calendar = .current) async throws -> UUID {
+        let size = UserDefaults.standard.string(forKey: SettingsKey.defaultPageSize).flatMap(PageSize.init(rawValue:)) ?? .letter
+        let defaults = PageDefaults(template: NotebookStarter.journal.template, paperColor: NotebookStarter.journal.paperColor, pageSize: size)
+        var page = defaults.newPage()
+        page.day = DailyJournal.dayKey(for: now, calendar: calendar)
+        var manifest = NotebookManifest(id: id, title: NotebookStarter.journal.title, createdAt: now,
+                                        cover: NotebookStarter.journal.spec(for: id), defaults: defaults, pages: [page])
+        manifest.library.lastOpenedAt = now
+        try await NotebookPackage(root: root, id: id).create(manifest)
+        index(manifest)
+        UserDefaults.standard.set(id.uuidString, forKey: SettingsKey.dailyJournalID)
+        return id
+    }
+
+    /// Nil for read-only notebooks and ones still opening, which then open at their saved page.
+    func prepareTodayPage(_ id: UUID, now: Date = .now, calendar: Calendar = .current) async -> UUID? {
+        guard let journal = record(id), !journal.isReadOnly else { return nil }
+        if let document = DocumentRegistry.shared.document(for: id) {
+            return DailyJournal.ensureTodayPage(in: document, now: now, calendar: calendar)
+        }
+        guard !DocumentRegistry.shared.isOpening(id) else { return nil }
+        let key = DailyJournal.dayKey(for: now, calendar: calendar)
+        let package = NotebookPackage(root: root, id: id)
+        let pageID = UUID()
+        let change: @Sendable (inout NotebookManifest) -> Void = { DailyJournal.dateToday(key, newPageID: pageID, in: &$0) }
+        let token = UUID()
+        defer {
+            changesInFlight[id]?[token] = nil
+            if changesInFlight[id]?.isEmpty == true { changesInFlight[id] = nil }
+        }
+        do {
+            if let page = try await package.readManifest().manifest.pages.last(where: { $0.day == key }) { return page.id }
+            changesInFlight[id, default: [:]][token] = change
+            let manifest = try await package.updateManifest(change)
+            index(manifest)
+            return manifest.pages.last { $0.day == key }?.id
+        } catch {
+            log.error("today's page failed for \(id): \(error.localizedDescription)")
+            return nil
+        }
     }
 }
 

@@ -572,7 +572,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         canvas.pageID = page.id
         canvas.overrideUserInterfaceStyle = page.effectivePaperColor.inkAppearance
         let number = (index(of: page.id) ?? 0) + 1
-        canvas.accessibilityLabel = String(localized: "Page \(number), handwriting")
+        canvas.accessibilityLabel = DailyJournal.canvasLabel(page: number, day: page.day)
         canvas.accessibilityIdentifier = "page.canvas.\(number)"
         place(canvas, in: slot)
         slot.addSubview(canvas)
@@ -709,7 +709,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         for (id, slot) in slots {
             guard let index = index(of: id) else { removeSlot(id); continue }
             position(slot, at: index)
-            slot.canvas?.accessibilityLabel = String(localized: "Page \(index + 1), handwriting")
+            slot.canvas?.accessibilityLabel = DailyJournal.canvasLabel(page: index + 1, day: pages[index].day)
             slot.canvas?.accessibilityIdentifier = "page.canvas.\(index + 1)"
         }
         contentView.frame = CGRect(x: 0, y: 0, width: layout.size.width * effectiveScale, height: layout.size.height * effectiveScale)

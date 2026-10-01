@@ -58,6 +58,7 @@ struct NotebookPage: Sendable, Hashable, Identifiable {
     func duplicated() -> NotebookPage {
         var copy = self
         copy.id = UUID()
+        copy.day = nil
         return copy
     }
 
@@ -72,10 +73,19 @@ struct NotebookPage: Sendable, Hashable, Identifiable {
         case .unknown(let raw): "u:" + ((try? raw.serialized(pretty: false)).map { String(decoding: $0, as: UTF8.self) } ?? "")
         }
         var hash: UInt64 = 0xcbf2_9ce4_8422_2325
-        for byte in "\(backgroundKey)|\(paperColorRaw)|\(Int(size.width))x\(Int(size.height))".utf8 {
+        let dayKey = day.map { "|d:\($0)" } ?? ""
+        for byte in "\(backgroundKey)|\(paperColorRaw)|\(Int(size.width))x\(Int(size.height))\(dayKey)".utf8 {
             hash = (hash ^ UInt64(byte)) &* 0x0100_0000_01b3
         }
         return String(hash, radix: 16).prefix(8).description
+    }
+}
+
+extension NotebookPage {
+    /// "yyyy-MM-dd" on a daily-journal page; older builds keep it as an unknown key.
+    var day: String? {
+        get { extra["date"]?.stringValue }
+        set { extra["date"] = newValue.map(JSONValue.string) }
     }
 }
 

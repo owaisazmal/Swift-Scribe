@@ -27,4 +27,9 @@ enum SettingsKey {
     static let defaultPaperColor = "defaultPaperColor"
     static let defaultPageSize = "defaultPageSize"
     static let librarySort = "librarySort"
+    static let dailyJournalID = "dailyJournalID"
+    static let dailyJournalPromptHidden = "dailyJournalPromptHidden"
+    static let showsOnThisDay = "showsOnThisDay"
+    static let onThisDayHiddenDay = "onThisDayHiddenDay"
+    static let keepsWritingHistory = "keepsWritingHistory"
 }

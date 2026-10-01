@@ -4,13 +4,17 @@ struct ScribeSettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(LibraryStore.self) private var store
     @Environment(AppModel.self) private var app
+    @Environment(WritingActivity.self) private var activity
     @AppStorage(SettingsKey.drawingInput) private var drawingInput: DrawingInput = .system
     @AppStorage(SettingsKey.defaultTemplate) private var template: PaperTemplate = .narrowRuled
     @AppStorage(SettingsKey.defaultPaperColor) private var color: PaperColor = .white
     @AppStorage(SettingsKey.defaultPageSize) private var size: PageSize = .letter
+    @AppStorage(SettingsKey.dailyJournalID) private var journalID = ""
+    @AppStorage(SettingsKey.showsOnThisDay) private var showsOnThisDay = true
     @State private var backupSize: String?
     @State private var confirmingBackupDelete = false
     @State private var backupError: String?
+    @State private var confirmingHistoryClear = false
 
     private let repository = URL(string: "https://github.com/owaisazmal/Swift-Scribe")!
 
@@ -51,6 +55,34 @@ struct ScribeSettingsView: View {
                     } header: {
                         SettingsNote("App Icon")
                     }
+                }
+
+                Section {
+                    let journal = journalID.isEmpty ? nil : store.dailyJournal
+                    LabeledContent("Journal", value: journal?.title ?? String(localized: "None"))
+                    Toggle("Show On This Day", isOn: $showsOnThisDay)
+                    if journal != nil {
+                        Button("Stop Using Daily Journal") { journalID = "" }
+                    }
+                } header: {
+                    SettingsNote("Daily Journal")
+                } footer: {
+                    SettingsNote("Touch and hold a notebook, then choose Use as Daily Journal. Press ⌘T in the library to open today's page.")
+                }
+
+                Section {
+                    Toggle("Keep Writing History", isOn: Bindable(activity).isEnabled)
+                    Button("Clear Writing History…", role: .destructive) { confirmingHistoryClear = true }
+                        .disabled(!activity.hasHistory)
+                        .confirmationDialog("Clear your writing history?", isPresented: $confirmingHistoryClear, titleVisibility: .visible) {
+                            Button("Clear Writing History", role: .destructive) { Task { await activity.clear() } }
+                        } message: {
+                            Text("The week strip and calendar start afresh. Your notebooks and pages aren't affected.")
+                        }
+                } header: {
+                    SettingsNote("Writing History")
+                } footer: {
+                    SettingsNote("Swift Scribe keeps a list of the days you wrote and which pages, on this device only. It's never shared.")
                 }
 
                 if let problem = app.migrationProblem {

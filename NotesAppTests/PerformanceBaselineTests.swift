@@ -122,6 +122,8 @@ final class PerformanceBaselineTests: XCTestCase {
         let (document, controller, _) = try await openV2(id, root: root, window: try hostWindow())
         store.index(document.manifest)
         document.onSaved = { store.index($0) }
+        let activity = WritingActivity(root: root, defaults: UserDefaults(suiteName: "perf-\(UUID().uuidString)")!)
+        document.onInkSaved = { activity.record(notebook: id, pages: $0, at: $1) }
         var inkOnly: [Double] = [], withIndex: [Double] = []
         for i in 0..<12 {
             await pause(0.05)
@@ -136,6 +138,7 @@ final class PerformanceBaselineTests: XCTestCase {
         report("autosave, main-thread CPU per save, ink only (heavy)", inkOnly)
         report("autosave, main-thread CPU per save, with index update (heavy)", withIndex)
         XCTAssertEqual(store.record(id)?.title, "Heavy 10")
+        XCTAssertTrue(activity.hasHistory)
     }
 
     func testV2AutosaveSnapshotHeavy() async throws {
