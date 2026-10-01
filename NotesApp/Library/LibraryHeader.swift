@@ -86,7 +86,7 @@ struct WeekStrip: View {
         let calendar = Calendar.current
         let isToday = day.date == week.today
         return Text(calendar.veryShortStandaloneWeekdaySymbols[calendar.component(.weekday, from: day.date) - 1])
-            .font(isToday ? .caption.weight(.bold) : .caption)
+            .font(isToday ? .caption.weight(.heavy) : .caption.weight(.semibold))
             .underline(isToday)
             .foregroundStyle(isToday ? Color.ink : Color.textSecondary)
             .frame(width: DaySheet.size.width)

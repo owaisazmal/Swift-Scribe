@@ -5,8 +5,9 @@ extension XCTestCase {
     /// audit reads off the dimmed screen behind a sheet (VoiceOver skips it by design), and `formText` below.
     @MainActor
     func audit(_ app: XCUIApplication, _ types: XCUIAccessibilityAuditType = .all, screen: String = "", modal: Bool = false,
-               scrolled: Bool = false, formText: [String] = []) throws {
+               scrolled: Bool = false, formText: [String] = [], sheet: XCUIElement? = nil) throws {
         let barMaxY = app.navigationBars.allElementsBoundByIndex.map { $0.frame.maxY }.max() ?? 0
+        let sheetTexts = sheet.map { $0.staticTexts.allElementsBoundByIndex.map(\.frame) } ?? []
         try app.performAccessibilityAudit(for: types) { issue in
             let element = issue.element
             print("AUDIT [\(screen)] \(issue.compactDescription) | type \(element.map { String($0.elementType.rawValue) } ?? "-") '\(element?.label ?? "nil")' \(element?.frame ?? .zero)")
@@ -18,6 +19,11 @@ extension XCTestCase {
             if issue.auditType == .dynamicType || (scrolled && issue.auditType == .textClipped), let label = element?.label,
                formText.contains(where: label.hasPrefix) {
                 print("AUDIT [\(screen)] ignored in a Form: \(label)")
+                return true
+            }
+            // Text dimmed behind or beside a page sheet; VoiceOver can't reach it.
+            if sheet != nil, issue.auditType == .contrast || issue.auditType == .textClipped, let element, !sheetTexts.contains(element.frame) {
+                print("AUDIT [\(screen)] ignored behind sheet: \(element.label)")
                 return true
             }
             if issue.auditType == .hitRegion, element?.label == "Tool palette handle" {
@@ -33,6 +39,7 @@ extension XCTestCase {
                 print("AUDIT [\(screen)] ignored behind modal: \(issue.compactDescription)")
                 return true
             }
+            print("AUDIT FAIL [\(screen)] \(issue.compactDescription) '\(element?.label ?? "nil")' \(element?.frame ?? .zero)")
             return false
         }
     }

@@ -407,16 +407,6 @@ final class NotebookDocument {
         return page
     }
 
-    func setTemplate(_ template: PaperTemplate, forPage pageID: UUID) {
-        guard let index = index(of: pageID), manifest.pages[index].template != nil, manifest.pages[index].template != template else { return }
-        updatePage(pageID, actionName: String(localized: "Change Template")) { $0.background = .template(template) }
-    }
-
-    func setPaperColor(_ color: PaperColor, forPage pageID: UUID) {
-        guard let index = index(of: pageID), manifest.pages[index].paperColor != color else { return }
-        updatePage(pageID, actionName: String(localized: "Change Paper Colour")) { $0.paperColor = color }
-    }
-
     /// Template and colour together, as one undo step.
     func setPaper(template: PaperTemplate, color: PaperColor, forPage pageID: UUID) {
         guard let index = index(of: pageID), let current = manifest.pages[index].template,

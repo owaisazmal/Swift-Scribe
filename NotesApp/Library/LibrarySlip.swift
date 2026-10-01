@@ -105,21 +105,54 @@ final class LibraryChangeCenter {
         let records = records.filter { !$0.isReadOnly }
         guard !records.isEmpty else { return }
         let text = message(records)
+        let ids = records.map(\.id)
+        let token = UndoToken(undoManager: undoManager)
         apply(records)
-        if let undoManager { register(records.map(\.id), in: store, undoManager: undoManager, action: action, undo: inverse, redo: apply) }
-        post(text, symbol: symbol, isTrash: isTrash) { [weak undoManager] in
-            if undoManager?.canUndo == true { undoManager?.undo() }
+        if let undoManager { register(ids, token: token, in: store, undoManager: undoManager, action: action, undo: inverse, redo: apply) }
+        post(text, symbol: symbol, isTrash: isTrash) { [weak self, weak store, weak undoManager] in
+            guard let store, !token.isUndone else { return }
+            if let undoManager, !token.isBuried, undoManager.canUndo {
+                undoManager.undo()
+            } else {
+                undoManager?.removeAllActions(withTarget: token)
+                token.isUndone = true
+                self?.dismiss()
+                inverse(ids.compactMap(store.record))
+            }
+        }
+    }
+
+    /// One change's undo target. Once anything else is registered after it, the slip undoes just this change.
+    @MainActor
+    private final class UndoToken: NSObject {
+        var isUndone = false
+        private(set) var isBuried = false
+        private var groups = 0
+
+        init(undoManager: UndoManager?) {
+            super.init()
+            guard let undoManager else { return }
+            NotificationCenter.default.addObserver(self, selector: #selector(groupClosed), name: .NSUndoManagerDidCloseUndoGroup, object: undoManager)
+        }
+
+        @objc nonisolated private func groupClosed(_ note: Notification) {
+            MainActor.assumeIsolated {
+                groups += 1
+                if groups > 1 { isBuried = true }
+            }
         }
     }
 
     /// Undo registers the redo, which registers the undo again, as NotebookDocument's page operations do.
-    private func register(_ ids: [UUID], in store: LibraryStore, undoManager: UndoManager, action: String,
+    private func register(_ ids: [UUID], token: UndoToken, in store: LibraryStore, undoManager: UndoManager, action: String,
                           undo: @escaping @MainActor ([NotebookRecord]) -> Void, redo: @escaping @MainActor ([NotebookRecord]) -> Void) {
-        undoManager.registerUndo(withTarget: store) { [weak self, weak undoManager] store in
+        undoManager.registerUndo(withTarget: token) { [weak self, weak store, weak undoManager, token] _ in
             self?.dismiss()
+            token.isUndone.toggle()
+            guard let store else { return }
             undo(ids.compactMap(store.record))
             guard let self, let undoManager else { return }
-            self.register(ids, in: store, undoManager: undoManager, action: action, undo: redo, redo: undo)
+            self.register(ids, token: token, in: store, undoManager: undoManager, action: action, undo: redo, redo: undo)
         }
         undoManager.setActionName(action)
     }
@@ -145,6 +178,7 @@ struct LibrarySlipView: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .frame(minHeight: 44)
             .accessibilityElement(children: .combine)
             .accessibilityAction(named: Text("Undo"), undo)
             HStack(spacing: Space.x1) {

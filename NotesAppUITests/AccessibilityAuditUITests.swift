@@ -42,12 +42,12 @@ final class AccessibilityAuditUITests: XCTestCase {
         XCTAssertTrue(textbook.waitForExistence(timeout: 90))
         sleep(1)
 
-        func check(_ screen: String, modal: Bool = false, scrolled: Bool = false, formText: [String] = []) throws {
+        func check(_ screen: String, modal: Bool = false, scrolled: Bool = false, formText: [String] = [], sheet: XCUIElement? = nil) throws {
             let attachment = XCTAttachment(screenshot: app.screenshot())
             attachment.name = "\(mode) \(screen)"
             attachment.lifetime = .keepAlways
             add(attachment)
-            try audit(app, checks, screen: "\(mode) \(screen)", modal: modal, scrolled: scrolled, formText: formText)
+            try audit(app, checks, screen: "\(mode) \(screen)", modal: modal, scrolled: scrolled, formText: formText, sheet: sheet)
         }
 
         /// Audits a sheet at the top, then again scrolled to the end, so text below the fold is checked while it's on screen.
@@ -98,8 +98,10 @@ final class AccessibilityAuditUITests: XCTestCase {
         app.buttons["writing.week"].firstMatch.tap()
         XCTAssertTrue(app.navigationBars["Writing Calendar"].waitForExistence(timeout: 10))
         sleep(1)
-        try checkSheet("writing calendar", scrolling: app.scrollViews.firstMatch)
-        app.buttons["Done"].firstMatch.tap()
+        try check("writing calendar", modal: true, sheet: app.scrollViews["writing.calendar"])
+        let calendarDone = app.navigationBars["Writing Calendar"].buttons["Done"]
+        if calendarDone.exists { calendarDone.tap() }
+        XCTAssertTrue(app.navigationBars["Writing Calendar"].waitForNonExistence(timeout: 5))
 
         let biology = app.buttons["notebook.Cell Biology 1"]
         XCTAssertTrue(biology.waitForExistence(timeout: 10))
@@ -124,6 +126,7 @@ final class AccessibilityAuditUITests: XCTestCase {
         sleep(1)
         try checkSheet("settings", scrolling: app.collectionViews.firstMatch,
                        formText: ["Cobalt", "Tomato", "Moss", "Oxblood", "Mustard", "Print",
+                                  "Stop Using Daily Journal", "About",
                                   "Report a Problem or Request a Feature", "Swift Scribe is free and open source"])
         app.buttons["Done"].firstMatch.tap()
 

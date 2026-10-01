@@ -150,7 +150,7 @@ final class DocumentSafetyTests: XCTestCase {
         let placeholder = document.pages[0]
         _ = await document.ink(placeholder.id)
         step { document.canvasDidChangeInk(placeholder.id, to: ink(2)) }
-        step { document.setTemplate(.dotted, forPage: placeholder.id) }
+        step { document.setPaper(template: .dotted, color: placeholder.paperColor, forPage: placeholder.id) }
 
         document.undoManager.undo()
         document.undoManager.undo()

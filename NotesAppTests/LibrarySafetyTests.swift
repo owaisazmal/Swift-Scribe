@@ -75,6 +75,26 @@ final class LibrarySafetyTests: XCTestCase {
         XCTAssertFalse(record.isTrashed, "undo and redo keep alternating")
     }
 
+    func testTheSlipUndoesOnlyItsOwnChangeOnceSomethingElseIsUndoable() async throws {
+        let store = try makeStore()
+        let changes = LibraryChangeCenter()
+        let undoManager = makeUndoManager()
+        let record = try await makeNotebook("Physics", in: store)
+        let other = UndoProbe()
+
+        grouped(undoManager) { changes.moveToTrash([record], in: store, undoManager: undoManager) }
+        grouped(undoManager) { undoManager.registerUndo(withTarget: other) { $0.undone = true } }
+
+        changes.current?.undo()
+        XCTAssertFalse(record.isTrashed)
+        XCTAssertNil(changes.current)
+        XCTAssertFalse(other.undone, "the later change is left alone")
+        undoManager.undo()
+        XCTAssertTrue(other.undone)
+        XCTAssertFalse(undoManager.canUndo, "the trash isn't undone twice")
+        XCTAssertFalse(record.isTrashed)
+    }
+
     func testUndoingAMoveReturnsEachNotebookToItsOwnShelf() async throws {
         let store = try makeStore()
         let changes = LibraryChangeCenter()
@@ -155,4 +175,8 @@ final class LibrarySafetyTests: XCTestCase {
         XCTAssertNil(store.record(id))
         XCTAssertFalse(FileManager.default.fileExists(atPath: store.root.package(id).path(percentEncoded: false)))
     }
+}
+
+private final class UndoProbe {
+    var undone = false
 }

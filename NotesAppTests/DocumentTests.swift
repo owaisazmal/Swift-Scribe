@@ -70,8 +70,8 @@ final class DocumentTests: XCTestCase {
         step { document.insertPages([.template(.grid, color: .ivory, size: .a4)], at: 1) }
         step { document.removePages([original[3].id]) }
         step { document.movePage(from: 0, to: 2) }
-        step { document.setTemplate(.dotted, forPage: original[1].id) }
-        step { document.setPaperColor(.yellow, forPage: original[2].id) }
+        step { document.setPaper(template: .dotted, color: original[1].paperColor, forPage: original[1].id) }
+        step { document.setPaper(template: original[2].template ?? .blank, color: .yellow, forPage: original[2].id) }
         document.undoManager.beginUndoGrouping()
         await document.duplicatePage(at: 0)
         document.undoManager.endUndoGrouping()
