@@ -30,6 +30,7 @@ struct NotebookCoverItem: View {
     let action: () -> Void
     @Environment(LibraryStore.self) private var store
     @Environment(LibraryChangeCenter.self) private var changes
+    @Environment(\.undoManager) private var undoManager
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -63,7 +64,7 @@ struct NotebookCoverItem: View {
             .accessibilityHint(record.accessibilityHint(isSelecting: isSelecting))
             .accessibilityActions {
                 if record.isTrashed, !isSelecting {
-                    Button("Restore") { store.restore([record]) }
+                    Button("Restore") { changes.restore([record], in: store, undoManager: undoManager) }
                     Button("Delete Permanently") { changes.requestPermanentDelete([record.id]) }
                 }
             }

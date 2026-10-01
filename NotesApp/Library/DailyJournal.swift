@@ -4,8 +4,7 @@ import PencilKit
 enum DailyJournal {
     /// "yyyy-MM-dd" on the Gregorian calendar, in the calendar's time zone.
     static func dayKey(for date: Date, calendar: Calendar = .current) -> String {
-        let parts = gregorian(calendar).dateComponents([.year, .month, .day], from: date)
-        return String(format: "%04ld-%02ld-%02ld", parts.year ?? 0, parts.month ?? 1, parts.day ?? 1)
+        ActivityFile.dayKey(for: date, calendar: calendar)
     }
 
     /// Noon on the key's day, so the date survives daylight-saving changes.
