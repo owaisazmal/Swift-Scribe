@@ -21,7 +21,8 @@ final class AccessibilityAuditUITests: XCTestCase {
     }
 
     private func tour(_ mode: String, appearance: XCUIDevice.Appearance, checks: XCUIAccessibilityAuditType, extra: [String] = []) throws {
-        XCUIDevice.shared.orientation = .landscapeLeft
+        // Portrait: in landscape the iPadOS 27 simulator hands the audit a rotated screenshot, so contrast samples the wrong pixels.
+        XCUIDevice.shared.orientation = .portrait
         XCUIDevice.shared.appearance = appearance
         addTeardownBlock { @MainActor in
             XCUIDevice.shared.appearance = .light
@@ -42,22 +43,24 @@ final class AccessibilityAuditUITests: XCTestCase {
         XCTAssertTrue(textbook.waitForExistence(timeout: 90))
         sleep(1)
 
-        func check(_ screen: String, modal: Bool = false, scrolled: Bool = false, formText: [String] = [], sheet: XCUIElement? = nil) throws {
+        func check(_ screen: String, modal: Bool = false, scrolled: Bool = false, formText: [String] = [], sheet: XCUIElement? = nil,
+                   popover: Bool = false, overlay: XCUIElement? = nil) throws {
             let attachment = XCTAttachment(screenshot: app.screenshot())
             attachment.name = "\(mode) \(screen)"
             attachment.lifetime = .keepAlways
             add(attachment)
-            try audit(app, checks, screen: "\(mode) \(screen)", modal: modal, scrolled: scrolled, formText: formText, sheet: sheet)
+            try audit(app, checks, screen: "\(mode) \(screen)", modal: modal, scrolled: scrolled, formText: formText, sheet: sheet, popover: popover,
+                      largeText: mode == "AX-L", overlay: overlay)
         }
 
         /// Audits a sheet at the top, then again scrolled to the end, so text below the fold is checked while it's on screen.
-        func checkSheet(_ screen: String, scrolling container: XCUIElement, formText: [String] = []) throws {
-            try check(screen, modal: true, formText: formText)
+        func checkSheet(_ screen: String, scrolling container: XCUIElement, formText: [String] = [], popover: Bool = false) throws {
+            try check(screen, modal: true, formText: formText, popover: popover)
             guard container.exists else { return }
             container.swipeUp(velocity: .fast)
             container.swipeUp(velocity: .fast)
             sleep(3)
-            try check("\(screen) (end)", modal: true, scrolled: true, formText: formText)
+            try check("\(screen) (end)", modal: true, scrolled: true, formText: formText, popover: popover)
         }
 
         func dismissKeyboard() {
@@ -67,7 +70,8 @@ final class AccessibilityAuditUITests: XCTestCase {
             let hittable = expectation(for: NSPredicate(format: "hittable == true"), evaluatedWith: hide)
             wait(for: [hittable], timeout: 5)
             hide.tap()
-            XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5), "audit without the keyboard over the screen")
+            let gone = NSPredicate { _, _ in !keyboard.exists || keyboard.frame.height < 100 || !keyboard.frame.intersects(app.windows.firstMatch.frame) }
+            wait(for: [expectation(for: gone, evaluatedWith: nil)], timeout: 5)
             sleep(1)
         }
 
@@ -108,7 +112,8 @@ final class AccessibilityAuditUITests: XCTestCase {
         biology.press(forDuration: 1.2)
         app.buttons["Delete"].firstMatch.tap()
         XCTAssertTrue(app.buttons["Undo"].waitForExistence(timeout: 5))
-        try check("library undo slip")
+        sleep(1)
+        try check("library undo slip", overlay: app.buttons["Undo"])
         if app.buttons["Undo"].exists {
             app.buttons["Undo"].tap()
             XCTAssertTrue(biology.waitForExistence(timeout: 5), "Undo puts the notebook back")
@@ -151,9 +156,9 @@ final class AccessibilityAuditUITests: XCTestCase {
         sleep(1)
         // At AX-L the drawer is a long list, and the audit misreads rows it scrolls back into view, so only its top is audited.
         if mode == "AX-L" {
-            try check("paper drawer", modal: true)
+            try check("paper drawer", modal: true, popover: true)
         } else {
-            try checkSheet("paper drawer", scrolling: app.scrollViews["paper.drawer"])
+            try checkSheet("paper drawer", scrolling: app.scrollViews["paper.drawer"], popover: true)
         }
         app.buttons["Done"].firstMatch.tap()
         app.buttons["editor.ribbon"].tap()
