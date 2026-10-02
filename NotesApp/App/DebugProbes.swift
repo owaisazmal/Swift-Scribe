@@ -56,7 +56,8 @@ final class FramePacingWindow {
     static var window: UIWindow?
 
     static func install() {
-        guard window == nil, let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first else { return }
+        guard window == nil, let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene })
+            .first(where: { $0.session.role == .windowApplication }) else { return }
         let window = PassThroughWindow(windowScene: scene)
         window.windowLevel = .alert + 1
         let controller = UIViewController()
@@ -136,6 +137,21 @@ final class AutoScroller: NSObject {
         link = nil
         completion?()
         Self.current = nil
+    }
+}
+
+/// `-secondScreenInset` stands a small window in for a second screen, so UI tests can see what one would show.
+@MainActor
+enum SecondScreenInset {
+    static func window() -> UIWindow? {
+        guard LaunchOptions.arguments.contains("-secondScreenInset"),
+              let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first(where: { $0.session.role == .windowApplication }) else { return nil }
+        let window = PassThroughWindow(windowScene: scene)
+        window.windowLevel = .alert + 1
+        window.frame = CGRect(x: scene.coordinateSpace.bounds.width - 496, y: 110, width: 480, height: 270)
+        window.layer.borderColor = UIColor.white.cgColor
+        window.layer.borderWidth = 1
+        return window
     }
 }
 

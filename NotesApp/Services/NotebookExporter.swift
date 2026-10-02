@@ -32,13 +32,26 @@ enum NotebookExporter {
         let renderer = UIGraphicsPDFRenderer(bounds: CGRect(origin: .zero, size: input.pages.first?.size ?? PageSize.letter.points), format: format)
         let assets = input.package.assetsDirectory
         let count = Double(max(input.pages.count, 1))
+        let outline = outline(for: input.pages)
+        let links = LinkTitles(pages: input.pages)
+        let linked = linkedPages(in: input.pages)
         try renderer.writePDF(to: url) { context in
+            if let outline { CGPDFContextSetOutline(context.cgContext, outline as CFDictionary) }
             for (index, page) in input.pages.enumerated() {
                 if Task.isCancelled { return }
                 autoreleasepool {
                     let bounds = CGRect(origin: .zero, size: page.size)
                     context.beginPage(withBounds: bounds, pageInfo: [:])
-                    PageRenderer.drawBackground(page, assets: assets, in: context.cgContext, size: page.size)
+                    PageRenderer.drawBackground(page, assets: assets, in: context.cgContext, size: page.size, links: links)
+                    // Destinations are placed in the PDF's own space, which runs up the page.
+                    if linked.contains(page.id) { context.addDestination(withName: page.id.uuidString, at: CGPoint(x: 0, y: page.size.height)) }
+                    if page.hasItems {
+                        for item in page.items {
+                            guard let link = item.link, linked.contains(link.target) else { continue }
+                            let box = item.boundingBox
+                            context.setDestinationWithName(link.target.uuidString, for: CGRect(x: box.minX, y: page.size.height - box.maxY, width: box.width, height: box.height))
+                        }
+                    }
                     let ink = input.inMemoryInk[page.id] ?? savedInk(page, in: input.package)
                     if !ink.strokes.isEmpty {
                         var image: UIImage?
@@ -58,6 +71,25 @@ enum NotebookExporter {
         }
         await progress(1)
         return url
+    }
+
+    /// The pages that links on other pages open, so those links still work in the exported PDF.
+    static func linkedPages(in pages: [NotebookPage]) -> Set<UUID> {
+        let ids = Set(pages.map(\.id))
+        var linked = Set<UUID>()
+        for page in pages where page.hasItems {
+            for item in page.items { if let target = item.link?.target, ids.contains(target) { linked.insert(target) } }
+        }
+        return linked
+    }
+
+    /// Bookmarks become the PDF's outline, so they show in any reader's sidebar.
+    static func outline(for pages: [NotebookPage]) -> [String: Any]? {
+        let children: [[String: Any]] = pages.enumerated().compactMap { index, page in
+            guard page.bookmark != nil else { return nil }
+            return [kCGPDFOutlineTitle as String: page.bookmarkTitle(number: index + 1), kCGPDFOutlineDestination as String: index + 1]
+        }
+        return children.isEmpty ? nil : [kCGPDFOutlineChildren as String: children]
     }
 
     /// Reads a page's saved ink directly: writes are atomic, so reading outside the package actor is safe.

@@ -58,9 +58,17 @@ enum PageRenderer {
     }
 
     /// Fills `rect` (whose size is the page size scaled by `rect.width / page.size.width`) with the page background.
-    static func drawBackground(_ page: NotebookPage, assets: URL, in ctx: CGContext, size: CGSize) {
+    /// The editor passes `items: false`: there, pictures and stickers are live views that can be moved.
+    static func drawBackground(_ page: NotebookPage, assets: URL, in ctx: CGContext, size: CGSize, items: Bool = true, links: LinkTitles? = nil) {
         ctx.setFillColor(paperColor(page.effectivePaperColor).cgColor)
         ctx.fill(CGRect(origin: .zero, size: size))
+        drawPaper(page, assets: assets, in: ctx, size: size)
+        if items, page.hasItems {
+            PageItemRenderer.draw(page.items, pageSize: page.size, assets: assets, in: ctx, size: size, onDark: page.effectivePaperColor.isDark, links: links)
+        }
+    }
+
+    private static func drawPaper(_ page: NotebookPage, assets: URL, in ctx: CGContext, size: CGSize) {
         switch page.background {
         case .template:
             drawTemplate(page.template ?? .blank, color: page.paperColor, in: ctx, size: size)
@@ -122,7 +130,7 @@ enum PageRenderer {
 
     /// Renders a page (background plus ink clipped to the page) to an image `width` points wide. Thread-safe.
     static func image(of page: NotebookPage, ink: PKDrawing, assets: URL, width: CGFloat, scale: CGFloat = 1,
-                      includeBackground: Bool = true) -> UIImage {
+                      includeBackground: Bool = true, links: LinkTitles? = nil) -> UIImage {
         let factor = width / max(page.size.width, 1)
         let size = CGSize(width: width, height: (page.size.height * factor).rounded())
         let format = UIGraphicsImageRendererFormat()
@@ -136,7 +144,7 @@ enum PageRenderer {
         }
         return UIGraphicsImageRenderer(size: size, format: format).image { context in
             if includeBackground {
-                drawBackground(page, assets: assets, in: context.cgContext, size: size)
+                drawBackground(page, assets: assets, in: context.cgContext, size: size, links: links)
             } else {
                 UIColor.white.setFill()
                 context.fill(CGRect(origin: .zero, size: size))

@@ -178,17 +178,6 @@ final class ParityTests: XCTestCase {
         XCTAssertEqual(hits[ids[0]]?.count, 8)
     }
 
-    func testDamagedV1InkKeepsTheV1SearchText() async throws {
-        let root = temporaryRoot(self)
-        let manifest = try await makeNotebook(root, pages: [.template(.blank, color: .white, size: .letter)])
-        let package = NotebookPackage(root: root, id: manifest.id)
-        try FileManager.default.createDirectory(at: package.url.appending(path: "legacy"), withIntermediateDirectories: true)
-        try Data("bad".utf8).write(to: package.url.appending(path: "legacy/drawing.pkdrawing.corrupt"))
-        try Data("mitochondria".utf8).write(to: package.textDirectory.appending(path: NotebookPackage.legacyTextName))
-        let text = await HandwritingIndexer.shared.index(HandwritingIndexer.Job(package: package, pages: manifest.pages))
-        XCTAssertTrue(text.contains("mitochondria"), "the only searchable trace of ink that couldn't be read is kept")
-    }
-
     func testEditorKeysAreOffWhileASheetIsUp() async throws {
         let root = temporaryRoot(self)
         let manifest = try await makeNotebook(root, pages: [.template(.blank, color: .white, size: .letter)])

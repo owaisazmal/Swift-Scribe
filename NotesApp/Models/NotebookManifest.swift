@@ -59,6 +59,7 @@ struct NotebookPage: Sendable, Hashable, Identifiable {
         var copy = self
         copy.id = UUID()
         copy.day = nil
+        copy.extra["bookmark"] = nil
         return copy
     }
 
@@ -74,7 +75,8 @@ struct NotebookPage: Sendable, Hashable, Identifiable {
         }
         var hash: UInt64 = 0xcbf2_9ce4_8422_2325
         let dayKey = day.map { "|d:\($0)" } ?? ""
-        for byte in "\(backgroundKey)|\(paperColorRaw)|\(Int(size.width))x\(Int(size.height))\(dayKey)".utf8 {
+        let itemsKey = extra["items"].flatMap { try? $0.serialized(pretty: false) }.map { "|i:" + String(decoding: $0, as: UTF8.self) } ?? ""
+        for byte in "\(backgroundKey)|\(paperColorRaw)|\(Int(size.width))x\(Int(size.height))\(dayKey)\(itemsKey)".utf8 {
             hash = (hash ^ UInt64(byte)) &* 0x0100_0000_01b3
         }
         return String(hash, radix: 16).prefix(8).description
@@ -163,7 +165,6 @@ struct NotebookManifest: Sendable, Hashable {
     var recordings: [RecordingEntry] = []
     var opaqueRecordings: [JSONValue] = []
     var library = LibraryState()
-    var migratedFrom: String?
     var extra: [String: JSONValue] = [:]
     var undecoded: [String: UndecodedField] = [:]
 

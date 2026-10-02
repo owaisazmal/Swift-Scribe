@@ -7,12 +7,9 @@ struct StorageRoot: Sendable, Hashable {
     var library: URL { url.appending(path: "Library", directoryHint: .isDirectory) }
     var foldersFile: URL { library.appending(path: "folders.json") }
     var indexStore: URL { url.appending(path: "LibraryIndex.store") }
-    var backups: URL { url.appending(path: "Backups", directoryHint: .isDirectory) }
-    var migrationLog: URL { library.appending(path: "migration-v1.json") }
     var activityFile: URL { library.appending(path: "activity.json") }
     var deleting: URL { url.appending(path: "Deleting", directoryHint: .isDirectory) }
-    var v1Notebooks: URL { url.appending(path: "Notebooks", directoryHint: .isDirectory) }
-    var v1Store: URL { url.appending(path: "SwiftScribe.store") }
+    var stickers: URL { url.appending(path: "Stickers", directoryHint: .isDirectory) }
 
     func package(_ id: UUID) -> URL {
         library.appending(path: "\(id.uuidString).\(Self.packageExtension)", directoryHint: .isDirectory)

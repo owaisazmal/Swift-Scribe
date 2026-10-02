@@ -11,9 +11,23 @@ protocol EditorCanvasControlling: AnyObject {
     func setToolPickerSuppressed(_ suppressed: Bool)
     func setDrawingPolicy(_ policy: PKCanvasViewDrawingPolicy)
     func fit(_ fit: PageFit)
+    func setPresenting(_ presenting: Bool)
+    func present(page index: Int)
+    func setLaserColor(_ color: LaserColor)
+    func visibleCenter(ofPage index: Int) -> CGPoint?
+    func select(_ selection: ItemSelection?)
+    func editText()
+}
+
+struct ItemSelection: Equatable {
+    let pageID: UUID
+    let itemID: UUID
 }
 
 enum PageFit { case width, page }
+
+/// Focus hides the chrome and leaves the tools; presenting hides both and turns the Pencil into a laser pointer.
+enum EditorMode: Equatable { case writing, focus, presenting }
 
 @MainActor
 @Observable
@@ -24,6 +38,15 @@ final class EditorSession {
     var isToolPickerVisible = true
     var canUndo = false
     var canRedo = false
+    /// The picture, sticker, text box or link being arranged. The canvas owns it; it's mirrored here for the chrome.
+    var selection: ItemSelection?
+    var isEditingText = false
+    /// The page a link was followed from, while the page it opened is still showing.
+    private(set) var linkReturn: UUID?
+    private(set) var mode = EditorMode.writing
+    var laserColor = LaserColor.red {
+        didSet { canvas?.setLaserColor(laserColor) }
+    }
     var drawingInput: DrawingInput {
         didSet {
             UserDefaults.standard.set(drawingInput.rawValue, forKey: SettingsKey.drawingInput)
@@ -43,6 +66,7 @@ final class EditorSession {
     func pageDidChange(_ index: Int) {
         guard index != currentPage else { return }
         currentPage = index
+        linkReturn = nil
         document.noteCurrentPage(index)
     }
 
@@ -50,6 +74,177 @@ final class EditorSession {
         guard document.pages.indices.contains(index) else { return }
         canvas?.scrollToPage(index, animated: animated)
         pageDidChange(index)
+    }
+
+    func enter(_ newMode: EditorMode) {
+        guard newMode != mode else { return }
+        mode = newMode
+        canvas?.setPresenting(newMode == .presenting)
+    }
+
+    /// A page forward or back. While presenting, each page is shown whole.
+    func step(_ delta: Int) {
+        let index = min(max(currentPage + delta, 0), document.pages.count - 1)
+        guard index != currentPage else { return }
+        if mode == .presenting {
+            canvas?.present(page: index)
+        } else {
+            go(to: index)
+        }
+    }
+
+    // MARK: Links
+
+    func addLink(to target: UUID) {
+        let link = PageLink(target: target)
+        addItem(.link(link), size: PageLinkArt.size(for: LinkTitles(pages: document.pages).title(for: link)), actionName: String(localized: "Add Link"))
+    }
+
+    /// Opens the page a link points at and remembers where it was followed from.
+    func follow(_ link: PageLink, from origin: UUID) {
+        guard let index = document.index(of: link.target) else {
+            AccessibilityNotification.Announcement(String(localized: "The page this link opened was deleted")).post()
+            return
+        }
+        canvas?.select(nil)
+        show(index)
+        linkReturn = document.index(of: origin) == index ? nil : origin
+    }
+
+    func goBack() {
+        guard let index = linkReturn.flatMap(document.index(of:)) else { return dismissLinkReturn() }
+        show(index)
+    }
+
+    func dismissLinkReturn() { linkReturn = nil }
+
+    private func show(_ index: Int) {
+        if mode == .presenting {
+            canvas?.present(page: index)
+        } else {
+            go(to: index)
+        }
+    }
+
+    func setLinkLabel(_ label: String) {
+        guard let selection else { return }
+        document.updateItems(onPage: selection.pageID, actionName: String(localized: "Rename Link")) { items in
+            guard let index = items.firstIndex(where: { $0.id == selection.itemID }), var link = items[index].link else { return }
+            link.label = label.trimmingCharacters(in: .whitespacesAndNewlines)
+            items[index].content = .link(link)
+        }
+    }
+
+    // MARK: Text boxes
+
+    static let addTextAction = String(localized: "Add Text Box")
+
+    /// Places an empty text box and starts typing in it.
+    func addText() {
+        guard !document.isReadOnly, document.pages.indices.contains(currentPage) else { return }
+        let box = TextBox(string: "")
+        let width = min(280, (document.pages[currentPage].size.width * 0.6).rounded())
+        addItem(.text(box), size: CGSize(width: width, height: box.height(width: width)), actionName: Self.addTextAction)
+        canvas?.editText()
+    }
+
+    func updateText(_ change: (inout TextBox) -> Void) {
+        guard let selection else { return }
+        document.updateItems(onPage: selection.pageID, actionName: String(localized: "Text Style")) { items in
+            guard let index = items.firstIndex(where: { $0.id == selection.itemID }), var box = items[index].text else { return }
+            change(&box)
+            items[index].content = .text(box)
+            items[index] = items[index].fittedToText()
+        }
+    }
+
+    var selectedItem: PageItem? {
+        guard let selection, let page = document.pages.first(where: { $0.id == selection.pageID }) else { return nil }
+        return page.items.first { $0.id == selection.itemID }
+    }
+
+    // MARK: Pictures and stickers
+
+    /// Places a new item and selects it: where it was dropped, or in the middle of what's showing of the current page.
+    func addItem(_ content: PageItem.Content, size: CGSize, onPage index: Int? = nil, at point: CGPoint? = nil,
+                 actionName: String = String(localized: "Add to Page"), source: String? = nil) {
+        let index = index ?? currentPage
+        guard !document.isReadOnly, document.pages.indices.contains(index) else { return }
+        let page = document.pages[index]
+        var centre = point ?? canvas?.visibleCenter(ofPage: index) ?? CGPoint(x: page.size.width / 2, y: page.size.height / 2)
+        // Never exactly on top of the last one placed.
+        let taken = page.items.map(\.center)
+        while taken.contains(where: { abs($0.x - centre.x) < 6 && abs($0.y - centre.y) < 6 }), centre.y + 28 < page.size.height {
+            centre = CGPoint(x: min(centre.x + 28, page.size.width), y: centre.y + 28)
+        }
+        var item = PageItem(content: content, center: centre, size: size)
+        item.source = source
+        document.updateItems(onPage: page.id, actionName: actionName) { $0.append(item) }
+        canvas?.select(ItemSelection(pageID: page.id, itemID: item.id))
+    }
+
+    /// Stores a picture in the notebook and places it on a page, sized to sit comfortably on it.
+    func addPicture(_ data: Data, onPage index: Int? = nil, at point: CGPoint? = nil) async throws {
+        guard let image = UIImage(data: data) else { throw ImportError.unreadable }
+        try await addPicture(image, onPage: index, at: point)
+    }
+
+    func addPicture(_ image: UIImage, onPage index: Int? = nil, at point: CGPoint? = nil) async throws {
+        let picture = try await Task.detached(priority: .userInitiated) { try PhotoImport.picture(image) }.value
+        let file = try await document.package.writeAsset(picture.data, ext: picture.ext)
+        let index = index ?? currentPage
+        guard document.pages.indices.contains(index) else { return }
+        let page = document.pages[index].size
+        let fit = min(page.width * 0.55 / picture.size.width, page.height * 0.4 / picture.size.height)
+        addItem(.image(file: file), size: CGSize(width: (picture.size.width * fit).rounded(), height: (picture.size.height * fit).rounded()),
+                onPage: index, at: point)
+    }
+
+    /// Places one of the user's own stickers. The notebook keeps its own copy, and one copy serves every placement.
+    func addSticker(_ sticker: CustomSticker) async throws {
+        guard document.pages.indices.contains(currentPage) else { return }
+        let placed = document.pages.lazy.filter(\.hasItems).flatMap(\.items).first { $0.source == sticker.id && $0.assetFile != nil }
+        var file = placed?.assetFile, shape = placed?.size
+        if let name = file, !FileManager.default.fileExists(atPath: document.package.assetURL(name).path(percentEncoded: false)) { file = nil }
+        if file == nil {
+            let url = sticker.url
+            let picture = try await Task.detached(priority: .userInitiated) {
+                guard let image = UIImage(contentsOfFile: url.path(percentEncoded: false)) else { throw ImportError.unreadable }
+                return try PhotoImport.picture(image)
+            }.value
+            file = try await document.package.writeAsset(picture.data, ext: picture.ext)
+            shape = picture.size
+        }
+        guard let file, let shape, document.pages.indices.contains(currentPage) else { return }
+        let page = document.pages[currentPage].size
+        let fit = min(150, page.width * 0.4) / max(shape.width, shape.height, 1)
+        addItem(.image(file: file), size: CGSize(width: (shape.width * fit).rounded(), height: (shape.height * fit).rounded()), source: sticker.id)
+    }
+
+    func deleteSelection() {
+        guard let selection else { return }
+        canvas?.select(nil)
+        document.updateItems(onPage: selection.pageID, actionName: String(localized: "Delete")) { $0.removeAll { $0.id == selection.itemID } }
+    }
+
+    func duplicateSelection() {
+        guard let selection, let page = document.pages.first(where: { $0.id == selection.pageID }),
+              var copy = page.items.first(where: { $0.id == selection.itemID }) else { return }
+        copy.id = UUID()
+        copy.raw = [:]
+        copy.center = CGPoint(x: min(copy.center.x + 24, page.size.width), y: min(copy.center.y + 24, page.size.height))
+        document.updateItems(onPage: selection.pageID, actionName: String(localized: "Duplicate")) { $0.append(copy) }
+        canvas?.select(ItemSelection(pageID: selection.pageID, itemID: copy.id))
+    }
+
+    /// One step forward or back in the page's stack of pictures and stickers.
+    func moveSelection(forward: Bool) {
+        guard let selection else { return }
+        document.updateItems(onPage: selection.pageID, actionName: forward ? String(localized: "Bring Forward") : String(localized: "Send Backward")) { items in
+            guard let index = items.firstIndex(where: { $0.id == selection.itemID }) else { return }
+            let target = index + (forward ? 1 : -1)
+            if items.indices.contains(target) { items.swapAt(index, target) }
+        }
     }
 
     func toggleToolPicker() {
@@ -91,7 +286,7 @@ struct EditorView: View {
     }
 }
 
-private struct EditorContent: View {
+fileprivate struct EditorContent: View {
     @Bindable var session: EditorSession
     let close: () -> Void
 
@@ -102,20 +297,27 @@ private struct EditorContent: View {
     @State private var showingRecordings = false
     @State private var importingPDF = false
     @State private var showingPhotoPicker = false
-    @State private var photoItem: PhotosPickerItem?
+    @State fileprivate var photoItem: PhotosPickerItem?
     @State private var export: ExportJob?
     @State private var confirmingDelete = false
     @State private var goToPage = false
     @State private var goToText = ""
     @State private var renaming = false
     @State private var titleText = ""
-    @State private var errorMessage: String?
+    @State fileprivate var errorMessage: String?
     @State private var ribbonWidth: CGFloat = 44
     @State private var paperMode: PaperDrawer.Mode?
     @State private var editingCover: NotebookRecord?
     @State private var knownPages: Set<UUID> = []
+    @State private var photoBecomesPage = true
+    @State private var showingStickers = false
+    @State private var pickingLink = false
+    @State private var renamingLink = false
+    @State private var linkLabel = ""
+    @State private var namingBookmark: UUID?
+    @State private var bookmarkName = ""
 
-    private var document: NotebookDocument { session.document }
+    fileprivate var document: NotebookDocument { session.document }
     private var cloth: ClothColor { document.manifest.cover.cloth }
 
     var body: some View {
@@ -124,18 +326,40 @@ private struct EditorContent: View {
                 .ignoresSafeArea(edges: .bottom)
                 .background(Color.desk.ignoresSafeArea())
                 .background {
-                    Button("Page After Current") { session.addPage(after: session.currentPage) }
-                        .keyboardShortcut("n", modifiers: .command)
-                        .disabled(document.isReadOnly)
-                        .hidden()
-                        .accessibilityHidden(true)
+                    Group {
+                        Button("Page After Current") { session.addPage(after: session.currentPage) }
+                            .keyboardShortcut("n", modifiers: .command)
+                            .disabled(document.isReadOnly)
+                        Button("Focus Mode") { enter(session.mode == .focus ? .writing : .focus) }
+                            .keyboardShortcut("f", modifiers: [.command, .control])
+                        Button("Present") { enter(session.mode == .presenting ? .writing : .presenting) }
+                            .keyboardShortcut(.return, modifiers: [.command, .option])
+                        if session.mode != .writing {
+                            Button("Done") { enter(.writing) }.keyboardShortcut(.cancelAction)
+                        }
+                    }
+                    .hidden()
+                    .accessibilityHidden(true)
                 }
-                .overlay(alignment: .topTrailing) { ribbon }
+                .overlay(alignment: .topTrailing) {
+                    switch session.mode {
+                    case .writing: ribbons
+                    case .focus: focusExit
+                    case .presenting: EmptyView()
+                    }
+                }
                 .overlay(alignment: .top) { banners }
+                .overlay(alignment: .top) {
+                    if session.selection != nil, session.mode != .presenting { arrangeBar } else if session.linkReturn != nil { returnBar }
+                }
+                .overlay(alignment: .bottom) { if session.mode == .presenting { presentationBar } }
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar { toolbar }
                 .toolbarBackground(.hidden, for: .navigationBar)
+                .toolbar(session.mode == .writing ? .visible : .hidden, for: .navigationBar)
         }
+        .statusBarHidden(session.mode != .writing)
+        .persistentSystemOverlays(session.mode == .writing ? .automatic : .hidden)
         .sheet(isPresented: $showingPages) {
             PageNavigator(session: session)
         }
@@ -149,7 +373,29 @@ private struct EditorContent: View {
         .onChange(of: photoItem) { _, item in
             guard let item else { return }
             let position = session.currentPage + 1
-            document.perform { await insertPhoto(item, at: position) }
+            let asPage = photoBecomesPage
+            document.perform { if asPage { await insertPhoto(item, at: position) } else { await addPicture(item) } }
+        }
+        .sheet(isPresented: $showingStickers) {
+            StickerDrawer { sticker in
+                session.addItem(.sticker(sticker.rawValue), size: sticker.defaultSize)
+                announce(String(localized: "\(sticker.displayName) added to the page"))
+            } onPickOwn: { sticker in
+                document.perform { await addSticker(sticker) }
+            }
+        }
+        .sheet(isPresented: $pickingLink) {
+            LinkPicker(session: session) { target in
+                session.addLink(to: target)
+                announce(String(localized: "Link added to the page"))
+            }
+        }
+        .alert("Rename Link", isPresented: $renamingLink) {
+            TextField("Page name", text: $linkLabel)
+            Button("Cancel", role: .cancel) {}
+            Button("Save") { session.setLinkLabel(linkLabel) }
+        } message: {
+            Text("Leave it empty to name the link after its page.")
         }
         .confirmationDialog("Delete page \(session.currentPage + 1)?", isPresented: $confirmingDelete, titleVisibility: .visible) {
             Button("Delete Page", role: .destructive) {
@@ -164,6 +410,11 @@ private struct EditorContent: View {
             Button("Go") { if let number = Int(goToText) { session.go(to: number - 1) } }
         } message: {
             Text("1 to \(document.pages.count)")
+        }
+        .alert("Name Bookmark", isPresented: Binding(get: { namingBookmark != nil }, set: { if !$0 { namingBookmark = nil } })) {
+            TextField("Name", text: $bookmarkName)
+            Button("Cancel", role: .cancel) {}
+            Button("Save") { if let namingBookmark { document.setBookmark(bookmarkName, forPage: namingBookmark) } }
         }
         .alert("Rename Notebook", isPresented: $renaming) {
             TextField("Title", text: $titleText)
@@ -197,10 +448,20 @@ private struct EditorContent: View {
 
     private var isPresentingModal: Bool {
         showingPages || showingRecordings || export != nil || importingPDF || showingPhotoPicker || renaming || goToPage || paperMode != nil
-            || editingCover != nil
+            || editingCover != nil || namingBookmark != nil || showingStickers || pickingLink || renamingLink
     }
 
-    private func announce(_ message: String) {
+    private func enter(_ mode: EditorMode) {
+        guard !isPresentingModal else { return }
+        withAnimation(Motion.adaptive(Motion.standard, reduceMotion: reduceMotion)) { session.enter(mode) }
+        switch mode {
+        case .writing: announce(String(localized: "Back to writing"))
+        case .focus: announce(String(localized: "Focus mode. The toolbar is hidden."))
+        case .presenting: announce(String(localized: "Presenting. Drag on the page to point."))
+        }
+    }
+
+    fileprivate func announce(_ message: String) {
         AccessibilityNotification.Announcement(message).post()
     }
 
@@ -223,18 +484,18 @@ private struct EditorContent: View {
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
         ToolbarItem(placement: .topBarLeading) {
-            Button { session.recorder.shutdown(); close() } label: { Label("Library", systemImage: "chevron.backward") }
+            Button { session.canvas?.select(nil); session.recorder.shutdown(); close() } label: { Label("Library", systemImage: "chevron.backward") }
                 .keyboardShortcut("w", modifiers: .command)
                 .accessibilityIdentifier("editor.back")
         }
         ToolbarItem(placement: .principal) { titleMenu }
         ToolbarItemGroup(placement: .topBarTrailing) {
             Button { document.undoManager.undo() } label: { Label("Undo", systemImage: "arrow.uturn.backward") }
-                .keyboardShortcut(isPresentingModal ? nil : KeyboardShortcut("z", modifiers: .command))
+                .keyboardShortcut(isPresentingModal || session.isEditingText ? nil : KeyboardShortcut("z", modifiers: .command))
                 .disabled(!session.canUndo)
                 .accessibilityIdentifier("editor.undo")
             Button { document.undoManager.redo() } label: { Label("Redo", systemImage: "arrow.uturn.forward") }
-                .keyboardShortcut(isPresentingModal ? nil : KeyboardShortcut("z", modifiers: [.command, .shift]))
+                .keyboardShortcut(isPresentingModal || session.isEditingText ? nil : KeyboardShortcut("z", modifiers: [.command, .shift]))
                 .disabled(!session.canRedo)
                 .accessibilityIdentifier("editor.redo")
         }
@@ -280,6 +541,56 @@ private struct EditorContent: View {
             }
     }
 
+    fileprivate var currentPage: NotebookPage? {
+        document.pages.indices.contains(session.currentPage) ? document.pages[session.currentPage] : nil
+    }
+
+    private func toggleBookmark() {
+        guard let page = currentPage, !document.isReadOnly else { return }
+        document.setBookmark(page.bookmark == nil ? "" : nil, forPage: page.id)
+        announce(page.bookmark == nil ? String(localized: "Page bookmarked") : String(localized: "Bookmark removed"))
+    }
+
+    private var ribbons: some View {
+        HStack(alignment: .top, spacing: Space.x1) {
+            bookmarkRibbon
+            ribbon
+        }
+        .padding(.trailing, Space.x8)
+    }
+
+    /// A slim ribbon beside the page number: mustard once the page is bookmarked.
+    private var bookmarkRibbon: some View {
+        let page = currentPage, marked = page?.bookmark != nil
+        return Button(action: toggleBookmark) {
+            Image(systemName: marked ? "bookmark.fill" : "bookmark")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(marked ? Color.onMustard : Color.textSecondary)
+                .frame(width: 28)
+                .padding(.top, Space.x2)
+                .padding(.bottom, Space.x2 + 28 * RibbonShape.notch)
+                .background { marked ? Color.mustard : Color.surface }
+                .clipShape(RibbonShape())
+                .overlay { if !marked { RibbonShape().stroke(Color.hairline, lineWidth: 1) } }
+                .shadow(color: .black.opacity(marked ? 0.15 : 0.06), radius: 1, y: 1)
+                .frame(width: 44, height: 44, alignment: .top)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(document.isReadOnly)
+        .keyboardShortcut(isPresentingModal ? nil : KeyboardShortcut("d", modifiers: .command))
+        .contextMenu {
+            if let page, marked, !document.isReadOnly {
+                Button { bookmarkName = page.bookmark ?? ""; namingBookmark = page.id } label: { Label("Name Bookmark…", systemImage: "pencil") }
+                Button(role: .destructive) { document.setBookmark(nil, forPage: page.id) } label: { Label("Remove Bookmark", systemImage: "bookmark.slash") }
+            }
+        }
+        .animation(Motion.adaptive(Motion.ribbon, reduceMotion: reduceMotion), value: marked)
+        .accessibilityLabel(Text(marked ? "Remove Bookmark" : "Bookmark Page"))
+        .accessibilityValue(Text(marked ? (page?.bookmarkTitle(number: session.currentPage + 1) ?? "") : ""))
+        .accessibilityIdentifier("editor.bookmark")
+    }
+
     private var ribbon: some View {
         let page = min(session.currentPage + 1, document.pages.count), count = document.pages.count
         return Button { showingPages = true } label: {
@@ -306,11 +617,180 @@ private struct EditorContent: View {
         .buttonStyle(.plain)
         .keyboardShortcut(isPresentingModal ? nil : KeyboardShortcut("p", modifiers: [.command, .shift]))
         .simultaneousGesture(LongPressGesture(minimumDuration: 0.4).onEnded { _ in goToText = ""; goToPage = true })
-        .padding(.trailing, Space.x8)
         .accessibilityLabel(Text("Page \(session.currentPage + 1) of \(document.pages.count)"))
         .accessibilityHint(Text("Opens the page navigator. Touch and hold to go to a page."))
         .accessibilityAction(named: Text("Go to page")) { goToText = ""; goToPage = true }
         .accessibilityIdentifier("editor.ribbon")
+    }
+
+    private var focusExit: some View {
+        Button { enter(.writing) } label: {
+            Image(systemName: "arrow.down.right.and.arrow.up.left")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(Color.ink)
+                .frame(width: 44, height: 44)
+                .background(Color.surface, in: Circle())
+                .overlay { Circle().strokeBorder(Color.hairline) }
+        }
+        .buttonStyle(.plain)
+        .hoverEffect(.lift)
+        .padding(.trailing, Space.x5)
+        .padding(.top, Space.x2)
+        .accessibilityLabel(Text("Exit Focus Mode"))
+        .accessibilityIdentifier("editor.focus.exit")
+    }
+
+    /// Shown while something on the page is selected. A text box and a link add their own controls in front.
+    private var arrangeBar: some View {
+        let item = session.selectedItem
+        return HStack(spacing: 0) {
+            if let box = item?.text {
+                arrangeButton("Edit Text", "keyboard") { session.canvas?.editText() }
+                    .disabled(session.isEditingText)
+                    .accessibilityIdentifier("editor.arrange.edit")
+                textStyleMenu(box)
+            }
+            if let link = item?.link {
+                arrangeButton("Open Linked Page", "arrow.turn.down.right") {
+                    if let page = session.selection?.pageID { session.follow(link, from: page) }
+                }
+                .disabled(document.index(of: link.target) == nil)
+                .accessibilityIdentifier("editor.arrange.open")
+                arrangeButton("Rename Link", "pencil") { linkLabel = link.label; renamingLink = true }
+            }
+            if sizeClass == .compact, item?.text != nil || item?.link != nil {
+                Menu {
+                    Button { session.duplicateSelection() } label: { Label("Duplicate", systemImage: "plus.square.on.square") }
+                    Button { session.moveSelection(forward: true) } label: { Label("Bring Forward", systemImage: "square.2.layers.3d.top.filled") }
+                    Button { session.moveSelection(forward: false) } label: { Label("Send Backward", systemImage: "square.2.layers.3d.bottom.filled") }
+                } label: {
+                    Image(systemName: "ellipsis").frame(width: 44, height: 44)
+                }
+                .accessibilityLabel(Text("More"))
+            } else {
+                arrangeButton("Duplicate", "plus.square.on.square") { session.duplicateSelection() }
+                arrangeButton("Bring Forward", "square.2.layers.3d.top.filled") { session.moveSelection(forward: true) }
+                arrangeButton("Send Backward", "square.2.layers.3d.bottom.filled") { session.moveSelection(forward: false) }
+            }
+            arrangeButton("Delete", "trash") { session.deleteSelection() }
+                .foregroundStyle(Color.tomato)
+            Divider().frame(height: 24).padding(.horizontal, Space.x2)
+            barDone { session.canvas?.select(nil) }
+                .accessibilityIdentifier("editor.arrange.done")
+        }
+        .floatingBar()
+        .padding(.top, Space.x2)
+        .transition(.move(edge: .top).combined(with: .opacity))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(Text("Arrange"))
+        .accessibilityIdentifier("editor.arrange.bar")
+    }
+
+    private func textStyleMenu(_ box: TextBox) -> some View {
+        Menu {
+            Picker("Size", selection: Binding(get: { box.fontSize }, set: { size in session.updateText { $0.fontSize = size } })) {
+                ForEach(TextBox.sizes, id: \.points) { Text($0.name).tag($0.points) }
+            }
+            Toggle(isOn: Binding(get: { box.isBold }, set: { bold in session.updateText { $0.isBold = bold } })) {
+                Label("Bold", systemImage: "bold")
+            }
+            Picker("Colour", selection: Binding(get: { box.tint }, set: { tint in session.updateText { $0.tint = tint } })) {
+                ForEach(TextBox.Tint.allCases) { Text($0.displayName).tag($0) }
+            }
+            .pickerStyle(.menu)
+            Picker("Alignment", selection: Binding(get: { box.alignment }, set: { alignment in session.updateText { $0.alignment = alignment } })) {
+                ForEach(TextBox.Alignment.allCases) { Label($0.displayName, systemImage: $0.symbol).tag($0) }
+            }
+            .pickerStyle(.menu)
+        } label: {
+            Image(systemName: "textformat.size").frame(width: 44, height: 44)
+        }
+        .accessibilityLabel(Text("Text Style"))
+        .accessibilityIdentifier("editor.arrange.style")
+    }
+
+    /// After a link was followed: the way back to the page it was on.
+    @ViewBuilder
+    private var returnBar: some View {
+        if let index = session.linkReturn.flatMap(document.index(of:)) {
+            HStack(spacing: 0) {
+                Button { session.goBack() } label: {
+                    Label("Back to Page \(index + 1)", systemImage: "arrow.uturn.backward")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color.ink)
+                        .lineLimit(1)
+                        .fixedSize()
+                        .frame(minHeight: 44)
+                }
+                .accessibilityIdentifier("editor.link.back")
+                Button { session.dismissLinkReturn() } label: { Image(systemName: "xmark").font(.footnote.weight(.bold)).frame(width: 44, height: 44) }
+                    .foregroundStyle(Color.textSecondary)
+                    .accessibilityLabel(Text("Dismiss"))
+            }
+            .padding(.leading, Space.x2)
+            .floatingBar()
+            .padding(.top, Space.x2)
+            .transition(.move(edge: .top).combined(with: .opacity))
+        }
+    }
+
+    /// Filled, like the library slip's Undo.
+    private func barDone(_ action: @escaping () -> Void) -> some View {
+        Button("Done", action: action)
+            .font(.subheadline.weight(.semibold))
+            .lineLimit(1)
+            .fixedSize()
+            .prominentButton()
+            .padding(.leading, Space.x1)
+    }
+
+    private func arrangeButton(_ title: LocalizedStringKey, _ symbol: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) { Image(systemName: symbol).frame(width: 44, height: 44) }
+            .accessibilityLabel(Text(title))
+    }
+
+    private var presentationBar: some View {
+        let page = min(session.currentPage + 1, document.pages.count), count = document.pages.count
+        return HStack(spacing: Space.x2) {
+            Button { session.step(-1) } label: { Image(systemName: "chevron.up").frame(width: 44, height: 44) }
+                .disabled(page <= 1)
+                .accessibilityLabel(Text("Previous Page"))
+            Text("Page \(page) of \(count)")
+                .font(.subheadline.weight(.semibold).monospacedDigit())
+                .foregroundStyle(Color.ink)
+                .lineLimit(1)
+                .fixedSize()
+            Button { session.step(1) } label: { Image(systemName: "chevron.down").frame(width: 44, height: 44) }
+                .disabled(page >= count)
+                .accessibilityLabel(Text("Next Page"))
+                .accessibilityIdentifier("editor.present.next")
+            Divider().frame(height: 24)
+            if ExternalDisplay.shared.isShowing {
+                Image(systemName: "tv")
+                    .foregroundStyle(Color.ink)
+                    .frame(width: 32, height: 44)
+                    .accessibilityLabel(Text("Showing on the second screen"))
+                    .accessibilityIdentifier("editor.present.screen")
+            }
+            Button {
+                session.laserColor = session.laserColor == .red ? .green : .red
+            } label: {
+                Circle()
+                    .fill(Color(uiColor: session.laserColor.uiColor))
+                    .frame(width: 18, height: 18)
+                    .overlay { Circle().strokeBorder(Color.ink.opacity(0.35)) }
+                    .frame(width: 44, height: 44)
+            }
+            .accessibilityLabel(Text("Laser Colour"))
+            .accessibilityValue(Text(session.laserColor.displayName))
+            barDone { enter(.writing) }
+                .accessibilityIdentifier("editor.present.done")
+        }
+        .floatingBar()
+        .padding(.bottom, Space.x5)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("editor.present.bar")
+        .transition(.move(edge: .bottom).combined(with: .opacity))
     }
 
     @ViewBuilder
@@ -361,7 +841,12 @@ private struct EditorContent: View {
             Button { paperMode = .add(after: session.currentPage) } label: { Label("Choose Paper…", systemImage: "square.grid.3x3") }
             Divider()
             Button { importingPDF = true } label: { Label("Insert PDF…", systemImage: "doc.richtext") }
-            Button { showingPhotoPicker = true } label: { Label("Insert Photo…", systemImage: "photo") }
+            Button { photoBecomesPage = true; showingPhotoPicker = true } label: { Label("Insert Photo…", systemImage: "photo") }
+            Divider()
+            Button { photoBecomesPage = false; showingPhotoPicker = true } label: { Label("Picture on This Page…", systemImage: "photo.on.rectangle.angled") }
+            Button { showingStickers = true } label: { Label("Sticker…", systemImage: "seal") }
+            Button { session.addText() } label: { Label("Text Box", systemImage: "character.textbox") }
+            Button { pickingLink = true } label: { Label("Link to a Page…", systemImage: "link") }
         } label: {
             Label("Add", systemImage: "plus")
         }
@@ -380,6 +865,11 @@ private struct EditorContent: View {
                 Button { paperMode = .change(pageID: current.id) } label: { Label("Change Paper…", systemImage: "paintpalette") }
             }
             Group {
+                if let current, current.bookmark != nil {
+                    Button { bookmarkName = current.bookmark ?? ""; namingBookmark = current.id } label: { Label("Name Bookmark…", systemImage: "bookmark") }
+                } else {
+                    Button(action: toggleBookmark) { Label("Bookmark Page", systemImage: "bookmark") }
+                }
                 Button { Task { await session.duplicatePage(at: session.currentPage) } } label: {
                     Label("Duplicate Page", systemImage: "plus.square.on.square")
                 }
@@ -389,6 +879,9 @@ private struct EditorContent: View {
             Divider()
             Button { session.canvas?.fit(.width) } label: { Label("Fit Width", systemImage: "arrow.left.and.right") }
             Button { session.canvas?.fit(.page) } label: { Label("Fit Page", systemImage: "arrow.up.and.down") }
+            Divider()
+            Button { enter(.focus) } label: { Label("Focus Mode", systemImage: "arrow.up.left.and.arrow.down.right") }
+            Button { enter(.presenting) } label: { Label("Present", systemImage: "play.rectangle") }
             Divider()
             Picker(selection: $session.drawingInput) {
                 ForEach(DrawingInput.allCases) { Text($0.displayName).tag($0) }
@@ -438,7 +931,59 @@ private struct EditorContent: View {
     }
 }
 
+extension EditorContent {
+    fileprivate func addSticker(_ sticker: CustomSticker) async {
+        do {
+            try await session.addSticker(sticker)
+            announce(String(localized: "Sticker added to the page"))
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Places a picture on the current page as something that can be moved, rather than as a new page.
+    fileprivate func addPicture(_ item: PhotosPickerItem) async {
+        defer { photoItem = nil }
+        do {
+            guard let data = try await item.loadTransferable(type: Data.self) else { throw ImportError.unreadable }
+            try await session.addPicture(data)
+            announce(String(localized: "Picture added to the page"))
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+private extension View {
+    /// The capsule that floats over the page: the presenter's controls and the arrange bar.
+    func floatingBar() -> some View {
+        fontWeight(.semibold)
+            .padding(.horizontal, Space.x4)
+            .padding(.vertical, 2)
+            .fixedSize()
+            .background(Color.surface, in: Capsule())
+            .overlay { Capsule().strokeBorder(Color.hairline) }
+            .shadow(color: .black.opacity(0.12), radius: 8, y: 3)
+    }
+}
+
 enum PhotoImport {
+    /// A picture for placing on a page: at most 1,600 px on the long side, PNG when it has transparency.
+    static func picture(_ image: UIImage) throws -> (data: Data, size: CGSize, ext: String) {
+        guard image.size.width > 0, image.size.height > 0 else { throw ImportError.unreadable }
+        let scale = min(1, 1600 / max(image.size.width * image.scale, image.size.height * image.scale))
+        let target = CGSize(width: (image.size.width * image.scale * scale).rounded(), height: (image.size.height * image.scale * scale).rounded())
+        let alpha = image.cgImage?.alphaInfo ?? .none
+        let transparent = ![.none, .noneSkipFirst, .noneSkipLast].contains(alpha)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = !transparent
+        let renderer = UIGraphicsImageRenderer(size: target, format: format)
+        let encoded = transparent ? renderer.pngData { _ in image.draw(in: CGRect(origin: .zero, size: target)) }
+                                  : renderer.jpegData(withCompressionQuality: 0.88) { _ in image.draw(in: CGRect(origin: .zero, size: target)) }
+        return (encoded, target, transparent ? "png" : "jpg")
+    }
+
     /// Downscales to at most 2,400 px on the long side and re-encodes as JPEG, off the main thread.
     static func normalize(_ data: Data) throws -> (Data, CGSize) {
         guard let image = UIImage(data: data), image.size.width > 0, image.size.height > 0 else { throw ImportError.unreadable }

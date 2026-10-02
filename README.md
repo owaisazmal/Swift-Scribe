@@ -1,6 +1,6 @@
 # Swift Scribe
 
-**A free, open-source handwritten notes app for iPad — a Notability / GoodNotes alternative with no subscriptions, no ads, and no tracking.**
+**A free, open-source handwritten notes app for iPad. It is a Notability / GoodNotes alternative with no subscriptions, no ads, and no tracking.**
 
 Swift Scribe is built entirely on Apple frameworks (SwiftUI, PencilKit, PDFKit, Vision, SwiftData). Your notes stay on your device.
 
@@ -14,6 +14,12 @@ Swift Scribe is built entirely on Apple frameworks (SwiftUI, PencilKit, PDFKit, 
 - Undo / redo (toolbar, tool palette, ⌘Z / ⇧⌘Z), including page operations
 - Hardware keyboard: arrows, space and Page Up/Down to scroll, ⌘↑/⌘↓ for the first and last page, ⌘N for a new page, ⇧⌘P for the page navigator, and ⌘Z to undo library changes too
 - Choose to draw with Apple Pencil only, finger and pencil, or follow the system setting
+- Focus mode (⌃⌘F) puts the toolbar away and leaves the page and your tools
+
+**Presenting**
+- Present (⌥⌘↩) shows one whole page at a time with the chrome hidden; arrows, space or the on-screen bar turn pages
+- The Pencil (or a finger, when fingers draw) becomes a laser pointer with a fading tail, in red or green; nothing it draws is saved
+- With a second screen attached (a cable or AirPlay), presenting puts the page and the laser on that screen and keeps the controls on the iPad; zoom in on the iPad and the screen follows. When you stop presenting, the screen goes back to mirroring
 
 **Notebooks & paper**
 - Continuous vertically scrolling pages
@@ -23,11 +29,17 @@ Swift Scribe is built entirely on Apple frameworks (SwiftUI, PencilKit, PDFKit, 
 - A paper drawer with real miniatures: add a page with any paper, or change a page's paper and color in place (undoable)
 - New Notebook starters (Journal, Lecture, Sketchbook, Planner, Music, Plain) and Shuffle for a fresh cover; your Quick Note paper only changes when you ask
 - Page navigator with thumbnails: jump, drag to reorder, insert, duplicate, delete, go to page
+- Bookmarks: tap the small ribbon beside the page number (⌘D), name it if you like, and find it in the navigator's Outline tab alongside an imported PDF's own table of contents
+- Links between pages: place a tab on one page that opens another; it is named after its page (or its bookmark) and follows the page when it moves, and a "Back to Page" button brings you back
 
 **PDFs & images**
 - Import PDFs as new notebooks, or insert them into an existing one, and annotate them
 - Insert photos as pages
-- Export any notebook as a PDF from the editor or the library (vector backgrounds, PDF text stays selectable), then share or print
+- Pictures on a page: add from Photos, drop from another app, or paste (⌘V), then move, resize, rotate, layer or delete them
+- Twenty-one built-in stickers (marks, sticky notes, washi tape, labels, stamps), drawn as vectors so they stay sharp at any zoom; ink goes over them, so you can write on a note
+- Stickers of your own: pick a photo and its subject is lifted out with a white die-cut edge (on-device, with Vision), kept in the sticker drawer for every notebook
+- Typed text boxes: type on the page, then move, resize, turn and restyle the box (size, bold, colour, alignment); typed text is searchable
+- Export any notebook as a PDF from the editor or the library (vector backgrounds, stickers and typed text, PDF text stays selectable, bookmarks become the PDF's outline, links between pages keep working), then share or print
 
 **Audio**
 - Record lectures or meetings alongside a notebook, and play them back later
@@ -44,7 +56,11 @@ Swift Scribe is built entirely on Apple frameworks (SwiftUI, PencilKit, PDFKit, 
 - Folders with spine colours, drag notebooks onto folders in the sidebar, reorder folders
 - Favorites, sorting (last opened, modified, created, title), duplicate, rename
 - Recently Deleted with 30-day auto-purge
-- Search by title, **handwriting** (on-device OCR with Vision), and imported PDF text, with page-level results that open at the matching page
+- Search by title, **handwriting** (on-device OCR with Vision), typed text, and imported PDF text, with page-level results that open at the matching page
+
+**Widgets & shortcuts**
+- Home Screen widgets: Continue Writing (your last notebook's cover and page), This Week, and Today's Page, plus Lock Screen versions
+- Shortcuts and Siri: open today's journal page, start a quick note, continue writing, or open a notebook by name
 
 ## Requirements
 
@@ -56,6 +72,8 @@ Swift Scribe is built entirely on Apple frameworks (SwiftUI, PencilKit, PDFKit, 
 
 Swift Scribe has no accounts and no analytics. The writing history behind the week strip and calendar is a small file on your device (`Library/activity.json`) listing the days you wrote and which pages. It is never shared, and Settings › Writing History turns it off or clears it.
 
+The widgets read a small snapshot the app writes to its own shared container on the device (the last notebook's title, page and cover, and page counts for recent days). With writing history off, no days are written there.
+
 ## Getting started
 
 ```bash
@@ -66,7 +84,7 @@ git clone https://github.com/owaisazmal/Swift-Scribe.git
 open Swift-Scribe/NotesApp.xcodeproj
 ```
 
-Select an iPad simulator and run. In the simulator you can draw with the mouse; on a device, choose **⋯ → Draw With** to switch between Apple Pencil only and finger drawing.
+Select an iPad simulator and run. To run on a device, choose your team for both the `NotesApp` and `ScribeWidgets` targets; they share the App Group `group.com.owais.NotesApp`, which you may need to rename to one your team owns (it's set in `Config/*.entitlements` and `Shared/WidgetSnapshot.swift`). In the simulator you can draw with the mouse; on a device, choose **⋯ → Draw With** to switch between Apple Pencil only and finger drawing.
 
 Run the tests with ⌘U or:
 
@@ -78,16 +96,18 @@ xcodebuild test -project NotesApp.xcodeproj -scheme NotesApp -destination 'platf
 
 ```
 NotesApp/
-├── App/          App entry, launch (migration, index refresh), test-only seeds and probes
+├── App/          App entry, launch (index refresh), test-only seeds and probes
 ├── Models/       Manifest types (NotebookManifest, NotebookPage, CoverSpec), paper types
-├── Storage/      Notebook packages, tolerant manifest codec, v1 migration, SwiftData library index
+├── Storage/      Notebook packages, tolerant manifest codec, SwiftData library index
 ├── Canvas/       Page stack (one PencilKit canvas per visible page), page rendering, undo proxy
-├── Editor/       NotebookDocument (model, undo, autosave), editor chrome, navigator, recorder
+├── Editor/       NotebookDocument (model, undo, autosave), editor chrome, navigator, recorder, second screen
 ├── Library/      Library views, covers, new-notebook sheet, library store, one-editor registry
 ├── Design/       Colour tokens, typography (Fraunces, Bricolage Grotesque), cover renderer
 ├── Services/     PDF export, handwriting recognition
 ├── Settings/     Settings and acknowledgements
 └── Resources/    Bundled fonts with their licences, privacy manifest
+ScribeWidgets/    The widget extension: Continue Writing, This Week, Today's Page
+Shared/           The snapshot the app writes and the widgets read
 ```
 
 Key design decisions (details and measurements in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); visual system in [docs/DESIGN.md](docs/DESIGN.md)):
@@ -102,20 +122,17 @@ Key design decisions (details and measurements in [docs/ARCHITECTURE.md](docs/AR
 - **One undo history.** Strokes and page operations register against the document, not against views, so undo survives canvases being recycled.
 - **One document per notebook.** Every window shares it, and closing waits for recordings, imports and the last save. If saving fails, the editor says so instead of closing.
 - **The index is a cache.** SwiftData indexes the library for fast sorting and search, and can always be rebuilt from the manifests.
-- **Old notebooks move across safely.** Notebooks from earlier versions are migrated on first launch, and the originals are kept in `Backups/v1`.
 
 ## Roadmap
 
 Contributions toward any of these are very welcome:
 
 - [ ] iCloud sync across devices
-- [ ] Typed text boxes and sticky notes on pages
-- [ ] Insert images/stickers as movable objects (not just full pages)
 - [ ] Audio playback synced to strokes (Notability-style replay)
 - [ ] Shape recognition (draw-and-hold to snap lines, circles, rectangles)
 - [ ] Split view: two notebooks side by side
-- [ ] Presentation / laser pointer mode
-- [ ] Outline / bookmarks, page links
+- [ ] Presenter notes and a next-page preview on the iPad while a second screen shows the page
+- [ ] Links to web addresses and to pages in other notebooks
 - [ ] Nested folders
 - [ ] Export as images, backup / restore of the whole library
 - [ ] Lasso and ruler across pages (both work within a page today)

@@ -59,15 +59,11 @@ struct DeskCards: View {
                 .task(id: "\(journal.id)|\(journal.modifiedAt.timeIntervalSince1970)|\(journal.pageCount)|\(today)|\(records.count)") {
                     await load(journal)
                 }
-                .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged).receive(on: DispatchQueue.main)) { _ in
-                    today = DailyJournal.dayKey(for: .now)
-                }
-                .onChange(of: scenePhase) { _, phase in
-                    if phase == .active { today = DailyJournal.dayKey(for: .now) }
-                }
+                .keepsDayCurrent($today, scenePhase: scenePhase)
         } else if offersJournal {
             StartJournalCard(today: today, zoomID: "today-\(newJournalID.uuidString)", zoomNamespace: zoomNamespace, asRow: asRows,
                              action: startJournal) { promptHidden = true }
+                .keepsDayCurrent($today, scenePhase: scenePhase)
                 .alert("The journal couldn't be created", isPresented: Binding(get: { failure != nil }, set: { if !$0 { failure = nil } })) {
                     Button("OK", role: .cancel) {}
                 } message: {
@@ -392,5 +388,17 @@ enum BlankPages {
             PageThumbnailer.render(page: page, ink: PKDrawing(), assets: FileManager.default.temporaryDirectory)
         }.value
         return images.value(key) { PageThumbnailer.SharedUIImage(image: image) }?.image
+    }
+}
+
+private extension View {
+    /// Moves `today` on at midnight and when the app comes back to the front.
+    func keepsDayCurrent(_ today: Binding<String>, scenePhase: ScenePhase) -> some View {
+        onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged).receive(on: DispatchQueue.main)) { _ in
+            today.wrappedValue = DailyJournal.dayKey(for: .now)
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { today.wrappedValue = DailyJournal.dayKey(for: .now) }
+        }
     }
 }

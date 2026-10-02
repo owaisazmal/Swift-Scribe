@@ -115,7 +115,6 @@ final class LibraryStore {
                 manifest.modifiedAt = .now
                 manifest.library.isFavorite = false
                 manifest.library.lastOpenedAt = nil
-                manifest.migratedFrom = nil
             }
             index(copy)
             updateSearchText(searchText, for: newID)

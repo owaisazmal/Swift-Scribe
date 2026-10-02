@@ -3,7 +3,6 @@ import SwiftUI
 struct ScribeSettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(LibraryStore.self) private var store
-    @Environment(AppModel.self) private var app
     @Environment(WritingActivity.self) private var activity
     @AppStorage(SettingsKey.drawingInput) private var drawingInput: DrawingInput = .system
     @AppStorage(SettingsKey.defaultTemplate) private var template: PaperTemplate = .narrowRuled
@@ -11,9 +10,6 @@ struct ScribeSettingsView: View {
     @AppStorage(SettingsKey.defaultPageSize) private var size: PageSize = .letter
     @AppStorage(SettingsKey.dailyJournalID) private var journalID = ""
     @AppStorage(SettingsKey.showsOnThisDay) private var showsOnThisDay = true
-    @State private var backupSize: String?
-    @State private var confirmingBackupDelete = false
-    @State private var backupError: String?
     @State private var confirmingHistoryClear = false
 
     private let repository = URL(string: "https://github.com/owaisazmal/Swift-Scribe")!
@@ -85,25 +81,6 @@ struct ScribeSettingsView: View {
                     SettingsNote("Swift Scribe keeps a list of the days you wrote and which pages, on this device only. It's never shared.")
                 }
 
-                if let problem = app.migrationProblem {
-                    Section {
-                        Text(problem)
-                    } header: {
-                        SettingsNote("Moving to the New Format")
-                    } footer: {
-                        SettingsNote("Your original notebooks are untouched. Swift Scribe tries again each time it opens.")
-                    }
-                }
-
-                if let backupSize {
-                    Section {
-                        LabeledContent("Previous-format backup", value: backupSize)
-                        Button("Delete Backup…", role: .destructive) { confirmingBackupDelete = true }
-                    } footer: {
-                        SettingsNote("Your notebooks were moved to the new format. The original files are kept in Backups/v1 inside the app's storage.")
-                    }
-                }
-
                 Section {
                     LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "–")
                     NavigationLink("Acknowledgements") { AcknowledgementsView() }
@@ -116,7 +93,7 @@ struct ScribeSettingsView: View {
                 } header: {
                     SettingsNote("About")
                 } footer: {
-                    SettingsNote("Swift Scribe is free and open source. No ads, no subscriptions, no tracking — your notes stay on your device.")
+                    SettingsNote("Swift Scribe is free and open source. No ads, no subscriptions, no tracking. Your notes stay on your device.")
                 }
             }
             .scrollContentBackground(.hidden)
@@ -126,43 +103,8 @@ struct ScribeSettingsView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
             }
-            .task { await refreshBackupSize() }
-            .confirmationDialog("Delete the previous-format backup?", isPresented: $confirmingBackupDelete, titleVisibility: .visible) {
-                Button("Delete Backup", role: .destructive) { Task { await deleteBackup() } }
-            } message: {
-                Text("This removes the copy of your notebooks in the old format. The notebooks in your library aren't affected. This can't be undone.")
-            }
-            .alert("The backup couldn't be deleted", isPresented: Binding(get: { backupError != nil }, set: { if !$0 { backupError = nil } })) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(backupError ?? "")
-            }
         }
         .presentationSizing(.page)
-    }
-
-    private var backupDirectory: URL { store.root.backups.appending(path: "v1", directoryHint: .isDirectory) }
-
-    private func refreshBackupSize() async {
-        let backup = backupDirectory
-        backupSize = await Task.detached { Self.size(of: backup) }.value
-    }
-
-    private func deleteBackup() async {
-        let backup = backupDirectory
-        let failure = await Task.detached(priority: .userInitiated) { () -> String? in
-            do { try FileManager.default.removeItem(at: backup) } catch { return error.localizedDescription }
-            return nil
-        }.value
-        backupError = failure
-        await refreshBackupSize()
-    }
-
-    nonisolated static func size(of directory: URL) -> String? {
-        guard let enumerator = FileManager.default.enumerator(at: directory, includingPropertiesForKeys: [.fileSizeKey]) else { return nil }
-        var total = 0
-        for case let url as URL in enumerator { total += (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0 }
-        return total > 0 ? total.formatted(.byteCount(style: .file)) : nil
     }
 }
 

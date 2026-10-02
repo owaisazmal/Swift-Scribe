@@ -1,6 +1,6 @@
 import XCTest
 
-/// The Phase 2 vertical slice: launch, library, new notebook, write, autosave, back, relaunch, and a migrated v1 notebook.
+/// The vertical slice: launch, library, new notebook, write, autosave, back, relaunch, and a seeded notebook.
 @MainActor
 final class SliceUITests: XCTestCase {
     private let root = "slice"
@@ -11,7 +11,7 @@ final class SliceUITests: XCTestCase {
 
     private func launch(reset: Bool, seed: Bool = false, extra: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["-storageRoot", root, "-drawingInput", "anyInput"] + (reset ? ["-resetStorage"] : []) + (seed ? ["-seedV1Fixture"] : []) + extra
+        app.launchArguments = ["-storageRoot", root, "-drawingInput", "anyInput"] + (reset ? ["-resetStorage"] : []) + (seed ? ["-seedLibrary", "3"] : []) + extra
         app.launch()
         return app
     }
@@ -44,8 +44,8 @@ final class SliceUITests: XCTestCase {
     func testVerticalSlice() throws {
         var app = launch(reset: true, seed: true)
         waitForLibrary(app)
-        let migrated = app.buttons["notebook.Migrated Lecture"]
-        XCTAssertTrue(migrated.waitForExistence(timeout: 10), "the v1 notebook is migrated at launch")
+        let seeded = app.buttons["notebook.Physics II 3"]
+        XCTAssertTrue(seeded.waitForExistence(timeout: 10), "the seeded notebooks are on the shelf")
         attach(app, "library-light")
         try audit(app, [.contrast, .elementDetection, .hitRegion, .sufficientElementDescription], screen: "library")
 
@@ -91,15 +91,62 @@ final class SliceUITests: XCTestCase {
         app.buttons["editor.back"].tap()
         waitForLibrary(app)
 
-        app.buttons["notebook.Migrated Lecture"].tap()
-        let migratedPage = app.descendants(matching: .any)["page.canvas.1"]
-        XCTAssertTrue(migratedPage.waitForExistence(timeout: 15))
-        XCTAssertEqual(strokeCount(migratedPage), 2, "migrated ink lands on its own page")
+        app.buttons["notebook.Physics II 3"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["page.canvas.1"].waitForExistence(timeout: 15))
         XCTAssertTrue(app.buttons["editor.ribbon"].label.contains("of 3"), app.buttons["editor.ribbon"].label)
-        attach(app, "migrated-notebook")
+        attach(app, "seeded-notebook")
     }
 
     /// Runs only on an iPhone destination: every cover swatch in New Notebook must be on screen, not clipped off a narrow sheet.
+    func testUndoneInkStaysGoneWhenWritingAgain() throws {
+        let app = launch(reset: true, seed: true)
+        waitForLibrary(app)
+        app.buttons["notebook.Physics II 3"].tap()
+        let canvas = app.descendants(matching: .any)["page.canvas.1"]
+        XCTAssertTrue(canvas.waitForExistence(timeout: 15))
+        let before = strokeCount(canvas)
+        write(2, on: canvas)
+        XCTAssertEqual(strokeCount(canvas), before + 2)
+        app.buttons["editor.undo"].tap()
+        XCTAssertEqual(strokeCount(canvas), before + 1)
+        canvas.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.5))
+            .press(forDuration: 0.05, thenDragTo: canvas.coordinate(withNormalizedOffset: CGVector(dx: 0.6, dy: 0.52)), withVelocity: 400, thenHoldForDuration: 0.05)
+        XCTAssertEqual(strokeCount(canvas), before + 2, "the undone stroke doesn't come back with the next one")
+        app.buttons["editor.undo"].tap()
+        app.buttons["editor.undo"].tap()
+        XCTAssertEqual(strokeCount(canvas), before)
+        app.buttons["editor.redo"].tap()
+        XCTAssertEqual(strokeCount(canvas), before + 1)
+    }
+
+    func testInkUndoneWhileItsPageIsOffScreenStaysGone() throws {
+        let app = launch(reset: true, extra: ["-seedLongPDF"])
+        let textbook = app.buttons["notebook.Textbook"]
+        XCTAssertTrue(textbook.waitForExistence(timeout: 90))
+        textbook.tap()
+        let canvas = app.descendants(matching: .any)["page.canvas.1"]
+        XCTAssertTrue(canvas.waitForExistence(timeout: 20))
+        write(2, on: canvas)
+        XCTAssertEqual(strokeCount(canvas), 2)
+
+        func open(page: Int) {
+            app.buttons["editor.ribbon"].tap()
+            let thumbnail = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Page \(page) of 300")).firstMatch
+            XCTAssertTrue(thumbnail.waitForExistence(timeout: 10))
+            thumbnail.tap()
+            if app.buttons["Done"].firstMatch.exists { app.buttons["Done"].firstMatch.tap() }
+        }
+        open(page: 9)
+        XCTAssertTrue(canvas.waitForNonExistence(timeout: 10), "page 1 has given up its canvas")
+        app.buttons["editor.undo"].tap()
+        if !canvas.waitForExistence(timeout: 3) { open(page: 1) }
+        XCTAssertTrue(canvas.waitForExistence(timeout: 10))
+        XCTAssertEqual(strokeCount(canvas), 1)
+        canvas.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.5))
+            .press(forDuration: 0.05, thenDragTo: canvas.coordinate(withNormalizedOffset: CGVector(dx: 0.6, dy: 0.52)), withVelocity: 400, thenHoldForDuration: 0.05)
+        XCTAssertEqual(strokeCount(canvas), 2, "the undone stroke doesn't come back with the next one")
+    }
+
     func testNewNotebookSwatchesFitOnIPhone() throws {
         try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone, "iPhone layout check")
         let app = launch(reset: true)
@@ -124,9 +171,9 @@ final class SliceUITests: XCTestCase {
         defer { XCUIDevice.shared.appearance = .light }
         var app = launch(reset: true, seed: true)
         waitForLibrary(app)
-        _ = app.buttons["notebook.Migrated Lecture"].waitForExistence(timeout: 10)
+        _ = app.buttons["notebook.Physics II 3"].waitForExistence(timeout: 10)
         attach(app, "library-dark")
-        app.buttons["notebook.Migrated Lecture"].tap()
+        app.buttons["notebook.Physics II 3"].tap()
         _ = app.descendants(matching: .any)["page.canvas.1"].waitForExistence(timeout: 15)
         sleep(1)
         attach(app, "editor-dark")
@@ -134,7 +181,7 @@ final class SliceUITests: XCTestCase {
 
         XCUIDevice.shared.appearance = .light
         app = launch(reset: false, extra: ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"])
-        XCTAssertTrue(app.buttons["notebook.Migrated Lecture"].waitForExistence(timeout: 30) || app.staticTexts["Migrated Lecture"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["notebook.Cell Biology 1"].waitForExistence(timeout: 30), "the list layout shows the seeded notebooks")
         attach(app, "library-largest-text")
         try audit(app, [.dynamicType, .textClipped], screen: "largest text")
     }

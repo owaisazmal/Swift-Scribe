@@ -30,6 +30,7 @@ struct LibraryRootView: View {
     @State private var changes = LibraryChangeCenter()
     @State private var openingToday = false
     @State private var triedRestore = false
+    @State private var performingAction = false
     @SceneStorage("scribe.openNotebook") private var restoredNotebook = ""
     @Namespace private var zoom
 
@@ -99,7 +100,64 @@ struct LibraryRootView: View {
             }
         }
         .onChange(of: open) { restoredNotebook = $1?.id.uuidString ?? "" }
-        .task(id: app.phase) { await restoreOpenNotebook() }
+        .task(id: app.phase) {
+            await restoreOpenNotebook()
+            takePendingAction()
+        }
+        .onChange(of: app.pendingAction) { takePendingAction() }
+        .onOpenURL { url in
+            if let action = AppAction(url: url) { Task { await perform(action) } }
+        }
+    }
+
+    private func takePendingAction() {
+        guard app.phase == .ready, let action = app.pendingAction else { return }
+        app.pendingAction = nil
+        Task { await perform(action) }
+    }
+
+    /// Carries out a widget link or shortcut from wherever this window is: sheets are put away, and an editor
+    /// showing another notebook saves and closes first.
+    private func perform(_ action: AppAction) async {
+        await app.start()
+        guard !performingAction else { return }
+        performingAction = true
+        defer { performingAction = false }
+        if creating || showingSettings {
+            creating = false
+            showingSettings = false
+            try? await Task.sleep(for: .milliseconds(600))
+        }
+        do {
+            let id: UUID
+            var page: UUID?
+            switch action {
+            case .today:
+                if let journal = store.dailyJournal { id = journal.id } else { id = try await store.createDailyJournal() }
+                page = await store.prepareTodayPage(id)
+            case .quickNote:
+                id = try await store.createQuickNote(folder: nil)
+            case .continueWriting:
+                guard let last = store.lastOpenedNotebook else { return }
+                id = last.id
+            case .open(let notebook):
+                guard let record = store.record(notebook), !record.isTrashed else { return }
+                id = notebook
+            }
+            if let current = open, current.id != id {
+                NotificationCenter.default.post(name: .scribeCloseEditor, object: current.id)
+                for _ in 0..<100 where open != nil { try? await Task.sleep(for: .milliseconds(100)) }
+                guard open == nil else { return }
+                try? await Task.sleep(for: .milliseconds(500))
+            }
+            if open?.id == id {
+                if let page { NotificationCenter.default.post(name: .scribeShowPage, object: id, userInfo: ["page": page]) }
+            } else {
+                openNotebook(id, pageID: page)
+            }
+        } catch {
+            quickNoteError = error.localizedDescription
+        }
     }
 
     /// ⌘T, starting a journal first if there isn't one.

@@ -57,7 +57,6 @@ enum ManifestCodec {
         }
         if !manifest.opaqueRecordings.isEmpty { warnings.append("\(manifest.opaqueRecordings.count) recording(s) could not be read and are kept as-is") }
         manifest.library = reader.nested("library", default: LibraryState(), decode: decodeLibrary, encode: encodeLibrary)
-        manifest.migratedFrom = reader.optionalString("migratedFrom")
         manifest.undecoded = reader.undecoded
         manifest.extra = reader.remaining
         if !reader.undecoded.isEmpty {
@@ -85,7 +84,6 @@ enum ManifestCodec {
         writer.set("pages", .array(interleave(manifest.pages, opaque: manifest.opaquePages)))
         writer.set("recordings", .array(manifest.recordings.map(encodeRecording) + manifest.opaqueRecordings))
         writer.set("library", encodeLibrary(manifest.library))
-        if let migratedFrom = manifest.migratedFrom { writer.set("migratedFrom", .string(migratedFrom)) }
         return .object(writer.values)
     }
 

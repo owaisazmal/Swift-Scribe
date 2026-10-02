@@ -23,26 +23,23 @@ struct PageNavigator: View {
     @State private var dragging: UUID?
     @State private var dropTarget: UUID?
     @FocusState private var goToFocused: Bool
+    @State private var tab = Tab.pages
+
+    enum Tab { case pages, outline }
 
     private var document: NotebookDocument { session.document }
     private var currentPage: Int { session.currentPage }
 
     var body: some View {
         NavigationStack {
-            ScrollViewReader { proxy in
-                ScrollView {
-                    if dynamicTypeSize.isAccessibilitySize {
-                        LazyVStack(spacing: Space.x3) { cells }
-                            .padding(Space.x4)
-                    } else {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 130, maximum: 180), spacing: Space.x5, alignment: .top)],
-                                  spacing: Space.x6) { cells }
-                            .padding(Space.x5)
+            Group {
+                switch tab {
+                case .pages: grid
+                case .outline:
+                    NotebookOutline(session: session) { index in
+                        dismiss()
+                        session.go(to: index)
                     }
-                }
-                .onAppear {
-                    guard document.pages.indices.contains(currentPage) else { return }
-                    proxy.scrollTo(document.pages[currentPage].id, anchor: .center)
                 }
             }
             .background(Color.desk)
@@ -51,19 +48,30 @@ struct PageNavigator: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
-                ToolbarItem(placement: .topBarLeading) {
-                    TextField("Go to page", text: $goToPage)
-                        .keyboardType(.numberPad)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 120)
-                        .focused($goToFocused)
-                        .onSubmit(go)
-                }
-                ToolbarItem(placement: .primaryAction) {
-                    Button { session.addPage(after: document.pages.count - 1) } label: {
-                        Label("Add Page", systemImage: "plus")
+                ToolbarItem(placement: .principal) {
+                    Picker("Show", selection: $tab) {
+                        Text("Pages").tag(Tab.pages)
+                        Text("Outline").tag(Tab.outline)
                     }
-                    .disabled(document.isReadOnly)
+                    .pickerStyle(.segmented)
+                    .fixedSize()
+                    .accessibilityIdentifier("navigator.tabs")
+                }
+                if tab == .pages {
+                    ToolbarItem(placement: .topBarLeading) {
+                        TextField("Go to page", text: $goToPage)
+                            .keyboardType(.numberPad)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 120)
+                            .focused($goToFocused)
+                            .onSubmit(go)
+                    }
+                    ToolbarItem(placement: .primaryAction) {
+                        Button { session.addPage(after: document.pages.count - 1) } label: {
+                            Label("Add Page", systemImage: "plus")
+                        }
+                        .disabled(document.isReadOnly)
+                    }
                 }
             }
             .confirmationDialog("Delete this page?", isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
@@ -71,6 +79,25 @@ struct PageNavigator: View {
                 Button("Delete Page", role: .destructive) { if let pendingDelete { document.removePages([pendingDelete]) } }
             } message: {
                 Text("You can undo this.")
+            }
+        }
+    }
+
+    private var grid: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                if dynamicTypeSize.isAccessibilitySize {
+                    LazyVStack(spacing: Space.x3) { cells }
+                        .padding(Space.x4)
+                } else {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 130, maximum: 180), spacing: Space.x5, alignment: .top)],
+                              spacing: Space.x6) { cells }
+                        .padding(Space.x5)
+                }
+            }
+            .onAppear {
+                guard document.pages.indices.contains(currentPage) else { return }
+                proxy.scrollTo(document.pages[currentPage].id, anchor: .center)
             }
         }
     }
@@ -107,6 +134,7 @@ struct PageNavigator: View {
             if targeted { dropTarget = page.id } else if dropTarget == page.id { dropTarget = nil }
         }
         .accessibilityLabel(Text("Page \(index + 1) of \(document.pages.count)\(isCurrent ? ", current" : "")"))
+        .accessibilityValue(Text(page.bookmark == nil ? "" : String(localized: "Bookmarked")))
         .accessibilityHint(Text("Opens this page"))
         .accessibilityActions {
             if !document.isReadOnly, index > 0 { Button("Move earlier") { move(page.id, to: index - 1) } }
@@ -165,6 +193,11 @@ struct PageNavigator: View {
         Button { Task { await session.duplicatePage(at: index) } } label: {
             Label("Duplicate", systemImage: "plus.square.on.square")
         }
+        if page.bookmark == nil {
+            Button { document.setBookmark("", forPage: page.id) } label: { Label("Bookmark", systemImage: "bookmark") }
+        } else {
+            Button { document.setBookmark(nil, forPage: page.id) } label: { Label("Remove Bookmark", systemImage: "bookmark.slash") }
+        }
         if index > 0 {
             Button { move(page.id, to: index - 1) } label: { Label("Move Earlier", systemImage: "arrow.backward") }
         }
@@ -173,6 +206,65 @@ struct PageNavigator: View {
         }
         Divider()
         Button(role: .destructive) { pendingDelete = page.id } label: { Label("Delete", systemImage: "trash") }
+    }
+}
+
+/// Picks the page a new link opens.
+struct LinkPicker: View {
+    let session: EditorSession
+    let pick: (UUID) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    private var document: NotebookDocument { session.document }
+
+    var body: some View {
+        NavigationStack {
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: Space.x4) {
+                        Text("The link sits on page \(session.currentPage + 1). Tap it there to open the page you choose.")
+                            .font(.footnote)
+                            .foregroundStyle(Color.textSecondary)
+                        if dynamicTypeSize.isAccessibilitySize {
+                            LazyVStack(spacing: Space.x3) { cells }
+                        } else {
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 130, maximum: 180), spacing: Space.x5, alignment: .top)], spacing: Space.x6) { cells }
+                        }
+                    }
+                    .padding(Space.x5)
+                }
+                .onAppear {
+                    guard document.pages.indices.contains(session.currentPage) else { return }
+                    proxy.scrollTo(document.pages[session.currentPage].id, anchor: .center)
+                }
+            }
+            .accessibilityIdentifier("link.picker")
+            .background(Color.desk)
+            .navigationTitle("Link to a Page")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
+        }
+    }
+
+    private var cells: some View {
+        ForEach(Array(document.pages.enumerated()), id: \.element.id) { index, page in
+            let isCurrent = index == session.currentPage
+            Button {
+                pick(page.id)
+                dismiss()
+            } label: {
+                PageThumbnailCell(document: document, page: page, index: index, isCurrent: isCurrent)
+            }
+            .buttonStyle(.plain)
+            .hoverEffect(.lift)
+            .disabled(isCurrent)
+            .accessibilityLabel(Text(isCurrent ? "Page \(index + 1), this page" : "Page \(index + 1)"))
+            .accessibilityValue(Text(page.bookmark.flatMap { $0.isEmpty ? nil : $0 } ?? ""))
+            .accessibilityHint(Text(isCurrent ? "" : "Links to this page"))
+            .accessibilityIdentifier("link.page.\(index + 1)")
+            .id(page.id)
+        }
     }
 }
 
@@ -205,7 +297,7 @@ private struct PageThumbnailCell: View {
             if dynamicTypeSize.isAccessibilitySize { row } else { tile }
         }
         .contentShape(Rectangle())
-        .task(id: "\(page.id)-\(page.inkHash ?? "")-\(page.background)-\(page.paperColorRaw)") {
+        .task(id: "\(page.id)-\(page.inkHash ?? "")-\(page.appearanceKey)") {
             image = await document.thumbnail(for: page)
         }
     }
@@ -250,6 +342,7 @@ private struct PageThumbnailCell: View {
         .overlay { Rectangle().strokeBorder(Color.hairline, lineWidth: 1) }
         .overlay { if isCurrent { StitchedSelection() } }
         .overlay(alignment: .topTrailing) { if isCurrent { ribbon } }
+        .overlay(alignment: .topLeading) { if page.bookmark != nil { bookmarkFlag } }
         .padding(4)
     }
 
@@ -264,6 +357,16 @@ private struct PageThumbnailCell: View {
             .offset(y: ribbonDropped || reduceMotion ? -4 : -22)
             .opacity(ribbonDropped || reduceMotion ? 1 : 0)
             .onAppear { withAnimation(Motion.ribbon.delay(0.2)) { ribbonDropped = true } }
+    }
+
+    private var bookmarkFlag: some View {
+        RibbonShape()
+            .fill(Color.mustard)
+            .overlay { RibbonShape().stroke(Color.onMustard.opacity(contrast == .increased ? 0.8 : 0.25), lineWidth: 1) }
+            .frame(width: 12, height: 24)
+            .padding(.leading, 10)
+            .offset(y: -4)
+            .accessibilityHidden(true)
     }
 
     private var paperName: String {

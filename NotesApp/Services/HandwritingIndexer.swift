@@ -36,7 +36,6 @@ actor HandwritingIndexer {
             await task.value
             if running[page.id]?.token == token { running[page.id] = nil }
         }
-        if await isComplete(job) { await job.package.removeLegacyText() }
         return LibraryIndex.searchText(in: job.package.textDirectory)
     }
 
@@ -45,23 +44,18 @@ actor HandwritingIndexer {
         running[page] = nil
     }
 
-    /// Whether every page of the notebook, not just this job's, has current text. A v1 notebook whose ink couldn't
-    /// be read never is: its v1 search text is the only trace of that ink.
-    private func isComplete(_ job: Job) async -> Bool {
-        let damagedV1Ink = job.package.url.appending(path: "legacy/drawing.pkdrawing.corrupt")
-        guard !Task.isCancelled, !FileManager.default.fileExists(atPath: damagedV1Ink.path(percentEncoded: false)),
-              let pages = try? await job.package.readManifest().manifest.pages else { return false }
-        for page in pages where !(await isCurrent(page, in: job.package)) { return false }
-        return true
-    }
-
     private func isCurrent(_ page: NotebookPage, in package: NotebookPackage) async -> Bool {
-        guard let text = await package.readText(page.id) else { return page.inkHash == nil && !page.hasPDFText }
+        guard let text = await package.readText(page.id) else { return page.inkHash == nil && !page.hasPDFText && page.typedText.isEmpty }
         return text.hasPrefix(Self.header(for: page))
     }
 
+    /// Typed text joins the stamp only on pages that have some, so pages read before text boxes existed stay current.
     nonisolated static func header(for page: NotebookPage) -> String {
-        "#ink:\(page.inkHash ?? "none")\n"
+        let typed = page.typedText
+        guard !typed.isEmpty else { return "#ink:\(page.inkHash ?? "none")\n" }
+        var hash: UInt64 = 0xcbf2_9ce4_8422_2325
+        for byte in typed.utf8 { hash = (hash ^ UInt64(byte)) &* 0x0100_0000_01b3 }
+        return "#ink:\(page.inkHash ?? "none")+\(String(hash, radix: 16))\n"
     }
 
     /// Rendering and Vision run off the actor, so an edit's `cancel(page:)` gets through while they work.
@@ -72,6 +66,8 @@ actor HandwritingIndexer {
         if case .pdf(let file, let index) = page.background, let text = PDFDocument(url: package.assetURL(file))?.page(at: index)?.string {
             chunks.append(text)
         }
+        let typed = page.typedText
+        if !typed.isEmpty { chunks.append(typed) }
         if page.inkHash != nil, case .ink(let drawing, _) = await package.readInk(page.id), !drawing.strokes.isEmpty {
             guard !Task.isCancelled else { return }
             let image = PageRenderer.image(of: page, ink: drawing, assets: package.assetsDirectory, width: 1400, includeBackground: false)
