@@ -134,7 +134,7 @@ final class CoverRendererTests: XCTestCase {
 
     @MainActor
     func testCoverKeyIgnoresPageCount() throws {
-        let schema = Schema(versionedSchema: LibraryIndexSchemaV1.self)
+        let schema = LibraryIndex.schema
         let container = try ModelContainer(for: schema, configurations: ModelConfiguration(schema: schema, isStoredInMemoryOnly: true))
         let root = temporaryRoot(self)
         let id = UUID()

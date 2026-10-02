@@ -2,8 +2,8 @@ import Foundation
 import SwiftData
 import os
 
-/// The library index: a SwiftData cache of what's in the notebook manifests and `folders.json`,
-/// for fast sorting, filtering and search. It can always be rebuilt from those files.
+/// The first index schema, kept only so a store written by it can be migrated. Each record carried its notebook's
+/// whole search text, so every library query loaded it.
 enum LibraryIndexSchemaV1: VersionedSchema {
     static let versionIdentifier = Schema.Version(1, 0, 0)
     static var models: [any PersistentModel.Type] { [NotebookRecord.self, FolderRecord.self] }
@@ -50,12 +50,74 @@ enum LibraryIndexSchemaV1: VersionedSchema {
     }
 }
 
-typealias NotebookRecord = LibraryIndexSchemaV1.NotebookRecord
-typealias FolderRecord = LibraryIndexSchemaV1.FolderRecord
+/// The library index: a SwiftData cache of what's in the notebook manifests and `folders.json`,
+/// for fast sorting, filtering and search. It can always be rebuilt from those files.
+/// Search text has its own table, so the shelf's queries never read it.
+enum LibraryIndexSchemaV2: VersionedSchema {
+    static let versionIdentifier = Schema.Version(2, 0, 0)
+    static var models: [any PersistentModel.Type] { [NotebookRecord.self, FolderRecord.self, NotebookSearchText.self] }
 
+    @Model
+    final class NotebookRecord {
+        @Attribute(.unique) var id: UUID = UUID()
+        var title: String = ""
+        var createdAt: Date = Date()
+        var modifiedAt: Date = Date()
+        var lastOpenedAt: Date?
+        var pageCount: Int = 0
+        var currentPage: Int = 0
+        var isFavorite: Bool = false
+        var deletedAt: Date?
+        var folder: FolderRecord?
+        var coverStyleRaw: String = CoverStyle.cloth.rawValue
+        var clothRaw: String = ClothColor.slate.rawValue
+        var inksRaw: String = "teal,blue"
+        var coverSeed: Int = 0
+        var firstPageID: UUID?
+        var firstPageInkHash: String?
+        var firstPageThumbKey: String?
+        var firstPageIsPDF: Bool = false
+        var isReadOnly: Bool = false
+        var issueCount: Int = 0
+        var indexedAt: Date = Date.distantPast
+
+        init(id: UUID) { self.id = id }
+    }
+
+    @Model
+    final class FolderRecord {
+        @Attribute(.unique) var id: UUID = UUID()
+        var name: String = ""
+        var clothRaw: String = ClothColor.slate.rawValue
+        var createdAt: Date = Date()
+        var sortIndex: Int = 0
+        @Relationship(deleteRule: .nullify, inverse: \LibraryIndexSchemaV2.NotebookRecord.folder)
+        var notebooks: [NotebookRecord]? = []
+
+        init(id: UUID) { self.id = id }
+    }
+
+    /// Everything recognised, typed or read from PDFs in one notebook. Deliberately not a relationship of the record.
+    @Model
+    final class NotebookSearchText {
+        @Attribute(.unique) var notebookID: UUID = UUID()
+        var text: String = ""
+
+        init(notebookID: UUID, text: String) {
+            self.notebookID = notebookID
+            self.text = text
+        }
+    }
+}
+
+typealias NotebookRecord = LibraryIndexSchemaV2.NotebookRecord
+typealias FolderRecord = LibraryIndexSchemaV2.FolderRecord
+typealias NotebookSearchText = LibraryIndexSchemaV2.NotebookSearchText
+
+/// V1 to V2 drops the record's search text and adds the empty table; the next refresh reads the text back from the packages.
 enum LibraryIndexMigrationPlan: SchemaMigrationPlan {
-    static var schemas: [any VersionedSchema.Type] { [LibraryIndexSchemaV1.self] }
-    static var stages: [MigrationStage] { [] }
+    static var schemas: [any VersionedSchema.Type] { [LibraryIndexSchemaV1.self, LibraryIndexSchemaV2.self] }
+    static var stages: [MigrationStage] { [.lightweight(fromVersion: LibraryIndexSchemaV1.self, toVersion: LibraryIndexSchemaV2.self)] }
 }
 
 extension NotebookRecord {
@@ -120,8 +182,10 @@ enum LibraryIndex {
 
     /// Opens the index. A store that can't be opened is set aside (never deleted) and a fresh one is rebuilt
     /// from the manifests; if even that fails, the app runs on an in-memory index for this launch.
+    static var schema: Schema { Schema(versionedSchema: LibraryIndexSchemaV2.self) }
+
     static func makeContainer(root: StorageRoot) -> (container: ModelContainer, recovered: Bool) {
-        let schema = Schema(versionedSchema: LibraryIndexSchemaV1.self)
+        let schema = schema
         try? FileManager.default.createDirectory(at: root.url, withIntermediateDirectories: true)
         let configuration = ModelConfiguration(schema: schema, url: root.indexStore)
         do {
@@ -180,13 +244,56 @@ enum LibraryIndex {
             let record = byID[id] ?? NotebookRecord(id: id)
             if byID[id] == nil { context.insert(record); byID[id] = record }
             record.apply(item.load.manifest, issues: item.issues)
-            record.searchText = item.searchText
+            setSearchText(item.searchText, for: id, in: context)
             record.folder = item.load.manifest.library.folderID.flatMap { folders[$0] }
         }
         for (id, record) in byID where stamps[id] == nil {
             context.delete(record)
         }
+
+        // Notebooks with no search row yet (a migrated or rebuilt index) get theirs from the text already on disk.
+        var listing = FetchDescriptor<NotebookSearchText>()
+        listing.propertiesToFetch = [\.notebookID]
+        let rows = (try? context.fetch(listing)) ?? []
+        let have = Set(rows.map(\.notebookID))
+        for row in rows where stamps[row.notebookID] == nil { context.delete(row) }
+        let missing = stamps.keys.filter { !have.contains($0) && scanned[$0] == nil }
+        if !missing.isEmpty {
+            let texts = await Task.detached(priority: .userInitiated) { () -> [UUID: String] in
+                var result: [UUID: String] = [:]
+                for id in missing { result[id] = searchText(in: NotebookPackage(root: root, id: id).textDirectory) }
+                return result
+            }.value
+            for (id, text) in texts { setSearchText(text, for: id, in: context) }
+        }
         do { try context.save() } catch { log.error("index save failed: \(error.localizedDescription)") }
+    }
+
+    static func searchRow(for id: UUID, in context: ModelContext) -> NotebookSearchText? {
+        try? context.fetch(FetchDescriptor<NotebookSearchText>(predicate: #Predicate { $0.notebookID == id })).first
+    }
+
+    /// Returns whether anything changed.
+    @discardableResult
+    static func setSearchText(_ text: String, for id: UUID, in context: ModelContext) -> Bool {
+        if let row = searchRow(for: id, in: context) {
+            guard row.text != text else { return false }
+            row.text = text
+        } else {
+            context.insert(NotebookSearchText(notebookID: id, text: text))
+        }
+        return true
+    }
+
+    /// The notebooks whose title or text contains `query`. Only IDs are read, so a library full of PDF text stays on disk.
+    nonisolated static func notebookIDs(matching query: String, in context: ModelContext) -> Set<UUID> {
+        var titles = FetchDescriptor<NotebookRecord>(predicate: #Predicate { $0.title.localizedStandardContains(query) })
+        titles.propertiesToFetch = [\.id]
+        var texts = FetchDescriptor<NotebookSearchText>(predicate: #Predicate { $0.text.localizedStandardContains(query) })
+        texts.propertiesToFetch = [\.notebookID]
+        let byTitle = ((try? context.fetch(titles)) ?? []).map(\.id)
+        let byText = ((try? context.fetch(texts)) ?? []).map(\.notebookID)
+        return Set(byTitle).union(byText)
     }
 
     nonisolated static func manifestStamps(root: StorageRoot) -> [UUID: Date] {

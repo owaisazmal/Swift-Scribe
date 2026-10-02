@@ -11,7 +11,7 @@ final class ParityTests: XCTestCase {
     private var container: ModelContainer?
 
     private func makeStore() throws -> LibraryStore {
-        let schema = Schema(versionedSchema: LibraryIndexSchemaV1.self)
+        let schema = LibraryIndex.schema
         let container = try ModelContainer(for: schema, configurations: ModelConfiguration(schema: schema, isStoredInMemoryOnly: true))
         self.container = container
         return LibraryStore(root: temporaryRoot(self), context: container.mainContext)
