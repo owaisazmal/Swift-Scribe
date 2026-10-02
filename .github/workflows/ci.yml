@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Build and unit tests
+    # Preview image with Xcode 27; switch to macos-27 once it is generally available.
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Pick an iPad simulator
+        run: |
+          xcodebuild -version
+          udid=$(xcrun simctl list devices available --json | jq -r '
+            [.devices | to_entries | sort_by(.key) | reverse | .[]
+              | select(.key | contains("iOS")) | .value[]]
+            | (map(select(.name | startswith("iPad Pro 11"))) + map(select(.name | startswith("iPad"))))
+            | first | .udid // empty')
+          if [ -z "$udid" ]; then
+            echo "::error::No iPad simulator is available on this runner."
+            exit 1
+          fi
+          echo "SIMULATOR_UDID=$udid" >> "$GITHUB_ENV"
+
+      - name: Build and test
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project NotesApp.xcodeproj \
+            -scheme NotesApp \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
+            -only-testing:NotesAppTests \
+            -parallel-testing-enabled NO \
+            -resultBundlePath "$RUNNER_TEMP/NotesApp.xcresult" \
+            2>&1 | tee "$RUNNER_TEMP/xcodebuild.log" \
+            | xcbeautify --renderer github-actions
+
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: test-results
+          path: |
+            ${{ runner.temp }}/xcodebuild.log
+            ${{ runner.temp }}/NotesApp.xcresult
