@@ -6,6 +6,8 @@ struct FolderEntry: Sendable, Hashable, Identifiable {
     var clothRaw: String
     var createdAt: Date
     var sortIndex: Int
+    /// The folder this one sits inside. Older builds keep the key and show the folder at the top level.
+    var parentID: UUID?
     var extra: [String: JSONValue] = [:]
     var undecoded: [String: UndecodedField] = [:]
 
@@ -40,7 +42,8 @@ struct FolderFile: Sendable, Hashable {
             let cloth = reader.string("cloth", default: ClothColor.slate.rawValue)
             let createdAt = reader.date("createdAt", default: .now)
             let sortIndex = reader.int("sortIndex", default: file.folders.count)
-            file.folders.append(FolderEntry(id: id, name: name, clothRaw: cloth, createdAt: createdAt, sortIndex: sortIndex,
+            let parent = reader.take("parent")?.stringValue.flatMap(UUID.init(uuidString:))
+            file.folders.append(FolderEntry(id: id, name: name, clothRaw: cloth, createdAt: createdAt, sortIndex: sortIndex, parentID: parent,
                                             extra: reader.remaining, undecoded: reader.undecoded))
         }
         return file
@@ -55,6 +58,7 @@ struct FolderFile: Sendable, Hashable {
             writer.set("cloth", .string(folder.clothRaw))
             writer.set("createdAt", ManifestCodec.encodeDate(folder.createdAt))
             writer.set("sortIndex", .number(Double(folder.sortIndex)))
+            if let parent = folder.parentID { writer.set("parent", .string(parent.uuidString)) }
             return .object(writer.values)
         }
         try JSONValue.object(["folders": .array(encoded + opaque)]).serialized().write(to: root.foldersFile, options: .atomic)

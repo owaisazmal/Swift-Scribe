@@ -4,9 +4,19 @@ import SwiftData
 /// Something asked of the app from outside its windows: a widget link, a shortcut, Siri.
 enum AppAction: Equatable, Sendable {
     case today, quickNote, continueWriting
-    case open(UUID)
+    case open(UUID, page: UUID? = nil)
 
     static let scheme = "swiftscribe"
+
+    /// The address that opens a notebook, at one of its pages if given. Links in exported PDFs use it.
+    static func url(forNotebook id: UUID, page: UUID? = nil) -> URL? {
+        var components = URLComponents()
+        components.scheme = scheme
+        components.host = "notebook"
+        components.path = "/\(id.uuidString)"
+        if let page { components.queryItems = [URLQueryItem(name: "page", value: page.uuidString)] }
+        return components.url
+    }
 
     init?(url: URL) {
         guard url.scheme == Self.scheme else { return nil }
@@ -16,7 +26,8 @@ enum AppAction: Equatable, Sendable {
         case "continue": self = .continueWriting
         case "notebook":
             guard let id = UUID(uuidString: url.lastPathComponent) else { return nil }
-            self = .open(id)
+            let page = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == "page" }?.value
+            self = .open(id, page: page.flatMap(UUID.init(uuidString:)))
         default: return nil
         }
     }

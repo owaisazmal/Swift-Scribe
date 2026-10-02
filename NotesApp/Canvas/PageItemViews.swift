@@ -79,10 +79,19 @@ final class PageItemView: UIView {
         case .text(let box):
             accessibilityLabel = box.string
             accessibilityTraits = .staticText
-        case .link:
-            accessibilityLabel = linkResolved ? String(localized: "Link to \(linkTitle)") : String(localized: "Link to a page that was deleted")
+        case .link(let link):
             accessibilityTraits = .link
-            accessibilityHint = String(localized: "Opens the page. Touch and hold to move or resize.")
+            switch link.kind {
+            case .page:
+                accessibilityLabel = linkResolved ? String(localized: "Link to \(linkTitle)") : String(localized: "Link to a page that was deleted")
+                accessibilityHint = String(localized: "Opens the page. Touch and hold to move or resize.")
+            case .notebook:
+                accessibilityLabel = linkResolved ? String(localized: "Link to the notebook \(linkTitle)") : String(localized: "Link to a notebook that was deleted")
+                accessibilityHint = String(localized: "Opens the notebook. Touch and hold to move or resize.")
+            case .web:
+                accessibilityLabel = String(localized: "Web link, \(linkTitle)")
+                accessibilityHint = String(localized: "Opens the address in your browser. Touch and hold to move or resize.")
+            }
         case .unknown:
             isAccessibilityElement = false
         }
@@ -97,8 +106,8 @@ final class PageItemView: UIView {
             let scale = bounds.width / max(item.size.width, 1)
             ctx.scaleBy(x: scale, y: scale)
             box.draw(in: ctx, rect: CGRect(origin: .zero, size: item.size), onDark: onDark)
-        case .link:
-            PageLinkArt.draw(title: linkTitle, resolved: linkResolved, in: ctx, rect: bounds)
+        case .link(let link):
+            PageLinkArt.draw(title: linkTitle, kind: link.kind, resolved: linkResolved, in: ctx, rect: bounds)
         case .image, .unknown:
             break
         }

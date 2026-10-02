@@ -22,11 +22,53 @@ struct TextBox: Sendable, Hashable {
     var alignment = Alignment.leading
 }
 
-/// A tab on one page that opens another page of the same notebook.
+/// A tab on a page that opens another page, a page of another notebook, or a web address.
 struct PageLink: Sendable, Hashable {
-    var target: UUID
-    /// Empty while the link is named after its page.
+    enum Destination: Sendable, Hashable {
+        case page(UUID)
+        /// `name` is the notebook's title when the link was made, for when the notebook can't be looked up.
+        case notebook(UUID, page: UUID?, name: String)
+        case web(URL)
+    }
+
+    var destination: Destination
+    /// Empty while the link is named after what it opens.
     var label = ""
+
+    init(_ destination: Destination, label: String = "") {
+        self.destination = destination
+        self.label = label
+    }
+
+    init(target: UUID, label: String = "") {
+        self.init(.page(target), label: label)
+    }
+
+    /// The page of this notebook the link opens, if that is what it opens.
+    var target: UUID? {
+        if case .page(let id) = destination { return id }
+        return nil
+    }
+}
+
+/// Reading a web address the way someone types it.
+enum WebAddress {
+    static func url(from text: String) -> URL? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !trimmed.contains(" ") else { return nil }
+        let full = trimmed.contains("://") ? trimmed : "https://" + trimmed
+        guard let url = URL(string: full), let scheme = url.scheme?.lowercased(), ["http", "https"].contains(scheme),
+              let host = url.host(), host.contains(".") || host == "localhost" else { return nil }
+        return url
+    }
+
+    /// "example.com/guide" for "https://www.example.com/guide".
+    static func display(_ url: URL) -> String {
+        var host = url.host() ?? url.absoluteString
+        if host.hasPrefix("www.") { host.removeFirst(4) }
+        let path = url.path()
+        return path.count > 1 && path.count <= 24 ? host + path : host
+    }
 }
 
 /// A picture, sticker, text box or link placed on a page, under the ink. Geometry is in page points.
@@ -142,8 +184,17 @@ struct PageItem: Sendable, Hashable, Identifiable {
             box.alignment = object["align"]?.stringValue.flatMap(TextBox.Alignment.init(rawValue:)) ?? .leading
             content = .text(box)
         case ("link", _, _):
-            guard let target = object["target"]?.stringValue.flatMap(UUID.init(uuidString:)) else { content = .unknown; break }
-            content = .link(PageLink(target: target, label: object["label"]?.stringValue ?? ""))
+            let label = object["label"]?.stringValue ?? ""
+            if let url = object["url"]?.stringValue.flatMap(WebAddress.url(from:)) {
+                content = .link(PageLink(.web(url), label: label))
+            } else if let notebook = object["notebook"]?.stringValue.flatMap(UUID.init(uuidString:)) {
+                let page = object["page"]?.stringValue.flatMap(UUID.init(uuidString:))
+                content = .link(PageLink(.notebook(notebook, page: page, name: object["name"]?.stringValue ?? ""), label: label))
+            } else if let target = object["target"]?.stringValue.flatMap(UUID.init(uuidString:)) {
+                content = .link(PageLink(target: target, label: label))
+            } else {
+                content = .unknown
+            }
         default: content = .unknown
         }
         raw = object
@@ -173,8 +224,18 @@ struct PageItem: Sendable, Hashable, Identifiable {
             object["align"] = .string(box.alignment.rawValue)
         case .link(let link):
             object["kind"] = .string("link")
-            object["target"] = .string(link.target.uuidString)
             object["label"] = .string(link.label)
+            for key in ["target", "notebook", "page", "name", "url"] { object[key] = nil }
+            switch link.destination {
+            case .page(let target):
+                object["target"] = .string(target.uuidString)
+            case .notebook(let notebook, let page, let name):
+                object["notebook"] = .string(notebook.uuidString)
+                object["page"] = page.map { .string($0.uuidString) }
+                object["name"] = .string(name)
+            case .web(let url):
+                object["url"] = .string(url.absoluteString)
+            }
         case .unknown:
             break
         }
@@ -195,9 +256,11 @@ extension NotebookPage {
 
     var hasItems: Bool { extra["items"] != nil }
 
-    /// Everything typed on the page, for search.
+    /// Everything typed on the page or in its presenter notes, for search.
     var typedText: String {
-        guard hasItems else { return "" }
-        return items.compactMap { $0.text?.string.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }.joined(separator: "\n")
+        let notes = notes
+        guard hasItems else { return notes }
+        let boxes = items.compactMap { $0.text?.string.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        return (boxes + (notes.isEmpty ? [] : [notes])).joined(separator: "\n")
     }
 }

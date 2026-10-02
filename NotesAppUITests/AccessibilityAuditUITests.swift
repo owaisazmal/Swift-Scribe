@@ -37,7 +37,7 @@ final class AccessibilityAuditUITests: XCTestCase {
         empty.terminate()
 
         let app = XCUIApplication()
-        app.launchArguments = ["-storageRoot", "audit", "-resetStorage", "-seedLibrary", "6", "-seedLongPDF", "-seedJournal", "-indexSeed", "-seedActivity", "-drawingInput", "anyInput"] + extra
+        app.launchArguments = ["-storageRoot", "audit", "-resetStorage", "-seedLibrary", "6", "-seedLongPDF", "-seedJournal", "-indexSeed", "-seedActivity", "-seedReplay", "-drawingInput", "anyInput"] + extra
         app.launch()
         let textbook = app.buttons["notebook.Textbook"]
         XCTAssertTrue(textbook.waitForExistence(timeout: 90))
@@ -196,10 +196,19 @@ final class AccessibilityAuditUITests: XCTestCase {
         app.buttons["editor.arrange.done"].tap()
 
         app.buttons["Add"].firstMatch.tap()
-        app.buttons["Link to a Page…"].firstMatch.tap()
-        XCTAssertTrue(app.navigationBars["Link to a Page"].waitForExistence(timeout: 10))
+        app.buttons["Link…"].firstMatch.tap()
+        let linkTabs = app.segmentedControls["link.tabs"]
+        XCTAssertTrue(linkTabs.waitForExistence(timeout: 10))
         sleep(1)
         try check("link picker", modal: true)
+        linkTabs.buttons["Another Notebook"].tap()
+        sleep(1)
+        try check("link notebooks", modal: true)
+        linkTabs.buttons["Web"].tap()
+        dismissKeyboard()
+        try check("link web address", modal: true)
+        linkTabs.buttons["This Notebook"].tap()
+        sleep(1)
         if app.buttons["link.page.2"].exists {
             app.buttons["link.page.2"].tap()
             XCTAssertTrue(app.buttons["editor.arrange.done"].waitForExistence(timeout: 5))
@@ -218,15 +227,71 @@ final class AccessibilityAuditUITests: XCTestCase {
         app.buttons["editor.focus.exit"].tap()
         XCTAssertTrue(app.buttons["editor.ribbon"].waitForExistence(timeout: 5))
         app.buttons["More"].firstMatch.tap()
+        app.buttons["Presenter Notes…"].firstMatch.tap()
+        let notes = app.textViews["presenter.notes.editor"]
+        XCTAssertTrue(notes.waitForExistence(timeout: 10))
+        notes.typeText("Open with the question")
+        dismissKeyboard()
+        try check("presenter notes", modal: true)
+        app.buttons["presenter.notes.done"].tap()
+        XCTAssertTrue(notes.waitForNonExistence(timeout: 5))
+
+        app.buttons["More"].firstMatch.tap()
         app.buttons["Present"].firstMatch.tap()
         XCTAssertTrue(app.buttons["editor.present.done"].waitForExistence(timeout: 5))
         sleep(1)
         try check("presenting", bar: app.otherElements["editor.present.bar"])
+        if app.buttons["editor.present.notes"].exists {
+            app.buttons["editor.present.notes"].tap()
+            XCTAssertTrue(app.descendants(matching: .any)["presenter.panel"].waitForExistence(timeout: 5))
+            sleep(1)
+            try check("presenter view", bar: app.otherElements["editor.present.bar"])
+        }
         app.buttons["editor.present.done"].tap()
+        XCTAssertTrue(app.buttons["editor.ribbon"].waitForExistence(timeout: 5))
+
+        app.buttons["More"].firstMatch.tap()
+        app.buttons["Select Ink Across Pages"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["editor.ink.done"].waitForExistence(timeout: 5))
+        sleep(1)
+        try check("select ink", bar: app.otherElements["editor.ink.bar"])
+        app.buttons["editor.ink.done"].tap()
         XCTAssertTrue(app.buttons["editor.ribbon"].waitForExistence(timeout: 5))
 
         app.buttons["Recordings"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["No Recordings"].firstMatch.waitForExistence(timeout: 5))
         try check("recordings", modal: true)
+        app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.7)).tap()
+        if app.navigationBars["Recordings"].exists, app.buttons["Done"].firstMatch.exists { app.buttons["Done"].firstMatch.tap() }
+        XCTAssertTrue(app.staticTexts["No Recordings"].firstMatch.waitForNonExistence(timeout: 5))
+
+        app.buttons["editor.title"].tap()
+        let beside = app.buttons["Open Another Notebook Beside…"].firstMatch
+        if beside.waitForExistence(timeout: 5) {
+            beside.tap()
+            XCTAssertTrue(app.navigationBars["Open Beside"].waitForExistence(timeout: 10))
+            sleep(1)
+            try check("beside picker", modal: true)
+            app.buttons["beside.notebook.Lecture Replay"].tap()
+            XCTAssertTrue(app.buttons["editor.close.pane"].waitForExistence(timeout: 20))
+            sleep(2)
+            try check("two notebooks")
+            app.buttons.matching(identifier: "Recordings").element(boundBy: 1).tap()
+            let replay = app.buttons["recording.replay.1"]
+            XCTAssertTrue(replay.waitForExistence(timeout: 10))
+            sleep(1)
+            try check("recordings list", modal: true)
+            replay.tap()
+            let play = app.buttons["editor.replay.play"]
+            XCTAssertTrue(play.waitForExistence(timeout: 10))
+            play.tap()
+            sleep(1)
+            try check("replay", bar: app.otherElements["editor.replay.bar"])
+            app.buttons["editor.replay.done"].tap()
+            XCTAssertTrue(app.buttons["editor.close.pane"].waitForExistence(timeout: 5))
+        } else {
+            // At the largest text sizes the menu is a list; the split view is audited at the default size.
+            app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.8)).tap()
+        }
     }
 }

@@ -90,20 +90,57 @@ extension TextBox {
     }
 }
 
-/// What a link calls the page it opens: its own label, the page's bookmark name, or the page number.
+/// What a link is called: its own label, or the name of what it opens (a bookmark name or page number, a notebook's
+/// title, a web address without its scheme).
 struct LinkTitles: Sendable, Equatable {
     private var titles: [UUID: String] = [:]
+    /// The library's notebooks by ID. Nil when they weren't looked up: then a link to a notebook uses the name it was made with.
+    private var notebooks: [UUID: String]?
 
-    init(pages: [NotebookPage] = []) {
+    init(pages: [NotebookPage] = [], notebooks: [UUID: String]? = nil) {
         for (index, page) in pages.enumerated() {
             titles[page.id] = page.bookmark.flatMap { $0.isEmpty ? nil : $0 } ?? String(localized: "Page \(index + 1)")
         }
+        self.notebooks = notebooks
     }
 
-    func resolves(_ link: PageLink) -> Bool { titles[link.target] != nil }
+    func resolves(_ link: PageLink) -> Bool {
+        switch link.destination {
+        case .page(let id): titles[id] != nil
+        case .notebook(let id, _, _): notebooks.map { $0[id] != nil } ?? true
+        case .web: true
+        }
+    }
 
     func title(for link: PageLink) -> String {
-        link.label.isEmpty ? titles[link.target] ?? String(localized: "Missing page") : link.label
+        guard link.label.isEmpty else { return link.label }
+        switch link.destination {
+        case .page(let id): return titles[id] ?? String(localized: "Missing page")
+        case .notebook(let id, _, let name): return notebooks?[id] ?? (name.isEmpty ? String(localized: "Notebook") : name)
+        case .web(let url): return WebAddress.display(url)
+        }
+    }
+}
+
+extension PageLink {
+    /// What its tab looks like.
+    enum Kind: Sendable { case page, notebook, web }
+
+    var kind: Kind {
+        switch destination {
+        case .page: .page
+        case .notebook: .notebook
+        case .web: .web
+        }
+    }
+
+    /// The link an exported PDF carries for something outside the document.
+    var externalURL: URL? {
+        switch destination {
+        case .page: nil
+        case .web(let url): url
+        case .notebook(let id, let page, _): AppAction.url(forNotebook: id, page: page)
+        }
     }
 }
 
@@ -113,6 +150,8 @@ enum PageLinkArt {
     private static let ink = UIColor(hex: 0x1B2230)
     private static let cream = UIColor(hex: 0xF7F1E3)
     private static let mustard = UIColor(hex: 0xE8B023)
+    private static let sage = UIColor(hex: 0xA9D6AD)
+    private static let sky = UIColor(hex: 0xA6BBFF)
     private static let faded = UIColor(hex: 0xB9B4A8)
 
     private static func label(_ title: String, size: CGFloat, color: UIColor) -> NSAttributedString {
@@ -128,8 +167,26 @@ enum PageLinkArt {
         return CGSize(width: min(max(height + 8 + text + 12, 84), 320), height: height)
     }
 
+    /// An arrow for a page, a book for another notebook, an arrow leaving the page for the web.
+    private static func glyph(_ kind: PageLink.Kind, in tab: CGRect, unit: CGFloat, ctx: CGContext) {
+        func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: tab.minX + x * unit, y: tab.minY + y * unit) }
+        switch kind {
+        case .page:
+            ctx.addLines(between: [point(9.5, 15), point(21, 15)])
+            ctx.addLines(between: [point(16, 10), point(21, 15), point(16, 20)])
+        case .web:
+            ctx.addLines(between: [point(10.5, 19.5), point(19.5, 10.5)])
+            ctx.addLines(between: [point(12.5, 10.5), point(19.5, 10.5), point(19.5, 17.5)])
+        case .notebook:
+            ctx.addPath(CGPath(roundedRect: CGRect(x: tab.minX + 9.5 * unit, y: tab.minY + 8 * unit, width: 11 * unit, height: 14 * unit),
+                               cornerWidth: 1.5 * unit, cornerHeight: 1.5 * unit, transform: nil))
+            ctx.addLines(between: [point(13, 8), point(13, 22)])
+        }
+        ctx.strokePath()
+    }
+
     /// Draws in a y-down context. The tab is as wide as the chip is tall; the title shrinks before it is cut short.
-    static func draw(title: String, resolved: Bool, in ctx: CGContext, rect: CGRect) {
+    static func draw(title: String, kind: PageLink.Kind = .page, resolved: Bool, in ctx: CGContext, rect: CGRect) {
         let unit = rect.height / height
         let chip = CGPath(roundedRect: rect.insetBy(dx: unit, dy: unit), cornerWidth: 6 * unit, cornerHeight: 6 * unit, transform: nil)
         ctx.saveGState()
@@ -142,16 +199,18 @@ enum PageLinkArt {
         ctx.setFillColor(cream.cgColor)
         ctx.fill(rect)
         let tab = CGRect(x: rect.minX, y: rect.minY, width: rect.height, height: rect.height)
-        ctx.setFillColor((resolved ? mustard : faded).cgColor)
+        let tint = switch kind {
+        case .page: mustard
+        case .notebook: sage
+        case .web: sky
+        }
+        ctx.setFillColor((resolved ? tint : faded).cgColor)
         ctx.fill(tab)
         ctx.setStrokeColor(ink.cgColor)
-        ctx.setLineWidth(2.2 * unit)
+        ctx.setLineWidth((kind == .notebook ? 1.8 : 2.2) * unit)
         ctx.setLineCap(.round)
         ctx.setLineJoin(.round)
-        let y = tab.midY
-        ctx.addLines(between: [CGPoint(x: tab.minX + 9.5 * unit, y: y), CGPoint(x: tab.maxX - 9 * unit, y: y)])
-        ctx.addLines(between: [CGPoint(x: tab.maxX - 14 * unit, y: y - 5 * unit), CGPoint(x: tab.maxX - 9 * unit, y: y), CGPoint(x: tab.maxX - 14 * unit, y: y + 5 * unit)])
-        ctx.strokePath()
+        glyph(kind, in: tab, unit: unit, ctx: ctx)
         ctx.restoreGState()
 
         ctx.saveGState()

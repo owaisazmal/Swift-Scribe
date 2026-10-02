@@ -63,13 +63,17 @@ struct ShelfView: View {
         }
     }
 
+    private var tree: FolderTree { FolderTree(folders: folders) }
+
+    /// A folder shows what is in it and in the folders inside it.
     private var visible: [NotebookRecord] {
+        let inside: Set<UUID> = if case .folder(let id) = scope { tree.subtree(id) } else { [] }
         let scoped = records.filter { record in
             switch scope {
             case .all: !record.isTrashed
             case .favorites: !record.isTrashed && record.isFavorite
             case .trash: record.isTrashed
-            case .folder(let id): !record.isTrashed && record.folder?.id == id
+            case .folder: !record.isTrashed && record.folder.map { inside.contains($0.id) } ?? false
             }
         }
         let searched = matches.map { found in scoped.filter { found.contains($0.id) } } ?? scoped
@@ -303,10 +307,16 @@ struct ShelfView: View {
         guard !visible.isEmpty else { return [] }
         if !searchText.isEmpty { return [Shelf(id: "results", title: String(localized: "Results"), records: visible)] }
         if scope == .trash || sort == .title { return [Shelf(id: "all", title: sort == .title ? String(localized: "A to Z") : title, records: visible)] }
-        if grouping == .folder, case .folder = scope {} else if grouping == .folder {
-            var shelves: [Shelf] = folders.compactMap { folder in
-                let items = visible.filter { $0.folder?.id == folder.id }
-                return items.isEmpty ? nil : Shelf(id: folder.id.uuidString, title: folder.name, records: items, cloth: folder.cloth)
+        let tree = tree
+        var root: UUID?
+        if case .folder(let id) = scope { root = id }
+        // Inside a folder with nothing but its own notebooks, shelves by folder would be one shelf: recency says more.
+        if grouping == .folder, root == nil || visible.contains(where: { $0.folder?.id != root }) {
+            let byID = Dictionary(folders.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+            var shelves: [Shelf] = tree.ordered.compactMap { id in
+                guard let folder = byID[id] else { return nil }
+                let items = visible.filter { $0.folder?.id == id }
+                return items.isEmpty ? nil : Shelf(id: id.uuidString, title: id == root ? folder.name : tree.path(of: id, from: root), records: items, cloth: folder.cloth)
             }
             let loose = visible.filter { $0.folder == nil }
             if !loose.isEmpty { shelves.append(Shelf(id: "loose", title: String(localized: "Not on a shelf"), records: loose)) }
@@ -366,7 +376,7 @@ struct ShelfView: View {
                 .disabled(selection.isEmpty)
                 Menu {
                     Button("Not on a shelf") { move(selected(visible), to: nil); endSelection() }
-                    ForEach(folders) { folder in Button(folder.name) { move(selected(visible), to: folder); endSelection() } }
+                    ForEach(folders) { folder in Button(tree.path(of: folder.id)) { move(selected(visible), to: folder); endSelection() } }
                 } label: { Label("Move", systemImage: "folder") }
                     .disabled(selection.isEmpty)
                 Spacer()
@@ -443,9 +453,8 @@ struct ShelfView: View {
             Button(role: .destructive) { changes.requestPermanentDelete([record.id]) } label: { Label("Delete Permanently", systemImage: "trash") }
         } else if record.isReadOnly {
             Button { onOpen(record) } label: { Label("Open", systemImage: "book") }
-            Button {
-                Task { do { export = try await ExportJob.forNotebook(record.id, root: store.root) } catch { errorMessage = error.localizedDescription } }
-            } label: { Label("Export as PDF", systemImage: "square.and.arrow.up") }
+            Button { startExport(record, as: .pdf) } label: { Label("Export as PDF", systemImage: "square.and.arrow.up") }
+            Button { startExport(record, as: .images) } label: { Label("Export as Images", systemImage: "photo.on.rectangle") }
             Text("Made with a newer version of Swift Scribe, so it can only be read here.")
         } else {
             Button { onOpen(record) } label: { Label("Open", systemImage: "book") }
@@ -457,7 +466,7 @@ struct ShelfView: View {
                 Button { move([record], to: nil) } label: { Label("Not on a shelf", systemImage: record.folder == nil ? "checkmark" : "tray") }
                 ForEach(folders) { folder in
                     Button { move([record], to: folder) } label: {
-                        Label(folder.name, systemImage: record.folder?.id == folder.id ? "checkmark" : "folder")
+                        Label(tree.path(of: folder.id), systemImage: record.folder?.id == folder.id ? "checkmark" : "folder")
                     }
                 }
             } label: { Label("Move to Shelf", systemImage: "folder") }
@@ -465,15 +474,19 @@ struct ShelfView: View {
                 Task { do { try await store.duplicate(record) } catch { errorMessage = error.localizedDescription } }
             } label: { Label("Duplicate", systemImage: "plus.square.on.square") }
             Button { editingCover = record } label: { Label("Change Cover…", systemImage: "book.closed") }
-            Button {
-                Task { do { export = try await ExportJob.forNotebook(record.id, root: store.root) } catch { errorMessage = error.localizedDescription } }
-            } label: { Label("Export as PDF", systemImage: "square.and.arrow.up") }
+            Button { startExport(record, as: .pdf) } label: { Label("Export as PDF", systemImage: "square.and.arrow.up") }
+            Button { startExport(record, as: .images) } label: { Label("Export as Images", systemImage: "photo.on.rectangle") }
             Toggle(isOn: Binding(get: { journalID == record.id.uuidString }, set: { journalID = $0 ? record.id.uuidString : "" })) {
                 Label("Use as Daily Journal", systemImage: "calendar")
             }
             Divider()
             Button(role: .destructive) { changes.moveToTrash([record], in: store, undoManager: undoManager) } label: { Label("Delete", systemImage: "trash") }
         }
+    }
+
+    private func startExport(_ record: NotebookRecord, as format: ExportJob.Format) {
+        let id = record.id
+        Task { do { export = try await ExportJob.forNotebook(id, root: store.root, format: format) } catch { errorMessage = error.localizedDescription } }
     }
 
     // MARK: Safety net

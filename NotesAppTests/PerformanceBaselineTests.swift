@@ -288,7 +288,7 @@ final class PerformanceBaselineTests: XCTestCase {
         let job = ExportJob(document: document)
         while case .running = job.state { await pause(0.01) }
         timer.invalidate()
-        guard case .finished(let url) = job.state else { return XCTFail("export failed: \(job.state)") }
+        guard case .finished(let urls) = job.state, let url = urls.first else { return XCTFail("export failed: \(job.state)") }
         let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
         print("PERF v2 export 20 pages: total=\(Int((CACurrentMediaTime() - start) * 1000))ms longestMainThreadGap=\(String(format: "%.1f", gaps.longest * 1000))ms bytes=\(size)")
     }

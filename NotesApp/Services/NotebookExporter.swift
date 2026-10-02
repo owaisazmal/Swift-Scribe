@@ -20,11 +20,10 @@ enum NotebookExporter {
     static func export(_ input: Input, progress: @escaping @Sendable (Double) async -> Void) async throws -> URL {
         let interval = signposter.beginInterval("Export", "\(input.pages.count) pages")
         defer { signposter.endInterval("Export", interval) }
-        let name = input.title.trimmingCharacters(in: .whitespacesAndNewlines)
-            .components(separatedBy: CharacterSet(charactersIn: "/\\:?%*|\"<>")).joined(separator: "-")
+        let name = fileName(input.title)
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let url = directory.appending(path: "\(name.isEmpty ? "Untitled" : name).pdf")
+        let url = directory.appending(path: "\(name).pdf")
         try Task.checkCancellation()
 
         let format = UIGraphicsPDFRendererFormat()
@@ -47,9 +46,14 @@ enum NotebookExporter {
                     if linked.contains(page.id) { context.addDestination(withName: page.id.uuidString, at: CGPoint(x: 0, y: page.size.height)) }
                     if page.hasItems {
                         for item in page.items {
-                            guard let link = item.link, linked.contains(link.target) else { continue }
+                            guard let link = item.link else { continue }
                             let box = item.boundingBox
-                            context.setDestinationWithName(link.target.uuidString, for: CGRect(x: box.minX, y: page.size.height - box.maxY, width: box.width, height: box.height))
+                            let area = CGRect(x: box.minX, y: page.size.height - box.maxY, width: box.width, height: box.height)
+                            if let target = link.target {
+                                if linked.contains(target) { context.setDestinationWithName(target.uuidString, for: area) }
+                            } else if let url = link.externalURL {
+                                context.setURL(url, for: area)
+                            }
                         }
                     }
                     let ink = input.inMemoryInk[page.id] ?? savedInk(page, in: input.package)
@@ -71,6 +75,40 @@ enum NotebookExporter {
         }
         await progress(1)
         return url
+    }
+
+    private static func fileName(_ title: String) -> String {
+        let name = title.trimmingCharacters(in: .whitespacesAndNewlines)
+            .components(separatedBy: CharacterSet(charactersIn: "/\\:?%*|\"<>")).joined(separator: "-")
+        return name.isEmpty ? String(localized: "Untitled") : name
+    }
+
+    /// Writes each page as a PNG, twice the page's size in points, numbered in page order.
+    static func exportImages(_ input: Input, progress: @escaping @Sendable (Double) async -> Void) async throws -> [URL] {
+        let interval = signposter.beginInterval("Export", "\(input.pages.count) images")
+        defer { signposter.endInterval("Export", interval) }
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let name = fileName(input.title), assets = input.package.assetsDirectory, links = LinkTitles(pages: input.pages)
+        let digits = String(input.pages.count).count, count = Double(max(input.pages.count, 1))
+        var urls: [URL] = []
+        for (index, page) in input.pages.enumerated() {
+            if Task.isCancelled {
+                try? FileManager.default.removeItem(at: directory)
+                throw CancellationError()
+            }
+            let number = input.pages.count == 1 ? "" : " " + String(repeating: "0", count: digits - String(index + 1).count) + String(index + 1)
+            let url = directory.appending(path: "\(name)\(number).png")
+            let ink = input.inMemoryInk[page.id] ?? savedInk(page, in: input.package)
+            let data = autoreleasepool {
+                PageRenderer.image(of: page, ink: ink, assets: assets, width: page.size.width, scale: 2, links: links).pngData()
+            }
+            guard let data else { throw ImportError.unreadable }
+            try data.write(to: url, options: .atomic)
+            urls.append(url)
+            await progress(Double(index + 1) / count)
+        }
+        return urls
     }
 
     /// The pages that links on other pages open, so those links still work in the exported PDF.
@@ -103,37 +141,47 @@ enum NotebookExporter {
 @MainActor
 @Observable
 final class ExportJob: Identifiable {
-    enum State: Equatable { case running, finished(URL), failed(String), cancelled }
+    enum State: Equatable { case running, finished([URL]), failed(String), cancelled }
+    /// One PDF, or a PNG for every page.
+    enum Format: Sendable { case pdf, images }
 
     let id = UUID()
+    let format: Format
     private(set) var progress: Double = 0
     private(set) var state: State = .running
     @ObservationIgnored private var task: Task<Void, Never>?
 
-    convenience init(document: NotebookDocument) {
+    /// `pages` narrows the export to some of the notebook's pages; nil exports them all.
+    convenience init(document: NotebookDocument, format: Format = .pdf, pages: [NotebookPage]? = nil) {
+        let pages = pages ?? document.pages
         var inMemory: [UUID: PKDrawing] = [:]
-        for page in document.pages { if let ink = document.loadedInk(page.id) { inMemory[page.id] = ink } }
-        self.init(input: NotebookExporter.Input(title: document.title, pages: document.pages, inMemoryInk: inMemory, package: document.package))
+        for page in pages { if let ink = document.loadedInk(page.id) { inMemory[page.id] = ink } }
+        self.init(input: NotebookExporter.Input(title: document.title, pages: pages, inMemoryInk: inMemory, package: document.package), format: format)
     }
 
     /// Exports from the library: the open document, with its unsaved ink, if the notebook is being edited, otherwise the saved pages.
-    static func forNotebook(_ id: UUID, root: StorageRoot) async throws -> ExportJob {
-        if let document = DocumentRegistry.shared.document(for: id) { return ExportJob(document: document) }
+    static func forNotebook(_ id: UUID, root: StorageRoot, format: Format = .pdf) async throws -> ExportJob {
+        if let document = DocumentRegistry.shared.document(for: id) { return ExportJob(document: document, format: format) }
         let package = NotebookPackage(root: root, id: id)
         let manifest = try await package.readManifest().manifest
-        return ExportJob(input: NotebookExporter.Input(title: manifest.title, pages: manifest.pages, inMemoryInk: [:], package: package))
+        return ExportJob(input: NotebookExporter.Input(title: manifest.title, pages: manifest.pages, inMemoryInk: [:], package: package), format: format)
     }
 
-    init(input: NotebookExporter.Input) {
+    init(input: NotebookExporter.Input, format: Format = .pdf) {
+        self.format = format
         task = Task { [weak self] in
-            let work = Task.detached(priority: .userInitiated) {
-                try await NotebookExporter.export(input) { value in
-                    await MainActor.run { self?.progress = max(self?.progress ?? 0, value) }
+            let report: @Sendable (Double) async -> Void = { value in
+                await MainActor.run { self?.progress = max(self?.progress ?? 0, value) }
+            }
+            let work = Task.detached(priority: .userInitiated) { () throws -> [URL] in
+                switch format {
+                case .pdf: [try await NotebookExporter.export(input, progress: report)]
+                case .images: try await NotebookExporter.exportImages(input, progress: report)
                 }
             }
             do {
-                let url = try await withTaskCancellationHandler { try await work.value } onCancel: { work.cancel() }
-                if self?.state == .running { self?.state = .finished(url) }
+                let urls = try await withTaskCancellationHandler { try await work.value } onCancel: { work.cancel() }
+                if self?.state == .running { self?.state = .finished(urls) }
             } catch is CancellationError {
                 self?.state = .cancelled
             } catch {
@@ -162,15 +210,16 @@ struct ExportSheet: View {
                         Text(job.progress, format: .percent.precision(.fractionLength(0)))
                     }
                     Button("Cancel", role: .cancel) { job.cancel(); dismiss() }
-                case .finished(let url):
-                    Label("Your PDF is ready.", systemImage: "checkmark.circle").font(.headline)
+                case .finished(let urls):
+                    Label(readyText(urls.count), systemImage: "checkmark.circle").font(.headline)
+                        .accessibilityIdentifier("export.ready")
                     HStack(spacing: Space.x3) {
                         Button { sharing = true } label: { Label("Share", systemImage: "square.and.arrow.up") }
                             .prominentButton()
-                        Button { print(url) } label: { Label("Print", systemImage: "printer") }
+                        Button { print(urls) } label: { Label(String(localized: "export.print", defaultValue: "Print"), systemImage: "printer") }
                             .buttonStyle(.bordered)
                     }
-                    .sheet(isPresented: $sharing) { ShareSheet(items: [url]) }
+                    .sheet(isPresented: $sharing) { ShareSheet(items: urls) }
                 case .failed(let message):
                     Label(message, systemImage: "exclamationmark.triangle")
                 case .cancelled:
@@ -180,7 +229,7 @@ struct ExportSheet: View {
             .padding(Space.x8)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.surface)
-            .navigationTitle("Export PDF")
+            .navigationTitle(job.format == .pdf ? Text("Export PDF") : Text("Export Images"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
         }
@@ -188,13 +237,21 @@ struct ExportSheet: View {
         .onDisappear { if job.state == .running { job.cancel() } }
     }
 
-    private func print(_ url: URL) {
+    private func readyText(_ count: Int) -> String {
+        switch job.format {
+        case .pdf: String(localized: "Your PDF is ready.")
+        case .images: count == 1 ? String(localized: "Your image is ready.") : String(localized: "Your \(count) images are ready.")
+        }
+    }
+
+    private func print(_ urls: [URL]) {
+        guard let first = urls.first else { return }
         let controller = UIPrintInteractionController.shared
         let info = UIPrintInfo.printInfo()
-        info.jobName = url.deletingPathExtension().lastPathComponent
+        info.jobName = first.deletingPathExtension().lastPathComponent
         info.outputType = .general
         controller.printInfo = info
-        controller.printingItem = url
+        if urls.count == 1 { controller.printingItem = first } else { controller.printingItems = urls }
         controller.present(animated: true)
     }
 }

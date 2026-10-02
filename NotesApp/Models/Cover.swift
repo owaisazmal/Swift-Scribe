@@ -7,9 +7,9 @@ enum CoverStyle: String, CaseIterable, Identifiable, Sendable {
 
     var displayName: String {
         switch self {
-        case .cloth: "Cloth"
-        case .print: "Print"
-        case .firstPage: "First page"
+        case .cloth: String(localized: "Cloth")
+        case .print: String(localized: "Print")
+        case .firstPage: String(localized: "First page")
         }
     }
 }
@@ -19,7 +19,21 @@ enum ClothColor: String, CaseIterable, Identifiable, Sendable {
 
     var id: String { rawValue }
 
-    var displayName: String { rawValue.capitalized }
+    var displayName: String {
+        switch self {
+        case .oxblood: String(localized: "Oxblood")
+        case .tomato: String(localized: "Tomato")
+        case .mustard: String(localized: "Mustard")
+        case .moss: String(localized: "Moss")
+        case .jade: String(localized: "Jade")
+        case .cobalt: String(localized: "Cobalt")
+        case .navy: String(localized: "Navy")
+        case .plum: String(localized: "Plum")
+        case .slate: String(localized: "Slate")
+        case .rose: String(localized: "Rose")
+        case .oat: String(localized: "Oat")
+        }
+    }
 
     var hex: UInt32 {
         switch self {
@@ -49,11 +63,11 @@ enum RisoInk: String, CaseIterable, Identifiable, Sendable {
 
     var displayName: String {
         switch self {
-        case .pink: "Fluorescent pink"
-        case .yellow: "Yellow"
-        case .teal: "Teal"
-        case .blue: "Riso blue"
-        case .black: "Black"
+        case .pink: String(localized: "Fluorescent pink")
+        case .yellow: String(localized: "Yellow")
+        case .teal: String(localized: "Teal")
+        case .blue: String(localized: "Riso blue")
+        case .black: String(localized: "Black")
         }
     }
 

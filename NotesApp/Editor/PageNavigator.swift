@@ -133,7 +133,7 @@ struct PageNavigator: View {
         } isTargeted: { targeted in
             if targeted { dropTarget = page.id } else if dropTarget == page.id { dropTarget = nil }
         }
-        .accessibilityLabel(Text("Page \(index + 1) of \(document.pages.count)\(isCurrent ? ", current" : "")"))
+        .accessibilityLabel(isCurrent ? Text("Page \(index + 1) of \(document.pages.count), current") : Text("Page \(index + 1) of \(document.pages.count)"))
         .accessibilityValue(Text(page.bookmark == nil ? "" : String(localized: "Bookmarked")))
         .accessibilityHint(Text("Opens this page"))
         .accessibilityActions {
@@ -209,65 +209,6 @@ struct PageNavigator: View {
     }
 }
 
-/// Picks the page a new link opens.
-struct LinkPicker: View {
-    let session: EditorSession
-    let pick: (UUID) -> Void
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-
-    private var document: NotebookDocument { session.document }
-
-    var body: some View {
-        NavigationStack {
-            ScrollViewReader { proxy in
-                ScrollView {
-                    VStack(alignment: .leading, spacing: Space.x4) {
-                        Text("The link sits on page \(session.currentPage + 1). Tap it there to open the page you choose.")
-                            .font(.footnote)
-                            .foregroundStyle(Color.textSecondary)
-                        if dynamicTypeSize.isAccessibilitySize {
-                            LazyVStack(spacing: Space.x3) { cells }
-                        } else {
-                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 130, maximum: 180), spacing: Space.x5, alignment: .top)], spacing: Space.x6) { cells }
-                        }
-                    }
-                    .padding(Space.x5)
-                }
-                .onAppear {
-                    guard document.pages.indices.contains(session.currentPage) else { return }
-                    proxy.scrollTo(document.pages[session.currentPage].id, anchor: .center)
-                }
-            }
-            .accessibilityIdentifier("link.picker")
-            .background(Color.desk)
-            .navigationTitle("Link to a Page")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
-        }
-    }
-
-    private var cells: some View {
-        ForEach(Array(document.pages.enumerated()), id: \.element.id) { index, page in
-            let isCurrent = index == session.currentPage
-            Button {
-                pick(page.id)
-                dismiss()
-            } label: {
-                PageThumbnailCell(document: document, page: page, index: index, isCurrent: isCurrent)
-            }
-            .buttonStyle(.plain)
-            .hoverEffect(.lift)
-            .disabled(isCurrent)
-            .accessibilityLabel(Text(isCurrent ? "Page \(index + 1), this page" : "Page \(index + 1)"))
-            .accessibilityValue(Text(page.bookmark.flatMap { $0.isEmpty ? nil : $0 } ?? ""))
-            .accessibilityHint(Text(isCurrent ? "" : "Links to this page"))
-            .accessibilityIdentifier("link.page.\(index + 1)")
-            .id(page.id)
-        }
-    }
-}
-
 /// The dashed rule marking where a dragged page will land.
 private struct InsertionRule: Shape {
     let vertical: Bool
@@ -281,7 +222,7 @@ private struct InsertionRule: Shape {
 }
 
 /// A grid tile, or a row at accessibility sizes; the current page is stitched and wears the notebook's ribbon.
-private struct PageThumbnailCell: View {
+struct PageThumbnailCell: View {
     let document: NotebookDocument
     let page: NotebookPage
     let index: Int

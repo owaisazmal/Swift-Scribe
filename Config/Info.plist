@@ -17,6 +17,23 @@
 	<array>
 		<dict>
 			<key>UTTypeIdentifier</key>
+			<string>com.owais.swiftscribe.backup</string>
+			<key>UTTypeDescription</key>
+			<string>Swift Scribe backup</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>scribebackup</string>
+				</array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
 			<string>com.owais.swiftscribe.notebook-reference</string>
 			<key>UTTypeDescription</key>
 			<string>Swift Scribe notebook</string>

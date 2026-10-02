@@ -6,9 +6,9 @@ enum DrawingInput: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .system: "System Setting"
-        case .pencilOnly: "Apple Pencil Only"
-        case .anyInput: "Pencil and Finger"
+        case .system: String(localized: "System Setting")
+        case .pencilOnly: String(localized: "Apple Pencil Only")
+        case .anyInput: String(localized: "Pencil and Finger")
         }
     }
 
@@ -32,4 +32,6 @@ enum SettingsKey {
     static let showsOnThisDay = "showsOnThisDay"
     static let onThisDayHiddenDay = "onThisDayHiddenDay"
     static let keepsWritingHistory = "keepsWritingHistory"
+    static let snapsShapes = "snapsShapes"
+    static let syncsWithICloud = "syncsWithICloud"
 }

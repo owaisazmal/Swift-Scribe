@@ -9,9 +9,13 @@ private struct SharedSlide: @unchecked Sendable {
 
 struct PageStack: UIViewControllerRepresentable {
     let session: EditorSession
+    /// The window the editor is in: its panes share one tool picker.
+    var window: EditorWindow?
 
     func makeUIViewController(context: Context) -> PageStackController {
-        let controller = PageStackController(session: session)
+        let picker = window?.toolPicker ?? PKToolPicker()
+        window?.toolPicker = picker
+        let controller = PageStackController(session: session, toolPicker: picker)
         session.canvas = controller
         return controller
     }
@@ -70,7 +74,7 @@ final class PageCanvasView: PKCanvasView {
         get {
             let count = strokeCount ?? drawing.strokes.count
             strokeCount = count
-            return count == 0 ? String(localized: "Empty") : count == 1 ? String(localized: "1 stroke") : String(localized: "\(count) strokes")
+            return count == 0 ? String(localized: "canvas.empty", defaultValue: "Empty") : count == 1 ? String(localized: "1 stroke") : String(localized: "\(count) strokes")
         }
         set {}
     }
@@ -169,7 +173,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     private let scrollView = UIScrollView()
     private let contentView = UIView()
     private let anchor = ToolPickerAnchor()
-    private let toolPicker = PKToolPicker()
+    private let toolPicker: PKToolPicker
     private let undoProxy: CanvasUndoProxy
     private let signposter = OSSignposter(subsystem: "com.owais.NotesApp", category: "editor")
 
@@ -192,6 +196,18 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     private let laser = LaserTrailView()
     private lazy var laserGesture = UILongPressGestureRecognizer(target: self, action: #selector(pointLaser))
     private(set) var isPresenting = false
+    /// The recording being replayed with its ink, and how far it has got.
+    private var replay: (timeline: ReplayTimeline, time: TimeInterval)?
+    /// The strokes each live canvas is showing faintly.
+    private var replayPending: [UUID: Set<Int>] = [:]
+    /// The overlay for selecting ink across pages, while that is on, and what has been caught.
+    private var inkLasso: InkLassoOverlay?
+    private var inkSelection: InkSelection = [:]
+    private var lassoMoveOrigin: CGPoint?
+    private var isMovingInk = false
+    private lazy var lassoPan = UIPanGestureRecognizer(target: self, action: #selector(lassoPanned))
+    /// Nothing on the page can be changed by hand while it is presented or replayed, or while ink is being selected.
+    private var isLocked: Bool { isPresenting || replay != nil || inkLasso != nil }
     private var selectionView: ItemSelectionView?
     private var linkTitles = LinkTitles()
     private var textView: UITextView?
@@ -199,6 +215,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     private var keyboardOverlap: CGFloat = 0
     private var mirrored: String?
     private var fingersDraw = false
+    private let strokeHold = StrokeHoldRecognizer()
     private lazy var itemTap = UITapGestureRecognizer(target: self, action: #selector(tappedPage))
     private lazy var itemHold = UILongPressGestureRecognizer(target: self, action: #selector(heldPage))
     private var zoomBeforePresenting: CGFloat?
@@ -211,15 +228,16 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     /// Called once when the first visible page has its ink on screen (for tests and the open signpost).
     var onFirstInk: ((TimeInterval) -> Void)?
 
-    init(session: EditorSession) {
+    init(session: EditorSession, toolPicker: PKToolPicker = PKToolPicker()) {
         self.session = session
+        self.toolPicker = toolPicker
         undoProxy = CanvasUndoProxy(document: session.document.undoManager)
         super.init(nibName: nil, bundle: nil)
         openInterval = signposter.beginInterval("Open to first ink")
         document.inkObserver = self
         document.onStructureChange = { [weak self] in self?.pagesDidChange() }
         pages = document.pages
-        linkTitles = LinkTitles(pages: pages)
+        linkTitles = LinkTitles(pages: pages, notebooks: session.notebookTitles)
         layout = PageStackLayout(pages: pages)
     }
 
@@ -261,11 +279,15 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         view.addInteraction(UIDropInteraction(delegate: self))
         itemTap.allowedTouchTypes = [NSNumber(value: UITouch.TouchType.direct.rawValue)]
         itemHold.minimumPressDuration = 0.45
-        for recognizer in [itemTap, itemHold] {
+        for recognizer in [itemTap, itemHold, strokeHold] {
             recognizer.cancelsTouchesInView = false
+            recognizer.delaysTouchesEnded = false
             recognizer.delegate = self
             scrollView.addGestureRecognizer(recognizer)
         }
+        strokeHold.onTouchDown = { [weak self] in self?.session.onTouchDown?() }
+        lassoPan.maximumNumberOfTouches = 1
+        lassoPan.allowedTouchTypes = Self.scrollTouchTypes + [NSNumber(value: UITouch.TouchType.pencil.rawValue)]
         toolPicker.addObserver(self)
         toolPicker.colorUserInterfaceStyle = .light
         toolPicker.stateAutosaveName = "SwiftScribe.ToolPicker"
@@ -321,7 +343,8 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         let bounds = view.bounds
         guard bounds.width > 0, bounds.height > 0, bounds.size != lastBounds.size else { return }
         let isFirst = lastBounds == .zero
-        let page = isFirst ? session.currentPage : currentPage
+        // While presenting, the page being shown is the session's: the scroll position is mid-change when the view resizes.
+        let page = isFirst ? session.currentPage : isPresenting ? pendingPage ?? session.currentPage : currentPage
         lastBounds = bounds
         fitScale = bounds.width / layout.size.width
         let tallest = layout.frames.map(\.height).max() ?? 1
@@ -421,6 +444,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
             slot.layoutItems(scale: bakedScale)
         }
         showSelection()
+        inkLasso?.scale = bakedScale
         updateInsets()
         isBaking = false
     }
@@ -596,6 +620,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         slot.layer.borderColor = UIColor.hairline.resolvedColor(with: traitCollection).cgColor
         position(slot, at: index)
         contentView.addSubview(slot)
+        if let inkLasso { contentView.bringSubviewToFront(inkLasso) }
         slots[page.id] = slot
         if page.hasItems { syncItems(in: slot) }
         return slot
@@ -712,11 +737,11 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
 
     private func show(_ ink: PKDrawing, in canvas: PageCanvasView) {
         isApplyingDrawing = true
-        canvas.drawing = ink
+        canvas.drawing = replayed(ink, on: canvas.pageID)
         canvas.strokeCount = nil
         isApplyingDrawing = false
         canvas.isLoaded = true
-        setDrawingEnabled(!document.isReadOnly && !isPresenting, canvas)
+        setDrawingEnabled(!document.isReadOnly && !isLocked, canvas)
         if !firstInkReported, canvas.pageID == firstInkPage, ink.strokes.isEmpty {
             DispatchQueue.main.async { [weak self] in self?.reportFirstInk() }
         }
@@ -732,6 +757,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         if canvas.isFirstResponder { anchor.becomeFirstResponder() }
         canvas.removeFromSuperview()
         canvas.pageID = nil
+        replayPending[id] = nil
         canvas.isLoaded = false
         canvas.overrideUserInterfaceStyle = .light
         slots[id]?.canvas = nil
@@ -772,7 +798,36 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
         guard !isApplyingDrawing, let canvas = canvasView as? PageCanvasView, canvas.isLoaded, let id = canvas.pageID else { return }
         canvas.strokeCount = nil
+        let before = document.loadedInk(id)
         document.canvasDidChangeInk(id, to: canvas.drawing)
+        straightenLastStroke(on: canvas, pageID: id, before: before)
+    }
+
+    /// Draw and hold: a stroke that ended with the pen at rest is redrawn as the line, circle or figure it looks like.
+    /// The tidied stroke is an undo step of its own, so Undo gives the hand-drawn one back. For that it has to wait
+    /// until the stroke's own undo group has closed, which happens at the end of this pass of the run loop.
+    private func straightenLastStroke(on canvas: PageCanvasView, pageID: UUID, before: PKDrawing?) {
+        guard let rest = strokeHold.takeHold(), rest >= ShapeSnap.holdDuration, ShapeSnap.isEnabled, canvas.tool is PKInkingTool, !canvas.isRulerActive,
+              let before, canvas.drawing.strokes.count == before.strokes.count + 1, let drawn = canvas.drawing.strokes.last,
+              let snapped = ShapeSnap.snapped(drawn) else { return }
+        let count = canvas.drawing.strokes.count, stamp = drawn.path.creationDate
+        func apply(tries: Int) {
+            guard canvas.pageID == pageID, canvas.drawing.strokes.count == count, canvas.drawing.strokes.last?.path.creationDate == stamp else { return }
+            guard document.undoManager.groupingLevel == 0 || tries == 0 else {
+                return DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) { apply(tries: tries - 1) }
+            }
+            var strokes = canvas.drawing.strokes
+            strokes[count - 1] = snapped.stroke
+            let drawing = PKDrawing(strokes: strokes)
+            isApplyingDrawing = true
+            canvas.drawing = drawing
+            isApplyingDrawing = false
+            document.canvasDidChangeInk(pageID, to: drawing)
+            document.undoManager.setActionName(String(localized: "Straighten Shape"))
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            AccessibilityNotification.Announcement(String(localized: "Straightened into a \(snapped.shape.displayName)")).post()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) { apply(tries: 5) }
     }
 
     /// Writing anywhere puts a selected picture down.
@@ -796,6 +851,8 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     // MARK: InkObserver
 
     func document(_ document: NotebookDocument, didReplaceInkOf pageID: UUID) {
+        // An undo or redo under the selection moves strokes about, so what was caught is let go.
+        if inkLasso != nil, !isMovingInk, !inkSelection.isEmpty { setInkSelection([:]) }
         guard let canvas = canvases[pageID], let ink = document.loadedInk(pageID) else { return }
         show(ink, in: canvas)
     }
@@ -805,7 +862,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     private func pagesDidChange() {
         let updated = document.pages
         let updatedKeys = updated.map(SlotKey.init), currentKeys = pages.map(SlotKey.init)
-        let titles = LinkTitles(pages: updated)
+        let titles = LinkTitles(pages: updated, notebooks: session.notebookTitles)
         let renamed = titles != linkTitles
         linkTitles = titles
         guard updatedKeys.elementsEqual(currentKeys, by: Self.sameSlot) else {
@@ -818,6 +875,16 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     }
 
     // MARK: Pictures, stickers, text and links
+
+    /// A linked notebook was renamed, deleted or brought back.
+    func linksDidChange() {
+        let titles = LinkTitles(pages: pages, notebooks: session.notebookTitles)
+        guard titles != linkTitles else { return }
+        linkTitles = titles
+        mirrored = nil
+        refreshItems(all: true)
+        mirrorPresentation()
+    }
 
     private func syncItems(in slot: PageSlotView) {
         slot.syncItems(assets: document.package.assetsDirectory, scale: bakedScale, links: linkTitles) { [weak self, weak slot] itemID in
@@ -848,7 +915,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     private func activate(_ selection: ItemSelection) {
         if let link = item(selection)?.link {
             session.follow(link, from: selection.pageID)
-        } else if !isPresenting, !document.isReadOnly {
+        } else if !isLocked, !document.isReadOnly {
             select(selection)
         }
     }
@@ -867,7 +934,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
 
     /// Puts the stitched outline round the selected item, or takes it away when the item or its page is gone.
     private func showSelection() {
-        guard !isPresenting, !document.isReadOnly, let (slot, item) = selectedItem() else {
+        guard !isLocked, !document.isReadOnly, let (slot, item) = selectedItem() else {
             discardTextEditor()
             selectionView?.removeFromSuperview()
             selectionView = nil
@@ -923,6 +990,8 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     /// While presenting nothing is drawn, so a tap on a link always opens it.
     @objc private func tappedPage(_ gesture: UITapGestureRecognizer) {
         guard !isOnSelection(gesture) else { return }
+        if replay != nil { return seekReplay(to: gesture.location(in: scrollView)) }
+        if inkLasso != nil { return setInkSelection([:]) }
         let hit = isPresenting || !fingersDraw ? item(at: gesture.location(in: scrollView)) : nil
         if let hit, let link = item(hit)?.link { return session.follow(link, from: hit.pageID) }
         guard !isPresenting, !document.isReadOnly else { return }
@@ -931,7 +1000,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
 
     /// Touch and hold picks one up with a finger or the Pencil, and drops the dot the hold would have drawn.
     @objc private func heldPage(_ gesture: UILongPressGestureRecognizer) {
-        guard gesture.state == .began, !isPresenting, !document.isReadOnly, !isOnSelection(gesture),
+        guard gesture.state == .began, !isLocked, !document.isReadOnly, !isOnSelection(gesture),
               let hit = item(at: gesture.location(in: scrollView)) else { return }
         if let canvas = canvases[hit.pageID], canvas.drawingGestureRecognizer.isEnabled {
             canvas.drawingGestureRecognizer.isEnabled = false
@@ -945,7 +1014,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
 
     /// Puts a text view over the selected text box. The page keeps the old text until typing ends.
     func editText() {
-        guard textView == nil, !isPresenting, !document.isReadOnly, let selection = session.selection,
+        guard textView == nil, !isLocked, !document.isReadOnly, let selection = session.selection,
               let (slot, item) = selectedItem(), let box = item.text else { return }
         let view = UITextView()
         view.backgroundColor = .clear
@@ -1051,7 +1120,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
 
     // MARK: Dropping and pasting pictures
 
-    private var acceptsPictures: Bool { !document.isReadOnly && !isPresenting }
+    private var acceptsPictures: Bool { !document.isReadOnly && !isLocked }
 
     func dropInteraction(_ interaction: UIDropInteraction, canHandle session: UIDropSession) -> Bool {
         acceptsPictures && session.canLoadObjects(ofClass: UIImage.self)
@@ -1141,7 +1210,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     // MARK: EditorCanvasControlling
 
     func setToolPickerVisible(_ visible: Bool) {
-        let shown = visible && !toolPickerSuppressed && !document.isReadOnly && !isPresenting
+        let shown = visible && !toolPickerSuppressed && !document.isReadOnly && !isLocked
         toolPicker.setVisible(shown, forFirstResponder: anchor)
         for canvas in canvases.values { toolPicker.setVisible(shown, forFirstResponder: canvas) }
         if !toolPickerSuppressed, textView == nil { anchor.becomeFirstResponder() }
@@ -1170,7 +1239,8 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     private func updateScrollTouches() {
         let fingersDraw = switch drawingPolicy {
         case _ where isPresenting: fingersPoint
-        case _ where document.isReadOnly: false
+        case _ where inkLasso != nil: true
+        case _ where document.isReadOnly || replay != nil: false
         case .anyInput: true
         case .pencilOnly: false
         default: toolPicker.isVisible && !UIPencilInteraction.prefersPencilOnlyDrawing
@@ -1179,6 +1249,206 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         scrollView.panGestureRecognizer.minimumNumberOfTouches = fingersDraw ? 2 : 1
         let pencil = NSNumber(value: UITouch.TouchType.pencil.rawValue)
         laserGesture.allowedTouchTypes = fingersPoint ? Self.scrollTouchTypes + [pencil] : [pencil]
+    }
+
+    /// This editor's pane was touched while another had the keyboard: key commands and undo come here now.
+    func paneBecameActive() {
+        if textView == nil, !toolPickerSuppressed { anchor.becomeFirstResponder() }
+    }
+
+    // MARK: Selecting ink across pages
+
+    private var stackFrames: [UUID: CGRect] {
+        Dictionary(zip(pages.map(\.id), layout.frames), uniquingKeysWith: { first, _ in first })
+    }
+
+    /// The ink of the pages that have a canvas: the pages a lasso can reach and a drag can land on.
+    private var liveInk: [UUID: PKDrawing] {
+        var result: [UUID: PKDrawing] = [:]
+        for id in canvases.keys { result[id] = document.loadedInk(id) }
+        return result
+    }
+
+    func setSelectingInk(_ selecting: Bool) {
+        guard selecting != (inkLasso != nil), isViewLoaded else { return }
+        if selecting {
+            select(nil)
+            let overlay = InkLassoOverlay(frame: contentView.bounds)
+            overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            overlay.scale = bakedScale
+            // The overlay takes the touches itself: a canvas underneath would hold a drag back for half a second.
+            overlay.addGestureRecognizer(lassoPan)
+            contentView.addSubview(overlay)
+            inkLasso = overlay
+        } else {
+            restoreLiftedInk()
+            inkLasso?.removeFromSuperview()
+            inkLasso = nil
+            setInkSelection([:])
+        }
+        for canvas in canvases.values where canvas.isLoaded { setDrawingEnabled(!document.isReadOnly && !isLocked, canvas) }
+        setToolPickerVisible(session.isToolPickerVisible)
+        updateScrollTouches()
+    }
+
+    private func setInkSelection(_ selection: InkSelection) {
+        inkSelection = selection.filter { !$0.value.isEmpty }
+        inkLasso?.showSelection(InkLasso.bounds(of: inkSelection, drawings: liveInk, frames: stackFrames))
+        let count = inkSelection.values.reduce(0) { $0 + $1.count }
+        if session.inkSelectionCount != count { session.inkSelectionCount = count }
+    }
+
+    private func stackPoint(_ gesture: UIGestureRecognizer) -> CGPoint {
+        let point = gesture.location(in: contentView)
+        return CGPoint(x: point.x / bakedScale, y: point.y / bakedScale)
+    }
+
+    /// A drag that starts on what is selected moves it; one that starts anywhere else draws a new lasso.
+    @objc private func lassoPanned(_ gesture: UIPanGestureRecognizer) {
+        guard let overlay = inkLasso, bakedScale > 0 else { return }
+        let point = stackPoint(gesture)
+        switch gesture.state {
+        case .began:
+            if let bounds = overlay.selectionBounds, bounds.insetBy(dx: -14, dy: -14).contains(point) {
+                lassoMoveOrigin = point
+                liftInk()
+            } else {
+                lassoMoveOrigin = nil
+                setInkSelection([:])
+                overlay.begin(at: point)
+            }
+        case .changed:
+            if let origin = lassoMoveOrigin {
+                overlay.drag(by: CGSize(width: point.x - origin.x, height: point.y - origin.y))
+            } else {
+                overlay.add(point)
+            }
+        case .ended:
+            if let origin = lassoMoveOrigin {
+                lassoMoveOrigin = nil
+                moveInkSelection(by: CGSize(width: point.x - origin.x, height: point.y - origin.y), copying: false)
+            } else {
+                catchInk(inside: InkLasso.outline(from: overlay.end()))
+            }
+        default:
+            lassoMoveOrigin = nil
+            _ = overlay.end()
+            restoreLiftedInk()
+        }
+    }
+
+    private func catchInk(inside outline: [CGPoint]) {
+        guard outline.count >= 3 else { return }
+        var caught: InkSelection = [:]
+        let box = ShapeRecognizer.bounds(of: outline)
+        for (id, frame) in stackFrames where frame.intersects(box) {
+            guard let ink = document.loadedInk(id), !ink.strokes.isEmpty else { continue }
+            let local = outline.map { CGPoint(x: $0.x - frame.minX, y: $0.y - frame.minY) }
+            caught[id] = InkLasso.strokes(in: ink, inside: local)
+        }
+        setInkSelection(caught)
+        let count = session.inkSelectionCount
+        AccessibilityNotification.Announcement(count == 0 ? String(localized: "No ink selected")
+                                               : count == 1 ? String(localized: "1 stroke selected") : String(localized: "\(count) strokes selected")).post()
+    }
+
+    /// While it is dragged the selected ink is drawn by the overlay, and the canvases draw their pages without it.
+    private func liftInk() {
+        guard let overlay = inkLasso else { return }
+        var images: [(image: UIImage, rect: CGRect)] = []
+        let frames = stackFrames, screen = traitCollection.displayScale
+        for (id, indices) in inkSelection {
+            guard let ink = document.loadedInk(id), let frame = frames[id], let page = pages.first(where: { $0.id == id }) else { continue }
+            let chosen = Set(indices)
+            let picked = PKDrawing(strokes: ink.strokes.enumerated().filter { chosen.contains($0.offset) }.map(\.element))
+            let bounds = picked.bounds.insetBy(dx: -2, dy: -2)
+            guard !bounds.isNull, !bounds.isEmpty else { continue }
+            var image: UIImage?
+            UITraitCollection(userInterfaceStyle: page.effectivePaperColor.inkAppearance).performAsCurrent {
+                image = picked.image(from: bounds, scale: min(screen * bakedScale, 6))
+            }
+            if let image { images.append((image, bounds.offsetBy(dx: frame.minX, dy: frame.minY))) }
+            if let canvas = canvases[id] {
+                isApplyingDrawing = true
+                canvas.drawing = InkLasso.removing([id: indices], from: [id: ink])[id] ?? ink
+                isApplyingDrawing = false
+            }
+        }
+        overlay.lift(images)
+    }
+
+    private func restoreLiftedInk() {
+        inkLasso?.drop()
+        for id in inkSelection.keys {
+            if let canvas = canvases[id], let ink = document.loadedInk(id) { show(ink, in: canvas) }
+        }
+    }
+
+    /// Commits a drag, or a copy, as one undo step across every page it touched.
+    private func moveInkSelection(by delta: CGSize, copying: Bool) {
+        guard !inkSelection.isEmpty, copying || abs(delta.width) + abs(delta.height) >= 1 else { return restoreLiftedInk() }
+        let moved = InkLasso.moved(inkSelection, by: delta, copying: copying, drawings: liveInk, frames: stackFrames)
+        isMovingInk = true
+        let done = document.updateInk(moved.drawings, actionName: copying ? String(localized: "Duplicate Ink") : String(localized: "Move Ink"))
+        isMovingInk = false
+        inkLasso?.drop()
+        if done { setInkSelection(moved.selection) } else { restoreLiftedInk() }
+    }
+
+    func duplicateInkSelection() {
+        moveInkSelection(by: CGSize(width: 18, height: 18), copying: true)
+    }
+
+    func deleteInkSelection() {
+        guard !inkSelection.isEmpty else { return }
+        let removed = InkLasso.removing(inkSelection, from: liveInk)
+        isMovingInk = true
+        document.updateInk(removed, actionName: String(localized: "Delete Ink"))
+        isMovingInk = false
+        setInkSelection([:])
+    }
+
+    // MARK: Replaying a recording
+
+    /// Shows the page as it was at `time` into the recording: ink written later is faint. Nil ends the replay.
+    func showReplay(_ timeline: ReplayTimeline?, at time: TimeInterval) {
+        let changed = (replay == nil) != (timeline == nil)
+        replay = timeline.map { ($0, time) }
+        if changed {
+            undoProxy.isSuspended = replay != nil
+            if replay != nil { select(nil) }
+            for canvas in canvases.values where canvas.isLoaded { setDrawingEnabled(!document.isReadOnly && !isLocked, canvas) }
+            setToolPickerVisible(session.isToolPickerVisible)
+            updateScrollTouches()
+        }
+        for (id, canvas) in canvases where canvas.isLoaded {
+            guard let ink = document.loadedInk(id) else { continue }
+            let pending = replay?.timeline.pending(onPage: id, at: time)
+            guard pending != replayPending[id] else { continue }
+            replayPending[id] = pending
+            isApplyingDrawing = true
+            canvas.drawing = ReplayInk.drawing(ink, pending: pending ?? [])
+            isApplyingDrawing = false
+        }
+    }
+
+    private func replayed(_ ink: PKDrawing, on pageID: UUID?) -> PKDrawing {
+        guard let replay, let pageID else { return ink }
+        let pending = replay.timeline.pending(onPage: pageID, at: replay.time)
+        replayPending[pageID] = pending
+        return ReplayInk.drawing(ink, pending: pending)
+    }
+
+    /// A tap on ink written during the recording jumps the sound to when it was written.
+    private func seekReplay(to point: CGPoint) {
+        guard let replay, bakedScale > 0 else { return }
+        let local = contentView.convert(point, from: scrollView)
+        for slot in slots.values where slot.frame.contains(local) {
+            let onPage = CGPoint(x: (local.x - slot.frame.minX) / bakedScale, y: (local.y - slot.frame.minY) / bakedScale)
+            guard let ink = document.loadedInk(slot.page.id), let stroke = ReplayInk.stroke(at: onPage, in: ink),
+                  let time = replay.timeline.time(ofStroke: stroke, onPage: slot.page.id) else { return }
+            session.seekReplay(to: time)
+        }
     }
 
     // MARK: Presenting
@@ -1201,7 +1471,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         mirrored = nil
         if presenting { ExternalDisplay.shared.begin(for: self) } else { ExternalDisplay.shared.end(for: self) }
         if presenting { select(nil) }
-        for canvas in canvases.values where canvas.isLoaded { setDrawingEnabled(!document.isReadOnly && !presenting, canvas) }
+        for canvas in canvases.values where canvas.isLoaded { setDrawingEnabled(!document.isReadOnly && !isLocked, canvas) }
         setToolPickerVisible(session.isToolPickerVisible)
         updateScrollTouches()
         guard isViewLoaded, lastBounds != .zero else { return }
@@ -1295,7 +1565,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     }
 
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
-        [laserGesture, itemTap, itemHold].contains { $0 === gestureRecognizer || $0 === other }
+        [laserGesture, itemTap, itemHold, strokeHold].contains { $0 === gestureRecognizer || $0 === other }
     }
 
     /// Two fingers are scrolling or zooming, not pointing.

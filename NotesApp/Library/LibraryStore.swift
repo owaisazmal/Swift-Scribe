@@ -9,9 +9,9 @@ enum ImportError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .unreadable: "The file couldn't be read."
-        case .locked: "This PDF is password protected. Unlock it in Files or Preview, then import it again."
-        case .empty: "The file doesn't contain any pages."
+        case .unreadable: String(localized: "The file couldn't be read.")
+        case .locked: String(localized: "This PDF is password protected. Unlock it in Files or Preview, then import it again.")
+        case .empty: String(localized: "The file doesn't contain any pages.")
         }
     }
 }
@@ -34,6 +34,8 @@ final class LibraryStore {
     @ObservationIgnored private var folderWrite: Task<Void, Never>?
     /// Called with the notebooks a permanent delete actually removed.
     @ObservationIgnored var onPermanentlyDeleted: (([UUID]) -> Void)?
+    /// Called after every change to the index made on this device, so a sync can follow it.
+    @ObservationIgnored var onIndexSaved: (() -> Void)?
 
     init(root: StorageRoot, context: ModelContext) {
         self.root = root
@@ -47,6 +49,7 @@ final class LibraryStore {
     func saveIndex() {
         do { try context.save() } catch { log.error("index save failed: \(error.localizedDescription)") }
         indexVersion &+= 1
+        onIndexSaved?()
     }
 
     func clearError() { lastError = nil }
@@ -110,7 +113,7 @@ final class LibraryStore {
         do {
             let copy = try await package.updateManifest { manifest in
                 manifest.id = newID
-                manifest.title = "\(manifest.title) Copy"
+                manifest.title = String(localized: "\(manifest.title) Copy")
                 manifest.createdAt = .now
                 manifest.modifiedAt = .now
                 manifest.library.isFavorite = false
@@ -189,7 +192,7 @@ final class LibraryStore {
                 if let row = LibraryIndex.searchRow(for: record.id, in: context) { context.delete(row) }
                 context.delete(record)
             } catch {
-                lastError = "“\(record.title)” couldn't be deleted: \(error.localizedDescription)"
+                lastError = String(localized: "“\(record.title)” couldn't be deleted: \(error.localizedDescription)")
             }
         }
         saveIndex()
@@ -251,17 +254,36 @@ final class LibraryStore {
 
     // MARK: Folders
 
+    private func allFolders() -> [FolderRecord] {
+        (try? context.fetch(FetchDescriptor<FolderRecord>(sortBy: [SortDescriptor(\.sortIndex)]))) ?? []
+    }
+
+    func folderTree() -> FolderTree { FolderTree(folders: allFolders()) }
+
+    /// Numbers every folder in sidebar order, parents before their children, so a plain sort by index gives that order.
+    private func renumberFolders(_ folders: [FolderRecord], tree: FolderTree) {
+        let byID = Dictionary(folders.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        for (index, id) in tree.ordered.enumerated() where byID[id]?.sortIndex != index { byID[id]?.sortIndex = index }
+    }
+
+    private func saveFolders() {
+        let folders = allFolders()
+        renumberFolders(folders, tree: FolderTree(folders: folders))
+        saveIndex()
+        writeFolders()
+    }
+
     @discardableResult
-    func createFolder(name: String, cloth: ClothColor) -> FolderRecord? {
+    func createFolder(name: String, cloth: ClothColor, parent: FolderRecord? = nil) -> FolderRecord? {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }
-        let last = try? context.fetch(FetchDescriptor<FolderRecord>(sortBy: [SortDescriptor(\.sortIndex, order: .reverse)])).first
-        let entry = FolderEntry(id: UUID(), name: trimmed, clothRaw: cloth.rawValue, createdAt: .now, sortIndex: (last?.sortIndex ?? -1) + 1)
+        let folders = allFolders()
+        guard !trimmed.isEmpty, FolderTree(folders: folders).canAddFolder(inside: parent?.id) else { return nil }
+        let entry = FolderEntry(id: UUID(), name: trimmed, clothRaw: cloth.rawValue, createdAt: .now,
+                                sortIndex: (folders.map(\.sortIndex).max() ?? -1) + 1, parentID: parent?.id)
         let record = FolderRecord(id: entry.id)
         record.apply(entry)
         context.insert(record)
-        saveIndex()
-        writeFolders()
+        saveFolders()
         return record
     }
 
@@ -279,35 +301,56 @@ final class LibraryStore {
         writeFolders()
     }
 
-    /// Reorders shelves in the sidebar.
-    func moveFolders(_ folders: [FolderRecord], from source: IndexSet, to destination: Int) {
-        var ordered = folders
+    /// Puts a folder inside another, or back at the top level, after the folders already there.
+    @discardableResult
+    func moveFolder(_ folder: FolderRecord, into parent: FolderRecord?) -> Bool {
+        let folders = allFolders()
+        guard folder.parentID != parent?.id, FolderTree(folders: folders).canMove(folder.id, into: parent?.id) else { return false }
+        folder.parentID = parent?.id
+        folder.sortIndex = (folders.map(\.sortIndex).max() ?? -1) + 1
+        saveFolders()
+        return true
+    }
+
+    /// Reorders the sidebar's rows. A folder keeps its parent: it takes the place among its own siblings that the drop gives it.
+    func moveFolders(_ rows: [FolderRecord], from source: IndexSet, to destination: Int) {
+        var ordered = rows
         ordered.move(fromOffsets: source, toOffset: destination)
-        for (index, folder) in ordered.enumerated() where folder.sortIndex != index { folder.sortIndex = index }
-        saveIndex()
-        writeFolders()
+        let moved = Set(source.map { rows[$0].id })
+        var tree = FolderTree(folders: allFolders())
+        for group in Set(rows.filter { moved.contains($0.id) }.map { tree.parent(of: $0.id) }) {
+            let siblings = ordered.filter { tree.parent(of: $0.id) == group }
+            for (index, sibling) in siblings.enumerated() { sibling.sortIndex = index }
+            tree = FolderTree(folders: allFolders())
+        }
+        saveFolders()
     }
 
+    /// Sorts every level by name.
     func sortFoldersByName(_ folders: [FolderRecord]) {
-        let sorted = folders.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
-        for (index, folder) in sorted.enumerated() where folder.sortIndex != index { folder.sortIndex = index }
-        saveIndex()
-        writeFolders()
+        let tree = FolderTree(folders: folders)
+        for group in Set(folders.map { tree.parent(of: $0.id) }) {
+            let siblings = folders.filter { tree.parent(of: $0.id) == group }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+            for (index, sibling) in siblings.enumerated() { sibling.sortIndex = index }
+        }
+        saveFolders()
     }
 
-    /// Deleting a folder keeps its notebooks; they move back to the whole library.
+    /// Deleting a folder keeps what was in it: its notebooks and its folders move up to the folder it sat in.
     func deleteFolder(_ folder: FolderRecord) {
-        move(folder.notebooks ?? [], to: nil)
+        let folders = allFolders()
+        let parent = folders.first { $0.id == folder.parentID }
+        move(folder.notebooks ?? [], to: parent)
+        for child in folders where child.parentID == folder.id { child.parentID = parent?.id }
         context.delete(folder)
-        saveIndex()
-        writeFolders()
+        saveFolders()
     }
 
     /// Writes are chained so they land in order, and each merges into the file so keys this version
     /// doesn't know about survive.
     private func writeFolders() {
         let folders = ((try? context.fetch(FetchDescriptor<FolderRecord>(sortBy: [SortDescriptor(\.sortIndex)]))) ?? []).map {
-            FolderEntry(id: $0.id, name: $0.name, clothRaw: $0.clothRaw, createdAt: $0.createdAt, sortIndex: $0.sortIndex)
+            FolderEntry(id: $0.id, name: $0.name, clothRaw: $0.clothRaw, createdAt: $0.createdAt, sortIndex: $0.sortIndex, parentID: $0.parentID)
         }
         let root = root, previous = folderWrite
         folderWrite = Task { [weak self] in
@@ -412,6 +455,40 @@ final class LibraryStore {
             log.error("today's page failed for \(id): \(error.localizedDescription)")
             return nil
         }
+    }
+}
+
+extension LibraryStore {
+    /// Saves what is open, then writes the whole library into one file.
+    func makeBackup() async throws -> URL {
+        for document in DocumentRegistry.shared.openDocuments { await document.flush() }
+        await folderWrite?.value
+        let root = root, journal = dailyJournal?.id
+        return try await Task.detached(priority: .userInitiated) { try LibraryBackup.create(root: root, journal: journal) }.value
+    }
+
+    /// Notebooks, folders or stickers were changed on disk by something other than this store (a sync): read them again.
+    func reloadFromDisk() async {
+        await folderWrite?.value
+        await LibraryIndex.refresh(root: root, context: context, full: true)
+        searchVersion &+= 1
+        indexVersion &+= 1
+    }
+
+    /// Adds a backup's notebooks, folders and stickers to the library, then brings the index up to date.
+    func restoreBackup(from url: URL) async throws -> LibraryBackup.Summary {
+        await folderWrite?.value
+        let root = root, keepsHistory = UserDefaults.standard.object(forKey: SettingsKey.keepsWritingHistory) as? Bool ?? true
+        let summary = try await Task.detached(priority: .userInitiated) {
+            try await LibraryBackup.restore(from: url, into: root, keepsHistory: keepsHistory)
+        }.value
+        await LibraryIndex.refresh(root: root, context: context)
+        searchVersion &+= 1
+        indexVersion &+= 1
+        if dailyJournal == nil, let journal = summary.journal, record(journal) != nil {
+            UserDefaults.standard.set(journal.uuidString, forKey: SettingsKey.dailyJournalID)
+        }
+        return summary
     }
 }
 
