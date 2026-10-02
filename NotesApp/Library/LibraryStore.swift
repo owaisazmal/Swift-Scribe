@@ -161,6 +161,11 @@ final class LibraryStore {
         changeLibraryState(records, index: { $0.isFavorite = favorite }) { $0.isFavorite = favorite }
     }
 
+    func setLocked(_ locked: Bool, for records: [NotebookRecord]) {
+        changeLibraryState(records, index: { $0.isLocked = locked }) { $0.isLocked = locked }
+        searchVersion &+= 1
+    }
+
     func moveToTrash(_ records: [NotebookRecord]) {
         let now = Date.now
         changeLibraryState(records, index: { $0.deletedAt = now }) { $0.deletedAt = now }

@@ -132,8 +132,9 @@ final class PageSlotView: UIView {
     weak var canvas: PageCanvasView?
     private(set) var itemViews: [UUID: PageItemView] = [:]
 
-    /// Pictures, stickers, text and links sit above the paper and below the canvas, back to front.
-    func syncItems(assets: URL, scale: CGFloat, links: LinkTitles, onActivate: @escaping (UUID) -> Void) {
+    /// Pictures, stickers, text and links sit above the paper and below the canvas, back to front. Study tape sits
+    /// above the canvas, so it covers the ink.
+    func syncItems(assets: URL, scale: CGFloat, links: LinkTitles, lifted: Set<UUID>, onActivate: @escaping (UUID) -> Void) {
         let items = page.items.filter { $0.content != .unknown }
         let keep = Set(items.map(\.id))
         for (id, view) in itemViews where !keep.contains(id) {
@@ -142,11 +143,33 @@ final class PageSlotView: UIView {
         }
         for item in items {
             let view = itemViews[item.id] ?? PageItemView(item: item, assets: assets)
-            view.update(item, onDark: page.effectivePaperColor.isDark, links: links)
+            view.update(item, onDark: page.effectivePaperColor.isDark, links: links, lifted: lifted.contains(item.id))
             view.onActivate = onActivate
             view.layout(scale: scale)
             itemViews[item.id] = view
-            if let canvas, canvas.superview === self { insertSubview(view, belowSubview: canvas) } else { addSubview(view) }
+            if item.isOverInk {
+                continue
+            } else if let canvas, canvas.superview === self {
+                insertSubview(view, belowSubview: canvas)
+            } else {
+                addSubview(view)
+            }
+        }
+        raiseTape()
+    }
+
+    /// Puts the tape back over the canvas, after either was added. Each goes in just above the canvas, so the last
+    /// strip in the page's list ends on top and whatever is selected stays above them all.
+    func raiseTape() {
+        for item in page.items.reversed() where item.isOverInk {
+            guard let view = itemViews[item.id] else { continue }
+            if let canvas, canvas.superview === self { insertSubview(view, aboveSubview: canvas) } else { addSubview(view) }
+        }
+    }
+
+    func showLifted(_ lifted: Set<UUID>, links: LinkTitles) {
+        for item in page.items where item.isOverInk {
+            itemViews[item.id]?.update(item, onDark: page.effectivePaperColor.isDark, links: links, lifted: lifted.contains(item.id))
         }
     }
 
@@ -218,6 +241,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     private let strokeHold = StrokeHoldRecognizer()
     private lazy var itemTap = UITapGestureRecognizer(target: self, action: #selector(tappedPage))
     private lazy var itemHold = UILongPressGestureRecognizer(target: self, action: #selector(heldPage))
+    private lazy var tapeTap = UITapGestureRecognizer(target: self, action: #selector(tappedTape))
     private var zoomBeforePresenting: CGFloat?
     private var lastSafeTop: CGFloat = 0
     private var firstInkPage: UUID?
@@ -279,7 +303,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         view.addInteraction(UIDropInteraction(delegate: self))
         itemTap.allowedTouchTypes = [NSNumber(value: UITouch.TouchType.direct.rawValue)]
         itemHold.minimumPressDuration = 0.45
-        for recognizer in [itemTap, itemHold, strokeHold] {
+        for recognizer in [itemTap, itemHold, strokeHold, tapeTap] {
             recognizer.cancelsTouchesInView = false
             recognizer.delaysTouchesEnded = false
             recognizer.delegate = self
@@ -343,8 +367,9 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         let bounds = view.bounds
         guard bounds.width > 0, bounds.height > 0, bounds.size != lastBounds.size else { return }
         let isFirst = lastBounds == .zero
-        // While presenting, the page being shown is the session's: the scroll position is mid-change when the view resizes.
-        let page = isFirst ? session.currentPage : isPresenting ? pendingPage ?? session.currentPage : currentPage
+        // While presenting or replaying, the page being shown is the session's: a panel comes in beside the pages,
+        // and the scroll position is mid-change when the view resizes.
+        let page = isFirst ? session.currentPage : isPresenting || replay != nil ? pendingPage ?? session.currentPage : currentPage
         lastBounds = bounds
         fitScale = bounds.width / layout.size.width
         let tallest = layout.frames.map(\.height).max() ?? 1
@@ -719,6 +744,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         slot.addSubview(canvas)
         slot.canvas = canvas
         canvases[page.id] = canvas
+        slot.raiseTape()
         if let selectionView, selectionView.superview === slot { slot.bringSubviewToFront(selectionView) }
         if let textView, textView.superview === slot { slot.bringSubviewToFront(textView) }
         if toolPicker.isVisible { toolPicker.setVisible(true, forFirstResponder: canvas) }
@@ -887,7 +913,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     }
 
     private func syncItems(in slot: PageSlotView) {
-        slot.syncItems(assets: document.package.assetsDirectory, scale: bakedScale, links: linkTitles) { [weak self, weak slot] itemID in
+        slot.syncItems(assets: document.package.assetsDirectory, scale: bakedScale, links: linkTitles, lifted: session.liftedTapes) { [weak self, weak slot] itemID in
             guard let self, let slot else { return }
             self.activate(ItemSelection(pageID: slot.page.id, itemID: itemID))
         }
@@ -911,10 +937,12 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         slots[selection.pageID]?.page.items.first { $0.id == selection.itemID }
     }
 
-    /// What VoiceOver's double tap does: a link opens its page, anything else is picked up.
+    /// What VoiceOver's double tap does: a link opens its page, tape lifts, anything else is picked up.
     private func activate(_ selection: ItemSelection) {
         if let link = item(selection)?.link {
             session.follow(link, from: selection.pageID)
+        } else if item(selection)?.tape != nil {
+            if replay == nil, inkLasso == nil { session.toggleTape(selection.itemID) }
         } else if !isLocked, !document.isReadOnly {
             select(selection)
         }
@@ -958,7 +986,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
 
     private func selectedItemChanged(_ item: PageItem, final: Bool) {
         guard let selection = session.selection, let slot = slots[selection.pageID] else { return }
-        slot.itemViews[item.id]?.update(item, onDark: slot.page.effectivePaperColor.isDark, links: linkTitles)
+        slot.itemViews[item.id]?.update(item, onDark: slot.page.effectivePaperColor.isDark, links: linkTitles, lifted: session.liftedTapes.contains(item.id))
         slot.itemViews[item.id]?.layout(scale: bakedScale)
         selectionView?.show(item)
         guard final else { return }
@@ -967,18 +995,40 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         }
     }
 
-    /// The topmost picture or sticker under a point in the scroll view.
-    private func item(at point: CGPoint) -> ItemSelection? {
+    /// The topmost thing under a point in the scroll view: tape first, since it lies over the rest.
+    private func item(at point: CGPoint, tapeOnly: Bool = false) -> ItemSelection? {
         guard bakedScale > 0 else { return nil }
         for slot in slots.values where slot.page.hasItems {
             let local = contentView.convert(point, from: scrollView)
             guard slot.frame.contains(local) else { continue }
             let onPage = CGPoint(x: (local.x - slot.frame.minX) / bakedScale, y: (local.y - slot.frame.minY) / bakedScale)
-            if let hit = slot.page.items.last(where: { $0.content != .unknown && $0.contains(onPage, slop: 6) }) {
-                return ItemSelection(pageID: slot.page.id, itemID: hit.id)
-            }
+            let items = slot.page.items
+            let hit = items.last { $0.isOverInk && $0.contains(onPage, slop: tapeOnly ? 0 : 6) }
+                ?? (tapeOnly ? nil : items.last { $0.content != .unknown && $0.contains(onPage, slop: 6) })
+            if let hit { return ItemSelection(pageID: slot.page.id, itemID: hit.id) }
         }
         return nil
+    }
+
+    // MARK: Study tape
+
+    /// A tap on tape, with a finger or the Pencil, lifts it or puts it back. Nothing is saved: lifting is for looking.
+    @objc private func tappedTape(_ gesture: UITapGestureRecognizer) {
+        guard let hit = item(at: gesture.location(in: scrollView), tapeOnly: true) else { return }
+        session.toggleTape(hit.itemID)
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
+
+    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        guard gestureRecognizer === tapeTap else { return true }
+        return replay == nil && inkLasso == nil && !isOnSelection(gestureRecognizer)
+            && item(at: gestureRecognizer.location(in: scrollView), tapeOnly: true) != nil
+    }
+
+    func tapesDidChange() {
+        for slot in slots.values where slot.page.hasItems { slot.showLifted(session.liftedTapes, links: linkTitles) }
+        mirrored = nil
+        mirrorPresentation()
     }
 
     private func isOnSelection(_ gesture: UIGestureRecognizer) -> Bool {
@@ -993,6 +1043,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         if replay != nil { return seekReplay(to: gesture.location(in: scrollView)) }
         if inkLasso != nil { return setInkSelection([:]) }
         let hit = isPresenting || !fingersDraw ? item(at: gesture.location(in: scrollView)) : nil
+        if let hit, item(hit)?.tape != nil { return }
         if let hit, let link = item(hit)?.link { return session.follow(link, from: hit.pageID) }
         guard !isPresenting, !document.isReadOnly else { return }
         if hit != nil || session.selection != nil { select(hit) }
@@ -1408,6 +1459,32 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         setInkSelection([:])
     }
 
+    /// The ink that is selected, page by page from the top, for reading as text.
+    func selectedInk() -> [PKDrawing] {
+        pages.compactMap { page in
+            guard let indices = inkSelection[page.id], let ink = document.loadedInk(page.id) else { return nil }
+            let chosen = Set(indices)
+            let strokes = ink.strokes.enumerated().filter { chosen.contains($0.offset) }.map(\.element)
+            return strokes.isEmpty ? nil : PKDrawing(strokes: strokes)
+        }
+    }
+
+    /// Takes the selected ink off its pages and types `text` where the first of it was, as one undo step.
+    func replaceInkSelection(with text: String) -> ItemSelection? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let page = pages.first(where: { inkSelection[$0.id]?.isEmpty == false }),
+              let bounds = selectedInk().first?.bounds, !bounds.isNull else { return nil }
+        let item = InkText.box(for: trimmed, replacing: bounds, pageSize: page.size)
+        let action = String(localized: "Turn Ink into Text")
+        isMovingInk = true
+        let done = document.updateInk(InkLasso.removing(inkSelection, from: liveInk), actionName: action)
+        isMovingInk = false
+        guard done else { return nil }
+        document.updateItems(onPage: page.id, actionName: action) { $0.append(item) }
+        setInkSelection([:])
+        return ItemSelection(pageID: page.id, itemID: item.id)
+    }
+
     // MARK: Replaying a recording
 
     /// Shows the page as it was at `time` into the recording: ink written later is faint. Nil ends the replay.
@@ -1548,7 +1625,9 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         ExternalDisplay.shared.setViewport(visible.isNull || visible.isEmpty ? whole : CGRect(
             x: (visible.minX - frame.minX) / frame.width, y: (visible.minY - frame.minY) / frame.height,
             width: visible.width / frame.width, height: visible.height / frame.height), by: self)
-        let key = "\(page.id)-\(page.thumbnailKey)-\(Int(pixels.width))x\(Int(pixels.height))"
+        let lifted = session.liftedTapes
+        let liftedKey = page.hasItems ? page.items.filter { lifted.contains($0.id) }.map(\.id.uuidString).joined() : ""
+        let key = "\(page.id)-\(page.thumbnailKey)-\(Int(pixels.width))x\(Int(pixels.height))-\(liftedKey)"
         guard key != mirrored else { return }
         mirrored = key
         let assets = document.package.assetsDirectory, titles = linkTitles
@@ -1557,7 +1636,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
             guard let self else { return }
             let ink = await self.document.ink(page.id)
             let image = await Task.detached(priority: .userInitiated) {
-                SharedSlide(image: PageRenderer.image(of: page, ink: ink, assets: assets, width: width, links: titles))
+                SharedSlide(image: PageRenderer.image(of: page, ink: ink, assets: assets, width: width, links: titles, lifted: lifted))
             }.value.image
             guard self.mirrored == key else { return }
             ExternalDisplay.shared.show(image, pageSize: page.size, by: self)
@@ -1565,7 +1644,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     }
 
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
-        [laserGesture, itemTap, itemHold, strokeHold].contains { $0 === gestureRecognizer || $0 === other }
+        [laserGesture, itemTap, itemHold, strokeHold, tapeTap].contains { $0 === gestureRecognizer || $0 === other }
     }
 
     /// Two fingers are scrolling or zooming, not pointing.

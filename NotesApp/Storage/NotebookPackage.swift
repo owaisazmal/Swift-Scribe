@@ -283,6 +283,27 @@ actor NotebookPackage {
         return name
     }
 
+    // MARK: Transcripts
+
+    nonisolated func transcriptTextURL(_ recordingID: UUID) -> URL { textDirectory.appending(path: "\(recordingID.uuidString).txt") }
+
+    /// A transcript is kept with the assets under a name the recording's entry holds; its words are also kept as
+    /// plain text beside the pages' recognised text, so search finds them.
+    func writeTranscript(_ transcript: Transcript, recordingID: UUID) throws -> String {
+        let file = try writeAsset(JSONEncoder().encode(transcript), ext: "json")
+        try makeDirectoryInExistingPackage(textDirectory)
+        try Data(transcript.text.utf8).write(to: transcriptTextURL(recordingID), options: .atomic)
+        return file
+    }
+
+    nonisolated func readTranscript(_ file: String) -> Transcript? {
+        (try? Data(contentsOf: assetURL(file))).flatMap { try? JSONDecoder().decode(Transcript.self, from: $0) }
+    }
+
+    func removeTranscriptText(_ recordingID: UUID) {
+        try? FileManager.default.removeItem(at: transcriptTextURL(recordingID))
+    }
+
     func removeAsset(_ file: String) {
         try? FileManager.default.removeItem(at: assetURL(file))
     }
@@ -305,6 +326,7 @@ actor NotebookPackage {
         let manifestDate = modificationDate(of: manifestURL) ?? .distantPast
         var keep = Set(manifest.pages.map(\.id.uuidString))
         for opaque in manifest.opaquePages { if let id = opaque.raw["id"]?.stringValue { keep.insert(id.uppercased()) } }
+        for recording in manifest.recordings where recording.transcriptFile != nil { keep.insert(recording.id.uuidString) }
         for directory in [inkDirectory, textDirectory] {
             for file in (try? fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? [] {
                 guard !file.lastPathComponent.contains(".corrupt") else { continue }

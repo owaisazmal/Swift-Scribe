@@ -515,6 +515,12 @@ final class NotebookDocument {
         structureChanged()
     }
 
+    func setTranscript(_ file: String?, forRecording id: UUID) {
+        guard !isReadOnly, let index = manifest.recordings.firstIndex(where: { $0.id == id }) else { return }
+        manifest.recordings[index].transcriptFile = file
+        structureChanged()
+    }
+
     /// Favourite, trash and folder changes made from the library while this notebook is open.
     func updateLibraryState(_ change: (inout LibraryState) -> Void) {
         guard !isReadOnly else { return }

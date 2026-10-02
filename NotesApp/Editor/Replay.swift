@@ -13,6 +13,12 @@ extension RecordingEntry {
         get { extra["pages"]?.arrayValue?.compactMap { $0.stringValue.flatMap(UUID.init(uuidString:)) } }
         set { extra["pages"] = newValue.map { .array($0.map { .string($0.uuidString) }) } }
     }
+
+    /// The file among the assets that holds what was said, once the recording has been transcribed.
+    var transcriptFile: String? {
+        get { extra["transcript"]?.stringValue }
+        set { extra["transcript"] = newValue.map(JSONValue.string) }
+    }
 }
 
 /// When each stroke written during a recording was begun, measured from the start of the recording.
@@ -110,6 +116,9 @@ enum ReplayInk {
 /// The transport along the bottom while a recording is replayed with its ink.
 struct ReplayBar: View {
     let session: EditorSession
+    /// Whether the transcript is showing beside the page; nil when there is none to show.
+    var transcript: Bool?
+    var toggleTranscript: () -> Void = {}
     let done: () -> Void
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var scrubbing: Double?
@@ -144,6 +153,14 @@ struct ReplayBar: View {
             .accessibilityIdentifier("editor.replay.position")
             if !dynamicTypeSize.isAccessibilitySize {
                 Text(clock(duration)).font(.subheadline.monospacedDigit()).foregroundStyle(Color.textSecondary)
+            }
+            if let transcript {
+                Button(action: toggleTranscript) {
+                    Image(systemName: "quote.bubble").symbolVariant(transcript ? .fill : .none).frame(width: 44, height: 44)
+                }
+                .accessibilityLabel(Text("Transcript"))
+                .accessibilityValue(Text(transcript ? "Showing" : "Hidden"))
+                .accessibilityIdentifier("editor.replay.transcript")
             }
             Divider().frame(height: 24)
             Button("Done", action: done)

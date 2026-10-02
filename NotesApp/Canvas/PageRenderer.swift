@@ -68,6 +68,12 @@ enum PageRenderer {
         }
     }
 
+    /// The study tape on a page, which goes on after the ink. Tape that is lifted isn't drawn.
+    static func drawOverInk(_ page: NotebookPage, assets: URL, in ctx: CGContext, size: CGSize, lifted: Set<UUID> = []) {
+        guard page.hasItems else { return }
+        PageItemRenderer.draw(page.items, pageSize: page.size, assets: assets, in: ctx, size: size, overInk: true, lifted: lifted)
+    }
+
     private static func drawPaper(_ page: NotebookPage, assets: URL, in ctx: CGContext, size: CGSize) {
         switch page.background {
         case .template:
@@ -130,7 +136,7 @@ enum PageRenderer {
 
     /// Renders a page (background plus ink clipped to the page) to an image `width` points wide. Thread-safe.
     static func image(of page: NotebookPage, ink: PKDrawing, assets: URL, width: CGFloat, scale: CGFloat = 1,
-                      includeBackground: Bool = true, links: LinkTitles? = nil) -> UIImage {
+                      includeBackground: Bool = true, links: LinkTitles? = nil, lifted: Set<UUID> = []) -> UIImage {
         let factor = width / max(page.size.width, 1)
         let size = CGSize(width: width, height: (page.size.height * factor).rounded())
         let format = UIGraphicsImageRendererFormat()
@@ -150,6 +156,7 @@ enum PageRenderer {
                 context.fill(CGRect(origin: .zero, size: size))
             }
             inkImage?.draw(in: CGRect(origin: .zero, size: size))
+            if includeBackground { drawOverInk(page, assets: assets, in: context.cgContext, size: size, lifted: lifted) }
         }
     }
 }

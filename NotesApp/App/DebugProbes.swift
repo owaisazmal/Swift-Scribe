@@ -207,6 +207,66 @@ enum ReplaySeed {
     }
 }
 
+/// Capital letters made of straight strokes, so tests have handwriting the recogniser can read.
+enum BlockLetters {
+    private static let shapes: [Character: [[(CGFloat, CGFloat)]]] = [
+        "A": [[(0, 6), (2, 0), (4, 6)], [(1, 3.6), (3, 3.6)]],
+        "E": [[(4, 0), (0, 0), (0, 6), (4, 6)], [(0, 3), (3, 3)]],
+        "F": [[(4, 0), (0, 0), (0, 6)], [(0, 3), (3, 3)]],
+        "H": [[(0, 0), (0, 6)], [(4, 0), (4, 6)], [(0, 3), (4, 3)]],
+        "I": [[(2, 0), (2, 6)]],
+        "K": [[(0, 0), (0, 6)], [(4, 0), (0, 3.4), (4, 6)]],
+        "L": [[(0, 0), (0, 6), (4, 6)]],
+        "M": [[(0, 6), (0, 0), (2, 3.5), (4, 0), (4, 6)]],
+        "N": [[(0, 6), (0, 0), (4, 6), (4, 0)]],
+        "O": [[(1, 0), (3, 0), (4, 1.5), (4, 4.5), (3, 6), (1, 6), (0, 4.5), (0, 1.5), (1, 0)]],
+        "T": [[(0, 0), (4, 0)], [(2, 0), (2, 6)]],
+        "V": [[(0, 0), (2, 6), (4, 0)]],
+        "W": [[(0, 0), (1, 6), (2, 2.5), (3, 6), (4, 0)]],
+        "X": [[(0, 0), (4, 6)], [(4, 0), (0, 6)]],
+        "Y": [[(0, 0), (2, 3)], [(4, 0), (2, 3)], [(2, 3), (2, 6)]],
+        "Z": [[(0, 0), (4, 0), (0, 6), (4, 6)]],
+    ]
+
+    /// `text` written from `origin`, each letter `height` tall, one stroke after another from `date`.
+    static func strokes(_ text: String, origin: CGPoint, height: CGFloat = 48, from date: Date = .now) -> [PKStroke] {
+        let unit = height / 6
+        var x = origin.x, strokes: [PKStroke] = []
+        for letter in text.uppercased() {
+            for line in shapes[letter] ?? [] {
+                let corners = line.map { CGPoint(x: x + $0.0 * unit, y: origin.y + $0.1 * unit) }
+                var points: [PKStrokePoint] = []
+                for (a, b) in zip(corners, corners.dropFirst()) {
+                    let steps = max(Int(hypot(b.x - a.x, b.y - a.y) / 4), 1)
+                    for step in (points.isEmpty ? 0 : 1)...steps {
+                        let t = CGFloat(step) / CGFloat(steps)
+                        points.append(PKStrokePoint(location: CGPoint(x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t), timeOffset: Double(points.count) * 0.01,
+                                                    size: CGSize(width: 3.5, height: 3.5), opacity: 1, force: 1, azimuth: 0, altitude: .pi / 2))
+                    }
+                }
+                strokes.append(PKStroke(ink: PKInk(.pen, color: .black),
+                                        path: PKStrokePath(controlPoints: points, creationDate: date.addingTimeInterval(Double(strokes.count) * 0.6))))
+            }
+            x += unit * (letter == " " ? 4 : 6)
+        }
+        return strokes
+    }
+}
+
+/// A notebook with a line of handwriting, for trying handwriting to text, study tape and the time-lapse.
+enum HandwritingSeed {
+    static func write(root: StorageRoot) async {
+        let paper = PageDefaults(template: .blank, paperColor: .white, pageSize: .letter)
+        let manifest = NotebookManifest(title: "Study Notes", defaults: paper, pages: [paper.newPage(), paper.newPage()])
+        let package = NotebookPackage(root: root, id: manifest.id)
+        try? await package.create(manifest)
+        let ink = PKDrawing(strokes: BlockLetters.strokes("HELLO", origin: CGPoint(x: 150, y: 160), from: Date.now.addingTimeInterval(-600)))
+        guard let saved = try? await package.write(SaveSnapshot(manifest: manifest, ink: [manifest.pages[0].id: ink])),
+              LaunchOptions.arguments.contains("-indexSeed") else { return }
+        _ = await HandwritingIndexer.shared.index(HandwritingIndexer.Job(package: package, pages: saved.manifest.pages))
+    }
+}
+
 enum LibrarySeed {
     /// Writes `count` notebooks with a mix of cover styles and a few folders, for scrolling tests.
     static func write(count: Int, root: StorageRoot) async {

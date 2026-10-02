@@ -100,9 +100,13 @@ struct ShelfView: View {
             LibraryIndex.notebookIDs(matching: query, in: ModelContext(container))
         }.value
         guard !Task.isCancelled else { return }
-        matches = found
+        // What is written in a locked notebook isn't searched: only its title can match.
+        let locked = records.filter(\.isLocked)
+        let hidden = Set(locked.filter { !$0.title.localizedStandardContains(query) }.map(\.id))
+        matches = found.subtracting(hidden)
         guard scope != .trash else { pageHits = [:]; return }
-        let ordered = visible.map(\.id).filter(found.contains)
+        let closed = Set(locked.map(\.id))
+        let ordered = visible.map(\.id).filter { found.contains($0) && !closed.contains($0) }
         let hits = await PageSearch.hits(for: query, in: ordered, root: store.root)
         guard !Task.isCancelled else { return }
         withAnimation(Motion.adaptive(Motion.standard, reduceMotion: reduceMotion)) { pageHits = hits }
@@ -210,7 +214,7 @@ struct ShelfView: View {
     /// The notebook to reopen at the top of All notebooks: the last one opened.
     private var continueCandidate: NotebookRecord? {
         guard scope == .all, searchText.isEmpty, !isSelecting else { return nil }
-        return records.filter { !$0.isTrashed && $0.lastOpenedAt != nil && $0.id.uuidString != journalID }
+        return records.filter { !$0.isTrashed && !$0.isLocked && $0.lastOpenedAt != nil && $0.id.uuidString != journalID }
             .max { ($0.lastOpenedAt ?? .distantPast) < ($1.lastOpenedAt ?? .distantPast) }
     }
 
@@ -275,11 +279,11 @@ struct ShelfView: View {
                     ForEach(visible.flatMap { record in (pageHits[record.id] ?? []).map { (record, $0) } }, id: \.1.id) { record, hit in
                         Button { onOpenPage(record, hit.page.id) } label: {
                             VStack(alignment: .leading, spacing: Space.x1) {
-                                Text("\(record.title), page \(hit.index + 1)").font(.headline).foregroundStyle(Color.ink)
+                                Text(hit.title(in: record.title)).font(.headline).foregroundStyle(Color.ink)
                                 Text(PageSearch.highlighted(hit.snippet, query: hitsQuery)).font(.subheadline).foregroundStyle(Color.textSecondary)
                             }
                         }
-                        .accessibilityLabel(Text("\(record.title), page \(hit.index + 1): \(hit.snippet)"))
+                        .accessibilityLabel(Text(hit.label(in: record.title)))
                         .accessibilityHint(Text("Opens the notebook at this page"))
                         .listRowBackground(Color.surface)
                     }
@@ -479,14 +483,24 @@ struct ShelfView: View {
             Toggle(isOn: Binding(get: { journalID == record.id.uuidString }, set: { journalID = $0 ? record.id.uuidString : "" })) {
                 Label("Use as Daily Journal", systemImage: "calendar")
             }
+            Button { toggleLock(record) } label: {
+                Label(record.isLocked ? "Remove Lock…" : "Lock…", systemImage: record.isLocked ? "lock.open" : "lock")
+            }
             Divider()
             Button(role: .destructive) { changes.moveToTrash([record], in: store, undoManager: undoManager) } label: { Label("Delete", systemImage: "trash") }
         }
     }
 
     private func startExport(_ record: NotebookRecord, as format: ExportJob.Format) {
-        let id = record.id
-        Task { do { export = try await ExportJob.forNotebook(id, root: store.root, format: format) } catch { errorMessage = error.localizedDescription } }
+        let id = record.id, title = record.title, locked = record.isLocked
+        Task {
+            if locked, !(await NotebookLock.shared.confirm(String(localized: "Export “\(title)”"))) { return }
+            do { export = try await ExportJob.forNotebook(id, root: store.root, format: format) } catch { errorMessage = error.localizedDescription }
+        }
+    }
+
+    private func toggleLock(_ record: NotebookRecord) {
+        Task { if let failure = await store.toggleLock(record) { errorMessage = failure } }
     }
 
     // MARK: Safety net

@@ -14,7 +14,7 @@ struct RecordCover: View {
         let root = store.root
         let id = record.id
         CoverView(request: record.coverRequest(width: width, scale: displayScale, colorScheme: colorScheme, contrast: contrast, root: root),
-                  showsShadow: showsShadow) {
+                  showsShadow: showsShadow, isObscured: record.isLocked) {
             _ = await PageThumbnailer.ensureFirstPage(root: root, notebookID: id)
         }
     }
@@ -81,7 +81,7 @@ struct NotebookCoverItem: View {
         var parts = [record.metaLine]
         if showsFolder, record.coverStyle != .cloth, let folder = record.folder { parts.append(folder.name) }
         return VStack(alignment: .leading, spacing: 2) {
-            if record.coverStyle == .firstPage {
+            if record.coverStyle == .firstPage || record.isLocked {
                 Text(record.title).font(.footnote.weight(.semibold)).foregroundStyle(Color.ink)
             }
             Text(parts.joined(separator: " · "))

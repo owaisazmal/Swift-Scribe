@@ -1,6 +1,7 @@
 import UIKit
 
-/// One picture, sticker, text box or link in the editor, under the canvas. Its frame follows the page's baked scale.
+/// One picture, sticker, text box or link in the editor, under the canvas, or a strip of study tape over it.
+/// Its frame follows the page's baked scale.
 final class PageItemView: UIView {
     private(set) var item: PageItem
     private let assets: URL
@@ -10,6 +11,7 @@ final class PageItemView: UIView {
     private var onDark = false
     private var linkTitle = ""
     private var linkResolved = true
+    private var isLifted = false
     var onActivate: ((UUID) -> Void)?
 
     init(item: PageItem, assets: URL) {
@@ -28,13 +30,16 @@ final class PageItemView: UIView {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    func update(_ newItem: PageItem, onDark: Bool = false, links: LinkTitles = LinkTitles()) {
+    func update(_ newItem: PageItem, onDark: Bool = false, links: LinkTitles = LinkTitles(), lifted: Bool = false) {
         let title = newItem.link.map(links.title(for:)) ?? "", resolved = newItem.link.map(links.resolves) ?? true
-        let changed = newItem.content != item.content || onDark != self.onDark || title != linkTitle || resolved != linkResolved
+        let changed = newItem.content != item.content || onDark != self.onDark || title != linkTitle || resolved != linkResolved || lifted != isLifted
         item = newItem
         self.onDark = onDark
         linkTitle = title
         linkResolved = resolved
+        isLifted = lifted
+        // Tape takes the touches that land on it, so a tap lifts it and nothing is written on it.
+        isUserInteractionEnabled = newItem.isOverInk
         if changed { reload() }
     }
 
@@ -57,6 +62,7 @@ final class PageItemView: UIView {
     private func reload() {
         accessibilityHint = String(localized: "Touch and hold to move or resize")
         accessibilityTraits = .image
+        accessibilityValue = nil
         isAccessibilityElement = true
         if item.assetFile == nil {
             picture.contents = nil
@@ -92,6 +98,11 @@ final class PageItemView: UIView {
                 accessibilityLabel = String(localized: "Web link, \(linkTitle)")
                 accessibilityHint = String(localized: "Opens the address in your browser. Touch and hold to move or resize.")
             }
+        case .tape:
+            accessibilityLabel = String(localized: "Study tape")
+            accessibilityValue = isLifted ? String(localized: "Lifted") : String(localized: "Covering")
+            accessibilityTraits = .button
+            accessibilityHint = String(localized: "Lifts the tape or puts it back. Touch and hold to move or resize.")
         case .unknown:
             isAccessibilityElement = false
         }
@@ -108,6 +119,8 @@ final class PageItemView: UIView {
             box.draw(in: ctx, rect: CGRect(origin: .zero, size: item.size), onDark: onDark)
         case .link(let link):
             PageLinkArt.draw(title: linkTitle, kind: link.kind, resolved: linkResolved, in: ctx, rect: bounds)
+        case .tape(let color):
+            TapeArt.draw(color, lifted: isLifted, in: ctx, rect: bounds)
         case .image, .unknown:
             break
         }
@@ -228,11 +241,12 @@ final class ItemSelectionView: UIView, UIGestureRecognizerDelegate {
         outline.strokeColor = UIColor.mustard.resolvedColor(with: traitCollection).cgColor
         underline.strokeColor = UIColor.ink.resolvedColor(with: traitCollection).withAlphaComponent(0.55).cgColor
         CATransaction.commit()
-        // A text box keeps its right edge for the width grip, so its corner handle moves to the left.
-        handle.center = CGPoint(x: item.text == nil ? bounds.maxX - outset / 2 : bounds.minX + outset / 2, y: bounds.maxY - outset / 2)
+        // A text box or a strip of tape keeps its right edge for the width grip, so its corner handle moves to the left.
+        let hasGrip = item.text != nil || item.tape != nil
+        handle.center = CGPoint(x: hasGrip ? bounds.minX + outset / 2 : bounds.maxX - outset / 2, y: bounds.maxY - outset / 2)
         handle.isHidden = isEditing
         side.center = CGPoint(x: bounds.maxX - outset / 2, y: bounds.midY)
-        side.isHidden = isEditing || item.text == nil
+        side.isHidden = isEditing || !hasGrip
     }
 
     override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
@@ -330,14 +344,14 @@ final class ItemSelectionView: UIView, UIGestureRecognizerDelegate {
         report(composed(from: base), state: gesture.state)
     }
 
-    /// A text box's side grip changes its width; the text wraps again and the box grows downwards.
+    /// The side grip changes the width: a text box wraps again and grows downwards, tape gets longer.
     @objc private func dragSide(_ gesture: UIPanGestureRecognizer) {
         guard let superview else { return }
         if gesture.state == .began { begin() }
-        guard let base, let box = base.text else { return }
+        guard let base else { return }
         let moved = gesture.translation(in: superview)
         let along = (moved.x * cos(base.rotation) + moved.y * sin(base.rotation)) / max(scale, 0.01)
         let width = min(max(base.size.width + along, 40), pageSize.width * 1.5)
-        report(base.resized(to: CGSize(width: width, height: box.height(width: width))), state: gesture.state)
+        report(base.resized(to: CGSize(width: width, height: base.text?.height(width: width) ?? base.size.height)), state: gesture.state)
     }
 }

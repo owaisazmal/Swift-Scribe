@@ -542,8 +542,13 @@
 				INFOPLIST_FILE = Config/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Swift Scribe";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Swift Scribe reads today's events to print them on a page when you ask it to. They are read on this iPad and go nowhere else.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Swift Scribe uses the camera to scan paper into your notebooks.";
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "Swift Scribe uses Face ID to open the notebooks you have locked.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Swift Scribe records audio alongside your notes when you tap the record button.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Swift Scribe saves the pictures and videos you export to your photo library when you choose to.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Swift Scribe adds photos you pick as pages or pictures in your notebooks.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Swift Scribe writes down what was said in a recording when you ask it to. It is done on this iPad; the recording is never sent anywhere.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -577,8 +582,13 @@
 				INFOPLIST_FILE = Config/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Swift Scribe";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Swift Scribe reads today's events to print them on a page when you ask it to. They are read on this iPad and go nowhere else.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Swift Scribe uses the camera to scan paper into your notebooks.";
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "Swift Scribe uses Face ID to open the notebooks you have locked.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Swift Scribe records audio alongside your notes when you tap the record button.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Swift Scribe saves the pictures and videos you export to your photo library when you choose to.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Swift Scribe adds photos you pick as pages or pictures in your notebooks.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Swift Scribe writes down what was said in a recording when you ask it to. It is done on this iPad; the recording is never sent anywhere.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

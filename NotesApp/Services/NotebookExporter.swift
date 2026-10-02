@@ -1,6 +1,7 @@
 import UIKit
 import SwiftUI
 import PencilKit
+import AVFoundation
 import os
 
 /// Writes a notebook as a PDF: vector backgrounds (templates, the original PDF pages, photos) with the ink
@@ -64,6 +65,7 @@ enum NotebookExporter {
                         }
                         image?.draw(in: bounds)
                     }
+                    PageRenderer.drawOverInk(page, assets: assets, in: context.cgContext, size: page.size)
                 }
                 let fraction = Double(index + 1) / count
                 Task { await progress(fraction) }
@@ -77,7 +79,7 @@ enum NotebookExporter {
         return url
     }
 
-    private static func fileName(_ title: String) -> String {
+    static func fileName(_ title: String) -> String {
         let name = title.trimmingCharacters(in: .whitespacesAndNewlines)
             .components(separatedBy: CharacterSet(charactersIn: "/\\:?%*|\"<>")).joined(separator: "-")
         return name.isEmpty ? String(localized: "Untitled") : name
@@ -132,7 +134,7 @@ enum NotebookExporter {
 
     /// Reads a page's saved ink directly: writes are atomic, so reading outside the package actor is safe.
     /// A file that can't be decoded exports as a blank page; the editor sets it aside when the page is opened.
-    private static func savedInk(_ page: NotebookPage, in package: NotebookPackage) -> PKDrawing {
+    static func savedInk(_ page: NotebookPage, in package: NotebookPackage) -> PKDrawing {
         guard let data = try? Data(contentsOf: package.inkURL(page.id)) else { return PKDrawing() }
         return (try? NotebookPackage.decodeInk(data)) ?? PKDrawing()
     }
@@ -142,11 +144,13 @@ enum NotebookExporter {
 @Observable
 final class ExportJob: Identifiable {
     enum State: Equatable { case running, finished([URL]), failed(String), cancelled }
-    /// One PDF, or a PNG for every page.
-    enum Format: Sendable { case pdf, images }
+    /// One PDF, a PNG for every page, or a film of one page being written.
+    enum Format: Sendable { case pdf, images, timelapse }
 
     let id = UUID()
     let format: Format
+    /// The first page's width over its height, for showing a film of it.
+    let shape: CGFloat
     private(set) var progress: Double = 0
     private(set) var state: State = .running
     @ObservationIgnored private var task: Task<Void, Never>?
@@ -169,6 +173,7 @@ final class ExportJob: Identifiable {
 
     init(input: NotebookExporter.Input, format: Format = .pdf) {
         self.format = format
+        shape = input.pages.first.map { $0.size.width / max($0.size.height, 1) } ?? 0.77
         task = Task { [weak self] in
             let report: @Sendable (Double) async -> Void = { value in
                 await MainActor.run { self?.progress = max(self?.progress ?? 0, value) }
@@ -177,6 +182,7 @@ final class ExportJob: Identifiable {
                 switch format {
                 case .pdf: [try await NotebookExporter.export(input, progress: report)]
                 case .images: try await NotebookExporter.exportImages(input, progress: report)
+                case .timelapse: [try await InkTimelapse.export(input, progress: report)]
                 }
             }
             do {
@@ -211,13 +217,25 @@ struct ExportSheet: View {
                     }
                     Button("Cancel", role: .cancel) { job.cancel(); dismiss() }
                 case .finished(let urls):
+                    if job.format == .timelapse, let url = urls.first {
+                        LoopingVideo(url: url)
+                            .aspectRatio(job.shape, contentMode: .fit)
+                            .frame(maxHeight: 420)
+                            .overlay { Rectangle().strokeBorder(Color.hairline, lineWidth: 1) }
+                            .accessibilityElement()
+                            .accessibilityLabel(Text("The page being written, playing over and over"))
+                            .accessibilityAddTraits(.isImage)
+                            .accessibilityIdentifier("export.preview")
+                    }
                     Label(readyText(urls.count), systemImage: "checkmark.circle").font(.headline)
                         .accessibilityIdentifier("export.ready")
                     HStack(spacing: Space.x3) {
                         Button { sharing = true } label: { Label("Share", systemImage: "square.and.arrow.up") }
                             .prominentButton()
-                        Button { print(urls) } label: { Label(String(localized: "export.print", defaultValue: "Print"), systemImage: "printer") }
-                            .buttonStyle(.bordered)
+                        if job.format != .timelapse {
+                            Button { print(urls) } label: { Label(String(localized: "export.print", defaultValue: "Print"), systemImage: "printer") }
+                                .buttonStyle(.bordered)
+                        }
                     }
                     .sheet(isPresented: $sharing) { ShareSheet(items: urls) }
                 case .failed(let message):
@@ -229,11 +247,11 @@ struct ExportSheet: View {
             .padding(Space.x8)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.surface)
-            .navigationTitle(job.format == .pdf ? Text("Export PDF") : Text("Export Images"))
+            .navigationTitle(job.format == .pdf ? Text("Export PDF") : job.format == .images ? Text("Export Images") : Text("Export Video"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
         }
-        .presentationDetents([.medium])
+        .presentationDetents(job.format == .timelapse ? [.large] : [.medium])
         .onDisappear { if job.state == .running { job.cancel() } }
     }
 
@@ -241,6 +259,7 @@ struct ExportSheet: View {
         switch job.format {
         case .pdf: String(localized: "Your PDF is ready.")
         case .images: count == 1 ? String(localized: "Your image is ready.") : String(localized: "Your \(count) images are ready.")
+        case .timelapse: String(localized: "Your video is ready.")
         }
     }
 
@@ -253,6 +272,34 @@ struct ExportSheet: View {
         controller.printInfo = info
         if urls.count == 1 { controller.printingItem = first } else { controller.printingItems = urls }
         controller.present(animated: true)
+    }
+}
+
+/// A film playing silently over and over, without controls: the preview of an exported time-lapse.
+struct LoopingVideo: UIViewRepresentable {
+    let url: URL
+
+    final class PlayerView: UIView {
+        override class var layerClass: AnyClass { AVPlayerLayer.self }
+        var looper: AVPlayerLooper?
+    }
+
+    func makeUIView(context: Context) -> PlayerView {
+        let view = PlayerView()
+        let player = AVQueuePlayer()
+        player.isMuted = true
+        view.looper = AVPlayerLooper(player: player, templateItem: AVPlayerItem(url: url))
+        (view.layer as? AVPlayerLayer)?.player = player
+        (view.layer as? AVPlayerLayer)?.videoGravity = .resizeAspect
+        player.play()
+        return view
+    }
+
+    func updateUIView(_ view: PlayerView, context: Context) {}
+
+    static func dismantleUIView(_ view: PlayerView, coordinator: ()) {
+        (view.layer as? AVPlayerLayer)?.player?.pause()
+        view.looper = nil
     }
 }
 

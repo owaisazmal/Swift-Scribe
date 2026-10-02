@@ -24,6 +24,13 @@ final class NotebookRecorder: NSObject {
     @ObservationIgnored private var player: AVAudioPlayer?
     @ObservationIgnored private var currentFile: String?
     @ObservationIgnored private var timer: Timer?
+    /// How far each transcription under way has got, by recording.
+    private(set) var transcribing: [UUID: Double] = [:]
+    @ObservationIgnored var transcriber: any SpeechTranscribing = Transcription.transcriber
+    /// Called once a transcript has been written or removed, so search can pick it up.
+    @ObservationIgnored var onTranscriptChange: (() -> Void)?
+    @ObservationIgnored private var transcriptTasks: [UUID: Task<Void, Never>] = [:]
+    @ObservationIgnored private var transcripts: [String: Transcript] = [:]
 
     init(document: NotebookDocument) {
         self.document = document
@@ -172,12 +179,74 @@ final class NotebookRecorder: NSObject {
     /// Removes the entry; the audio file is cleaned up with the package's other unreferenced assets.
     func delete(_ recording: RecordingEntry) {
         if playingID == recording.id { stopPlayback() }
+        cancelTranscription(recording.id)
         document.removeRecording(recording.id)
+        guard recording.transcriptFile != nil else { return }
+        let package = document.package, id = recording.id
+        Task { [weak self] in
+            await package.removeTranscriptText(id)
+            self?.onTranscriptChange?()
+        }
     }
 
     func shutdown() {
         stopRecording()
         stopPlayback()
+        for id in Array(transcriptTasks.keys) { cancelTranscription(id) }
+    }
+
+    // MARK: Transcripts
+
+    func transcript(for recording: RecordingEntry) -> Transcript? {
+        guard let file = recording.transcriptFile else { return nil }
+        if let held = transcripts[file] { return held }
+        let read = document.package.readTranscript(file)
+        transcripts[file] = read
+        return read
+    }
+
+    /// Writes down what was said, on the device. The result replaces any transcript the recording already has.
+    func transcribe(_ recording: RecordingEntry, locale: Locale) {
+        guard !document.isReadOnly, transcriptTasks[recording.id] == nil else { return }
+        let id = recording.id, url = document.package.assetURL(recording.file), transcriber = transcriber
+        transcribing[id] = 0
+        transcriptTasks[id] = Task { [weak self] in
+            do {
+                let transcript = try await transcriber.transcribe(url, locale: locale) { fraction in
+                    Task { @MainActor in
+                        guard let self, let current = self.transcribing[id] else { return }
+                        self.transcribing[id] = max(current, fraction)
+                    }
+                }
+                try Task.checkCancellation()
+                guard let self else { return }
+                let file = try await self.document.package.writeTranscript(transcript, recordingID: id)
+                self.transcripts[file] = transcript
+                self.document.setTranscript(file, forRecording: id)
+                self.onTranscriptChange?()
+            } catch is CancellationError {
+            } catch {
+                self?.errorMessage = error.localizedDescription
+            }
+            self?.transcribing[id] = nil
+            self?.transcriptTasks[id] = nil
+        }
+    }
+
+    func cancelTranscription(_ id: UUID) {
+        transcriptTasks[id]?.cancel()
+        transcriptTasks[id] = nil
+        transcribing[id] = nil
+    }
+
+    func removeTranscript(_ recording: RecordingEntry) {
+        guard !document.isReadOnly, recording.transcriptFile != nil else { return }
+        document.setTranscript(nil, forRecording: recording.id)
+        let package = document.package, id = recording.id
+        Task { [weak self] in
+            await package.removeTranscriptText(id)
+            self?.onTranscriptChange?()
+        }
     }
 
     private func startTimer() {

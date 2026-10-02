@@ -28,15 +28,19 @@ struct CoverView: View {
     /// False for the live preview, whose every keystroke would otherwise fill the caches.
     var persist = true
     var showsShadow = true
+    /// A locked notebook's cover is blurred past reading, under a padlock.
+    var isObscured = false
     var prepareFirstPage: (@MainActor () async -> Void)?
     @State private var image: UIImage?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorSchemeContrast) private var contrast
 
-    init(request: CoverRequest, persist: Bool = true, showsShadow: Bool = true, prepareFirstPage: (@MainActor () async -> Void)? = nil) {
+    init(request: CoverRequest, persist: Bool = true, showsShadow: Bool = true, isObscured: Bool = false,
+         prepareFirstPage: (@MainActor () async -> Void)? = nil) {
         self.request = request
         self.persist = persist
         self.showsShadow = showsShadow
+        self.isObscured = isObscured
         self.prepareFirstPage = prepareFirstPage
         _image = State(initialValue: CoverCache.shared.cached(request.key))
     }
@@ -51,11 +55,15 @@ struct CoverView: View {
             .aspectRatio(3 / 4, contentMode: .fit)
             .overlay {
                 if let image {
-                    Image(uiImage: image).resizable().interpolation(.high).transition(.opacity)
+                    Image(uiImage: image).resizable().interpolation(.high)
+                        .blur(radius: isObscured ? max(request.width * 0.09, 5) : 0, opaque: true)
+                        .clipShape(shape)
+                        .transition(.opacity)
                 } else {
                     shape.fill(placeholder)
                 }
             }
+            .overlay { if isObscured { LockBadge(diameter: min(max(request.width * 0.3, 20), 52)) } }
             .overlay { if contrast == .increased { shape.strokeBorder(Color.hairline, lineWidth: 1) } }
             .background { if showsShadow { CoverShadowView() } }
             .task(id: request.key) {
@@ -130,6 +138,7 @@ extension NotebookRecord {
                      String(localized: "edited \(modifiedAt.formatted(.relative(presentation: .named)))")]
         if isFavorite { parts.append(String(localized: "favourite")) }
         if let folder { parts.append(String(localized: "in \(folder.name)")) }
+        if isLocked { parts.append(String(localized: "locked")) }
         if isReadOnly { parts.append(String(localized: "read-only")) }
         if issueCount > 0 { parts.append(String(localized: "has files that couldn't be read")) }
         return parts.joined(separator: ", ")

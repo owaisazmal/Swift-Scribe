@@ -37,7 +37,7 @@ final class AccessibilityAuditUITests: XCTestCase {
         empty.terminate()
 
         let app = XCUIApplication()
-        app.launchArguments = ["-storageRoot", "audit", "-resetStorage", "-seedLibrary", "6", "-seedLongPDF", "-seedJournal", "-indexSeed", "-seedActivity", "-seedReplay", "-drawingInput", "anyInput"] + extra
+        app.launchArguments = ["-storageRoot", "audit", "-resetStorage", "-seedLibrary", "6", "-seedLongPDF", "-seedJournal", "-indexSeed", "-seedActivity", "-seedReplay", "-seedHandwriting", "-fakeTranscript", "-drawingInput", "anyInput"] + extra
         app.launch()
         let textbook = app.buttons["notebook.Textbook"]
         XCTAssertTrue(textbook.waitForExistence(timeout: 90))
@@ -290,9 +290,91 @@ final class AccessibilityAuditUITests: XCTestCase {
             try check("replay", bar: app.otherElements["editor.replay.bar"])
             app.buttons["editor.replay.done"].tap()
             XCTAssertTrue(app.buttons["editor.close.pane"].waitForExistence(timeout: 5))
+            app.buttons["editor.close.pane"].tap()
+            XCTAssertTrue(app.buttons["editor.close.pane"].waitForNonExistence(timeout: 10))
         } else {
             // At the largest text sizes the menu is a list; the split view is audited at the default size.
             app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.8)).tap()
         }
+        sleep(1)
+        app.buttons["editor.back"].firstMatch.tap()
+
+        // Study tape, handwriting as text and the film of a page.
+        let study = app.buttons["notebook.Study Notes"]
+        XCTAssertTrue(study.waitForExistence(timeout: 20))
+        study.tap()
+        let canvas = app.descendants(matching: .any)["page.canvas.1"]
+        XCTAssertTrue(canvas.waitForExistence(timeout: 20))
+        app.buttons["Add"].firstMatch.tap()
+        app.buttons["Study Tape"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["editor.arrange.done"].waitForExistence(timeout: 5))
+        sleep(1)
+        try check("tape selected", bar: app.otherElements["editor.arrange.bar"])
+        app.buttons["editor.arrange.done"].tap()
+        let tape = app.buttons["Study tape"]
+        XCTAssertTrue(tape.waitForExistence(timeout: 5))
+        tape.tap()
+        sleep(1)
+        try check("tape lifted")
+
+        app.buttons["More"].firstMatch.tap()
+        app.buttons["Select Ink Across Pages"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["editor.ink.done"].waitForExistence(timeout: 5))
+        canvas.coordinate(withNormalizedOffset: CGVector(dx: 0.12, dy: 0.14))
+            .press(forDuration: 0.1, thenDragTo: canvas.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.33)), withVelocity: 400, thenHoldForDuration: 0.2)
+        let asText = app.buttons["editor.ink.text"]
+        XCTAssertTrue(asText.waitForExistence(timeout: 5))
+        sleep(1)
+        try check("ink selected", bar: app.otherElements["editor.ink.bar"])
+        asText.tap()
+        XCTAssertTrue(app.textViews["inktext.editor"].waitForExistence(timeout: 20))
+        sleep(1)
+        try check("handwriting as text", modal: true)
+        app.buttons["Cancel"].firstMatch.tap()
+        app.buttons["editor.ink.done"].tap()
+        XCTAssertTrue(app.buttons["editor.ribbon"].waitForExistence(timeout: 5))
+
+        app.buttons["editor.title"].tap()
+        app.buttons["Export"].firstMatch.tap()
+        let film = app.buttons["This Page as a Time-lapse Video…"].firstMatch
+        XCTAssertTrue(film.waitForExistence(timeout: 5))
+        film.tap()
+        XCTAssertTrue(app.staticTexts["Your video is ready."].waitForExistence(timeout: 60))
+        sleep(1)
+        try check("export video", modal: true)
+        app.buttons["Done"].firstMatch.tap()
+        app.buttons["editor.back"].firstMatch.tap()
+
+        // A transcript, and the replay it leads.
+        let lecture = app.buttons["notebook.Lecture Replay"]
+        XCTAssertTrue(lecture.waitForExistence(timeout: 20))
+        lecture.tap()
+        XCTAssertTrue(app.buttons["editor.ribbon"].waitForExistence(timeout: 20))
+        if app.buttons["Recordings"].firstMatch.exists {
+            app.buttons["Recordings"].firstMatch.tap()
+        } else {
+            app.buttons["More"].firstMatch.tap()
+            app.buttons["Recordings"].firstMatch.tap()
+        }
+        let transcript = app.buttons["recording.transcript.1"]
+        XCTAssertTrue(transcript.waitForExistence(timeout: 10))
+        transcript.tap()
+        let transcribe = app.buttons["transcript.start"]
+        XCTAssertTrue(transcribe.waitForExistence(timeout: 5))
+        sleep(1)
+        try check("transcript offer", modal: true, popover: true)
+        transcribe.tap()
+        let line = app.buttons["transcript.line.2"]
+        XCTAssertTrue(line.waitForExistence(timeout: 15))
+        sleep(1)
+        try check("transcript", modal: true, formText: ["Tap a line to hear it"], popover: true)
+        line.tap()
+        let play = app.buttons["editor.replay.play"]
+        XCTAssertTrue(play.waitForExistence(timeout: 10))
+        play.tap()
+        sleep(1)
+        try check("replay with transcript", bar: app.otherElements["editor.replay.bar"])
+        app.buttons["editor.replay.done"].tap()
+        XCTAssertTrue(app.buttons["editor.ribbon"].waitForExistence(timeout: 5))
     }
 }

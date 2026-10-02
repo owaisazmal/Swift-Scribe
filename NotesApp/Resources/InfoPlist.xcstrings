@@ -30,6 +30,35 @@
         }
       }
     },
+    "NSPhotoLibraryAddUsageDescription" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Swift Scribe sichert die von dir exportierten Bilder und Videos in deiner Fotomediathek, wenn du das auswählst."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Swift Scribe saves the pictures and videos you export to your photo library when you choose to."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Swift Scribe guarda en tu fototeca las imágenes y los vídeos que exportas cuando tú lo eliges."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Swift Scribe enregistre dans votre photothèque les images et les vidéos que vous exportez lorsque vous le choisissez."
+          }
+        }
+      }
+    },
     "NSPhotoLibraryUsageDescription" : {
       "extractionState" : "extracted_with_value",
       "localizations" : {
@@ -55,6 +84,35 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Swift Scribe ajoute les photos que vous choisissez comme pages ou images dans vos carnets."
+          }
+        }
+      }
+    },
+    "NSSpeechRecognitionUsageDescription" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Swift Scribe schreibt auf, was in einer Aufnahme gesagt wurde, wenn du darum bittest. Das geschieht auf diesem iPad; die Aufnahme wird nie irgendwohin gesendet."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Swift Scribe writes down what was said in a recording when you ask it to. It is done on this iPad; the recording is never sent anywhere."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Swift Scribe pone por escrito lo que se dijo en una grabación cuando se lo pides. Se hace en este iPad; la grabación nunca se envía a ningún sitio."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Swift Scribe met par écrit ce qui a été dit dans un enregistrement lorsque vous le demandez. Tout se fait sur cet iPad ; l’enregistrement n’est jamais envoyé nulle part."
           }
         }
       }

@@ -23,6 +23,9 @@ protocol EditorCanvasControlling: AnyObject {
     func setSelectingInk(_ selecting: Bool)
     func duplicateInkSelection()
     func deleteInkSelection()
+    func selectedInk() -> [PKDrawing]
+    func replaceInkSelection(with text: String) -> ItemSelection?
+    func tapesDidChange()
 }
 
 struct ItemSelection: Equatable {
@@ -54,8 +57,11 @@ final class EditorSession {
     private(set) var mode = EditorMode.writing
     /// How many strokes the lasso across pages has caught.
     var inkSelectionCount = 0
-    /// The recording being replayed with its ink.
+    /// The study tape that is lifted for now. It isn't saved: every strip is back in place when the notebook is opened again.
+    private(set) var liftedTapes: Set<UUID> = []
+    /// The recording being replayed with its ink, and what was said in it if it has been transcribed.
     private(set) var replay: ReplayTimeline?
+    private(set) var replayLines: [Transcript.Line] = []
     @ObservationIgnored private var replayPage: UUID?
     var laserColor = LaserColor.red {
         didSet { canvas?.setLaserColor(laserColor) }
@@ -112,17 +118,19 @@ final class EditorSession {
 
     /// Plays a recording from its start with the page as it was: ink written later in the recording is faint until
     /// the sound reaches it. Reads the pages written on during the recording, or every page for an older recording.
-    func beginReplay(_ recording: RecordingEntry) async -> Bool {
+    func beginReplay(_ recording: RecordingEntry, at time: TimeInterval = 0) async -> Bool {
         guard mode != .presenting, mode != .replaying, !recorder.isRecording else { return false }
         let ids = recording.inkedPages?.filter { document.index(of: $0) != nil } ?? document.pages.map(\.id)
         var drawings: [UUID: PKDrawing] = [:]
         for id in ids { drawings[id] = await document.ink(id) }
         guard mode != .presenting, mode != .replaying, recorder.beginReplay(recording) else { return false }
         replay = ReplayTimeline(recording: recording, drawings: drawings)
+        replayLines = recorder.transcript(for: recording)?.lines ?? []
         replayPage = nil
         recorder.onPlaybackTime = { [weak self] in self?.showReplay(at: $0) }
         enter(.replaying)
         showReplay(at: 0)
+        if time > 0 { recorder.seek(to: time) }
         return true
     }
 
@@ -144,6 +152,7 @@ final class EditorSession {
         recorder.onPlaybackTime = nil
         recorder.stopPlayback()
         replay = nil
+        replayLines = []
         canvas?.showReplay(nil, at: 0)
     }
 
@@ -208,6 +217,34 @@ final class EditorSession {
             guard let index = items.firstIndex(where: { $0.id == selection.itemID }), var link = items[index].link else { return }
             link.label = label.trimmingCharacters(in: .whitespacesAndNewlines)
             items[index].content = .link(link)
+        }
+    }
+
+    // MARK: Study tape
+
+    func addTape() {
+        let last = UserDefaults.standard.string(forKey: SettingsKey.tapeColor).flatMap(TapeColor.init(rawValue:)) ?? .mustard
+        addItem(.tape(last), size: TapeArt.defaultSize, actionName: String(localized: "Add Study Tape"))
+    }
+
+    func toggleTape(_ id: UUID) {
+        if liftedTapes.remove(id) == nil { liftedTapes.insert(id) }
+        canvas?.tapesDidChange()
+        AccessibilityNotification.Announcement(liftedTapes.contains(id) ? String(localized: "Tape lifted") : String(localized: "Tape put back")).post()
+    }
+
+    func coverAllTapes() {
+        guard !liftedTapes.isEmpty else { return }
+        liftedTapes = []
+        canvas?.tapesDidChange()
+    }
+
+    func setTapeColor(_ color: TapeColor) {
+        guard let selection else { return }
+        UserDefaults.standard.set(color.rawValue, forKey: SettingsKey.tapeColor)
+        document.updateItems(onPage: selection.pageID, actionName: String(localized: "Tape Colour")) { items in
+            guard let index = items.firstIndex(where: { $0.id == selection.itemID }), items[index].tape != nil else { return }
+            items[index].content = .tape(color)
         }
     }
 
@@ -348,22 +385,26 @@ final class EditorSession {
 
 struct EditorView: View {
     let document: NotebookDocument
+    /// True while a locked notebook is behind its lock screen.
+    var isCovered = false
     let close: () -> Void
     @State private var session: EditorSession
 
-    init(document: NotebookDocument, initialPageID: UUID? = nil, close: @escaping () -> Void) {
+    init(document: NotebookDocument, initialPageID: UUID? = nil, isCovered: Bool = false, close: @escaping () -> Void) {
         self.document = document
+        self.isCovered = isCovered
         self.close = close
         _session = State(initialValue: EditorSession(document: document, initialPageID: initialPageID))
     }
 
     var body: some View {
-        EditorContent(session: session, close: close)
+        EditorContent(session: session, isCovered: isCovered, close: close)
     }
 }
 
 fileprivate struct EditorContent: View {
     @Bindable var session: EditorSession
+    var isCovered = false
     let close: () -> Void
 
     @Environment(LibraryStore.self) private var store
@@ -371,6 +412,7 @@ fileprivate struct EditorContent: View {
     @Environment(\.editorPane) private var pane
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var paneWidth: CGFloat = 1024
     @State private var pickingBeside = false
     @State private var showingRecordingsSheet = false
@@ -400,14 +442,26 @@ fileprivate struct EditorContent: View {
     @State private var editingNotes: NotesTarget?
     @State private var presenterPanel: Bool?
     @State private var presentingSince = Date.now
+    @State private var readingInk: InkToRead?
+    @State private var hidesTranscript = false
 
     private struct NotesTarget: Identifiable {
         let id: UUID
     }
 
+    private struct InkToRead: Identifiable {
+        let id = UUID()
+        let ink: [PKDrawing]
+    }
+
     /// Notes and the next page sit beside the page while a second screen shows it, or when asked for.
     private var showsPresenterPanel: Bool {
         session.mode == .presenting && !isCompact && (presenterPanel ?? ExternalDisplay.shared.isShowing)
+    }
+
+    /// What was said sits beside the page while a transcribed recording is replayed.
+    private var showsTranscriptPanel: Bool {
+        session.mode == .replaying && !isCompact && !session.replayLines.isEmpty && !hidesTranscript
     }
 
     /// A pane beside another notebook has about half a window: its bar keeps the essentials and the rest move into More.
@@ -438,6 +492,11 @@ fileprivate struct EditorContent: View {
                     }
                     .frame(width: 300)
                     .transition(.move(edge: .trailing))
+                }
+                if showsTranscriptPanel {
+                    TranscriptPanel(session: session)
+                        .frame(width: 300)
+                        .transition(.move(edge: .trailing))
                 }
             }
             .background(Color.desk.ignoresSafeArea())
@@ -485,7 +544,9 @@ fileprivate struct EditorContent: View {
                 if session.mode == .presenting {
                     presentationBar
                 } else if session.mode == .replaying {
-                    ReplayBar(session: session) { enter(.writing) }
+                    ReplayBar(session: session, transcript: isCompact || session.replayLines.isEmpty ? nil : !hidesTranscript,
+                              toggleTranscript: { withAnimation(Motion.adaptive(Motion.standard, reduceMotion: reduceMotion)) { hidesTranscript.toggle() } },
+                              done: { enter(.writing) })
                         .floatingBar()
                         .padding(.bottom, Space.x5)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -497,6 +558,14 @@ fileprivate struct EditorContent: View {
     private func sheets<Content: View>(_ content: Content) -> some View {
         content
         .sheet(item: $editingNotes) { target in PresenterNotesSheet(document: document, pageID: target.id) }
+        .sheet(item: $readingInk) { target in
+            InkTextSheet(ink: target.ink) { text in
+                guard let placed = session.canvas?.replaceInkSelection(with: text) else { return }
+                session.enter(.writing)
+                session.canvas?.select(placed)
+                announce(String(localized: "Handwriting replaced with text"))
+            }
+        }
         .sheet(isPresented: $pickingBeside) {
             BesidePicker(current: document.id) { id in
                 window?.beside = OpenNotebook(id: id)
@@ -586,6 +655,7 @@ fileprivate struct EditorContent: View {
             document.noteCurrentPage(session.currentPage)
             session.openNotebook = { openLinkedNotebook($0, page: $1, from: $2) }
             session.onTouchDown = { if pane != .single, window?.active != document.id { window?.active = document.id } }
+            session.recorder.onTranscriptChange = { refreshSearchText() }
             refreshNotebookTitles()
         }
         .onChange(of: window?.active) { if pane != .single, window?.active == document.id { session.canvas?.paneBecameActive() } }
@@ -602,7 +672,8 @@ fileprivate struct EditorContent: View {
 
     private var isPresentingModal: Bool {
         showingPages || showingRecordings || showingRecordingsSheet || pickingBeside || export != nil || importingPDF || showingPhotoPicker || renaming || goToPage || paperMode != nil
-            || editingCover != nil || namingBookmark != nil || showingStickers || pickingLink || renamingLink || editingNotes != nil
+            || editingCover != nil || namingBookmark != nil || showingStickers || pickingLink || renamingLink || editingNotes != nil || readingInk != nil
+            || isCovered
     }
 
     private func enter(_ mode: EditorMode) {
@@ -693,12 +764,18 @@ fileprivate struct EditorContent: View {
                 .disabled(document.isReadOnly)
             if !document.isReadOnly {
                 Button { editingCover = store.record(document.id) } label: { Label("Change Cover…", systemImage: "book.closed") }
+                let locked = document.manifest.library.isLocked
+                Button { toggleLock() } label: { Label(locked ? "Remove Lock…" : "Lock…", systemImage: locked ? "lock.open" : "lock") }
             }
             Menu {
                 Button { export = ExportJob(document: document) } label: { Label("Notebook as a PDF…", systemImage: "doc.richtext") }
                 Button { export = ExportJob(document: document, format: .images) } label: { Label("Every Page as an Image…", systemImage: "photo.on.rectangle") }
                 if let page = currentPage {
                     Button { export = ExportJob(document: document, format: .images, pages: [page]) } label: { Label("This Page as an Image…", systemImage: "photo") }
+                    Button { export = ExportJob(document: document, format: .timelapse, pages: [page]) } label: {
+                        Label("This Page as a Time-lapse Video…", systemImage: "film")
+                    }
+                    .disabled(document.loadedInk(page.id)?.strokes.isEmpty ?? (page.inkHash == nil))
                 }
             } label: { Label("Export", systemImage: "square.and.arrow.up") }
             if let window, pane == .single, !isNarrow, sizeClass != .compact {
@@ -726,18 +803,18 @@ fileprivate struct EditorContent: View {
         Button { showingRecordings = true } label: { Label("Recordings", systemImage: "waveform") }
             .popover(isPresented: $showingRecordings) {
                 recordingList { showingRecordings = false }
-                    .frame(minWidth: 320, minHeight: 280)
+                    .frame(minWidth: 400, minHeight: 440)
                     .presentationBackground(Color.surface)
                     .presentationCompactAdaptation(.sheet)
             }
     }
 
     private func recordingList(dismiss: @escaping () -> Void) -> some View {
-        RecordingList(recorder: session.recorder) { recording in
+        RecordingList(recorder: session.recorder) { recording, time in
             dismiss()
             Task {
                 try? await Task.sleep(for: .milliseconds(350))
-                if await session.beginReplay(recording) {
+                if await session.beginReplay(recording, at: time) {
                     announce(String(localized: "Replaying. Ink appears as it was written; tap ink to jump to that moment."))
                 }
             }
@@ -861,7 +938,13 @@ fileprivate struct EditorContent: View {
                 .accessibilityIdentifier("editor.arrange.open")
                 arrangeButton("Rename Link", "pencil") { linkLabel = link.label; renamingLink = true }
             }
-            if isCompact, item?.text != nil || item?.link != nil {
+            if let tape = item?.tape, let id = item?.id {
+                let lifted = session.liftedTapes.contains(id)
+                arrangeButton(lifted ? "Put Tape Back" : "Lift Tape", lifted ? "eye.slash" : "eye") { session.toggleTape(id) }
+                    .accessibilityIdentifier("editor.arrange.lift")
+                tapeColorMenu(tape)
+                arrangeButton("Duplicate", "plus.square.on.square") { session.duplicateSelection() }
+            } else if isCompact, item?.text != nil || item?.link != nil {
                 Menu {
                     Button { session.duplicateSelection() } label: { Label("Duplicate", systemImage: "plus.square.on.square") }
                     Button { session.moveSelection(forward: true) } label: { Label("Bring Forward", systemImage: "square.2.layers.3d.top.filled") }
@@ -912,18 +995,38 @@ fileprivate struct EditorContent: View {
         .accessibilityIdentifier("editor.arrange.style")
     }
 
+    private func tapeColorMenu(_ current: TapeColor) -> some View {
+        Menu {
+            Picker("Tape Colour", selection: Binding(get: { current }, set: { session.setTapeColor($0) })) {
+                ForEach(TapeColor.allCases) { Text($0.displayName).tag($0) }
+            }
+        } label: {
+            Image(systemName: "paintpalette").frame(width: 44, height: 44)
+        }
+        .accessibilityLabel(Text("Tape Colour"))
+        .accessibilityValue(Text(current.displayName))
+        .accessibilityIdentifier("editor.arrange.tape")
+    }
+
     /// While ink is being selected across pages: what to do, then what can be done with what was caught.
     private var inkBar: some View {
         let count = session.inkSelectionCount
         return HStack(spacing: 0) {
-            Text(count == 0 ? String(localized: "Draw round ink on any page")
-                            : count == 1 ? String(localized: "1 stroke. Drag it to move it.") : String(localized: "\(count) strokes. Drag them to move them."))
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Color.ink)
-                .lineLimit(1)
-                .padding(.trailing, Space.x2)
-                .accessibilityIdentifier("editor.ink.status")
+            // With ink caught, the buttons need the room in a narrow pane and at the largest text sizes.
+            if count == 0 || !(isCompact || dynamicTypeSize.isAccessibilitySize) {
+                Text(count == 0 ? String(localized: "Draw round ink on any page")
+                                : count == 1 ? String(localized: "1 stroke. Drag it to move it.") : String(localized: "\(count) strokes. Drag them to move them."))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color.ink)
+                    .lineLimit(1)
+                    .padding(.trailing, Space.x2)
+                    .accessibilityIdentifier("editor.ink.status")
+            }
             if count > 0 {
+                arrangeButton("Turn into Text", "text.viewfinder") {
+                    if let ink = session.canvas?.selectedInk(), !ink.isEmpty { readingInk = InkToRead(ink: ink) }
+                }
+                .accessibilityIdentifier("editor.ink.text")
                 arrangeButton("Duplicate", "plus.square.on.square") { session.canvas?.duplicateInkSelection() }
                     .accessibilityIdentifier("editor.ink.duplicate")
                 arrangeButton("Delete", "trash") { session.canvas?.deleteInkSelection() }
@@ -1105,6 +1208,7 @@ fileprivate struct EditorContent: View {
             Button { showingStickers = true } label: { Label("Sticker…", systemImage: "seal") }
             Button { session.addText() } label: { Label("Text Box", systemImage: "character.textbox") }
             Button { pickingLink = true } label: { Label("Link…", systemImage: "link") }
+            Button { session.addTape() } label: { Label("Study Tape", systemImage: "rectangle.dashed") }
         } label: {
             Label("Add", systemImage: "plus")
         }
@@ -1152,6 +1256,9 @@ fileprivate struct EditorContent: View {
             Divider()
             if !document.isReadOnly {
                 Button { enter(.selecting) } label: { Label("Select Ink Across Pages", systemImage: "lasso") }
+            }
+            if !session.liftedTapes.isEmpty {
+                Button { session.coverAllTapes() } label: { Label("Put All Tape Back", systemImage: "eye.slash") }
             }
             Divider()
             Button { enter(.focus) } label: { Label("Focus Mode", systemImage: "arrow.up.left.and.arrow.down.right") }
@@ -1220,6 +1327,20 @@ extension EditorContent {
             }
         }
         session.notebookTitles = titles
+    }
+
+    fileprivate func toggleLock() {
+        guard let record = store.record(document.id) else { return }
+        Task { if let failure = await store.toggleLock(record) { errorMessage = failure } }
+    }
+
+    /// A transcript was written or removed: the library's search text for this notebook is read again.
+    fileprivate func refreshSearchText() {
+        let directory = document.package.textDirectory, id = document.id, store = store
+        Task {
+            let text = await Task.detached(priority: .utility) { LibraryIndex.searchText(in: directory) }.value
+            store.updateSearchText(text, for: id)
+        }
     }
 
     fileprivate func openLinkedNotebook(_ id: UUID, page: UUID?, from origin: UUID) {
@@ -1339,11 +1460,12 @@ struct NoticeBanner: View {
 
 struct RecordingList: View {
     let recorder: NotebookRecorder
-    /// Replays a recording with its ink.
-    var replay: ((RecordingEntry) -> Void)?
+    /// Replays a recording with its ink, from a moment in it.
+    var replay: ((RecordingEntry, TimeInterval) -> Void)?
+    @State private var path: [UUID] = []
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             List {
               Section {
                 ForEach(Array(recorder.recordings.enumerated()), id: \.element.id) { index, recording in
@@ -1366,8 +1488,16 @@ struct RecordingList: View {
                         }
                         .frame(minHeight: 44)
                         .accessibilityElement(children: .combine)
+                        Button { path.append(recording.id) } label: {
+                            Image(systemName: "quote.bubble").symbolVariant(recording.transcriptFile == nil ? .none : .fill)
+                                .font(.title3).frame(width: 44, height: 44)
+                        }
+                        .buttonStyle(.borderless)
+                        .accessibilityLabel(Text("Transcript"))
+                        .accessibilityValue(Text(recorder.transcribing[recording.id] != nil ? "Transcribing" : recording.transcriptFile == nil ? "Not transcribed" : "Transcribed"))
+                        .accessibilityIdentifier("recording.transcript.\(index + 1)")
                         if let replay {
-                            Button { replay(recording) } label: {
+                            Button { replay(recording, 0) } label: {
                                 Image(systemName: "pencil.and.scribble").font(.title3).frame(width: 44, height: 44)
                             }
                             .buttonStyle(.borderless)
@@ -1385,7 +1515,7 @@ struct RecordingList: View {
                 }
               } footer: {
                 if replay != nil, !recorder.recordings.isEmpty {
-                    Text("The pencil replays a recording with your ink: what you wrote appears as it was written, and tapping ink jumps to that moment.")
+                    Text("The pencil replays a recording with your ink: what you wrote appears as it was written, and tapping ink jumps to that moment. The speech bubble opens what was said.")
                         .foregroundStyle(Color.textSecondary)
                 }
               }
@@ -1405,6 +1535,9 @@ struct RecordingList: View {
             }
             .navigationTitle("Recordings")
             .navigationBarTitleDisplayMode(.inline)
+            .navigationDestination(for: UUID.self) { id in
+                TranscriptView(recorder: recorder, recordingID: id, replay: replay)
+            }
         }
     }
 }
