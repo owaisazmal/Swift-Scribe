@@ -80,8 +80,13 @@ extension XCTestCase {
                 print("AUDIT [\(screen)] ignored in PencilKit's tool picker: \(issue.compactDescription)")
                 return true
             }
+            // Scrolled, text just below the glass bar sits in its fading edge, where it reads as low contrast.
+            if scrolled, issue.auditType == .contrast, let element, element.frame.minY < barMaxY + 44 {
+                print("AUDIT [\(screen)] ignored under the bar's edge: \(element.label)")
+                return true
+            }
             // Scrolled, some text sits under the glass bar; the audit sometimes can't name it, so it can't be placed there.
-            if scrolled, issue.auditType == .contrast || issue.auditType == .dynamicType, element == nil {
+            if scrolled, issue.auditType == .contrast || issue.auditType == .dynamicType || issue.auditType == .textClipped, element == nil {
                 print("AUDIT [\(screen)] ignored, unnamed text in a scrolled sheet: \(issue.compactDescription)")
                 return true
             }

@@ -133,7 +133,8 @@ final class AccessibilityAuditUITests: XCTestCase {
         sleep(1)
         try checkSheet("settings", scrolling: app.collectionViews.firstMatch,
                        formText: ["Cobalt", "Tomato", "Moss", "Oxblood", "Mustard", "Print",
-                                  "Stop Using Daily Journal", "About",
+                                  "Stop Using Daily Journal", "About", "Sync with iCloud", "iCloud isn't available", "Sync Now",
+                                  "Back Up Library", "Restore from a Backup", "Straighten Shapes",
                                   "Report a Problem or Request a Feature", "Swift Scribe is free and open source"])
         app.buttons["Done"].firstMatch.tap()
 
@@ -280,7 +281,7 @@ final class AccessibilityAuditUITests: XCTestCase {
             let replay = app.buttons["recording.replay.1"]
             XCTAssertTrue(replay.waitForExistence(timeout: 10))
             sleep(1)
-            try check("recordings list", modal: true)
+            try check("recordings list", modal: true, formText: ["The pencil replays"])
             replay.tap()
             let play = app.buttons["editor.replay.play"]
             XCTAssertTrue(play.waitForExistence(timeout: 10))
