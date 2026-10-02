@@ -1354,14 +1354,18 @@ struct RecordingList: View {
                         .buttonStyle(.borderless)
                         .disabled(recorder.isRecording)
                         .accessibilityLabel(recorder.playingID == recording.id ? "Stop" : "Play")
-                        VStack(alignment: .leading, spacing: Space.x1) {
-                            Text("Recording \(index + 1)").font(.body.weight(.medium))
-                            Text(recording.createdAt.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(Color.textSecondary)
-                            if recorder.playingID == recording.id { ProgressView(value: recorder.playbackProgress) }
+                        HStack(spacing: Space.x3) {
+                            VStack(alignment: .leading, spacing: Space.x1) {
+                                Text("Recording \(index + 1)").font(.body.weight(.medium))
+                                Text(recording.createdAt.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(Color.textSecondary)
+                                if recorder.playingID == recording.id { ProgressView(value: recorder.playbackProgress) }
+                            }
+                            Spacer()
+                            Text(Duration.seconds(recording.duration).formatted(.time(pattern: .minuteSecond)))
+                                .font(.callout.monospacedDigit()).foregroundStyle(Color.textSecondary)
                         }
-                        Spacer()
-                        Text(Duration.seconds(recording.duration).formatted(.time(pattern: .minuteSecond)))
-                            .font(.callout.monospacedDigit()).foregroundStyle(Color.textSecondary)
+                        .frame(minHeight: 44)
+                        .accessibilityElement(children: .combine)
                         if let replay {
                             Button { replay(recording) } label: {
                                 Image(systemName: "pencil.and.scribble").font(.title3).frame(width: 44, height: 44)

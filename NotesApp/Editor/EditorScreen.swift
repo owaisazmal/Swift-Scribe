@@ -84,13 +84,20 @@ struct EditorPanes: View {
                     window.split = min(max(start + (stacked ? value.translation.height : value.translation.width) / total, 0.3), 0.7)
                 }
                 .onEnded { _ in dragOrigin = nil })
-            .accessibilityElement()
-            .accessibilityLabel(Text("Divider between the notebooks"))
-            .accessibilityValue(Text(window.split, format: .percent.precision(.fractionLength(0))))
-            .accessibilityAdjustableAction { direction in
-                window.split = min(max(window.split + (direction == .increment ? 0.05 : -0.05), 0.3), 0.7)
+            .accessibilityHidden(true)
+            // VoiceOver's handle is a full-size target laid over the strip; it takes no touches, so the panes' edges stay theirs.
+            .overlay {
+                Color.clear
+                    .frame(minWidth: 44, minHeight: 44)
+                    .allowsHitTesting(false)
+                    .accessibilityElement()
+                    .accessibilityLabel(Text("Divider between the notebooks"))
+                    .accessibilityValue(Text(window.split, format: .percent.precision(.fractionLength(0))))
+                    .accessibilityAdjustableAction { direction in
+                        window.split = min(max(window.split + (direction == .increment ? 0.05 : -0.05), 0.3), 0.7)
+                    }
+                    .accessibilityIdentifier("editor.split.divider")
             }
-            .accessibilityIdentifier("editor.split.divider")
     }
 
     /// The first notebook only closes once the one beside it has saved and closed.

@@ -73,6 +73,7 @@ struct PresenterPanel: View {
                 Text(Duration.seconds(elapsed).formatted(.time(pattern: elapsed >= 3600 ? .hourMinuteSecond : .minuteSecond)))
                     .font(.title2.weight(.semibold).monospacedDigit())
                     .foregroundStyle(Color.ink)
+                    .fixedSize()
                     .accessibilityLabel(Text("Presenting for \(Duration.seconds(elapsed).formatted(.units(allowed: [.hours, .minutes, .seconds], width: .wide)))"))
                 Text(context.date.formatted(date: .omitted, time: .shortened))
                     .font(.subheadline.monospacedDigit())
