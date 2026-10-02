@@ -41,6 +41,7 @@ struct SaveSnapshot: Sendable {
 struct SaveReceipt: Sendable {
     var manifest: NotebookManifest
     var inkHashes: [UUID: String?]
+    var inkBytes: [UUID: Int] = [:]
 }
 
 /// All file IO for one `<uuid>.scribe` package. Ink files are written before the manifest,
@@ -204,6 +205,7 @@ actor NotebookPackage {
         try makeDirectories()
         var manifest = snapshot.manifest
         var hashes: [UUID: String?] = [:]
+        var bytes: [UUID: Int] = [:]
         for (pageID, drawing) in snapshot.ink {
             let file = inkURL(pageID)
             if drawing.strokes.isEmpty {
@@ -215,13 +217,14 @@ actor NotebookPackage {
                 let data = drawing.dataRepresentation()
                 try data.write(to: file, options: .atomic)
                 hashes[pageID] = Self.hash(data)
+                bytes[pageID] = data.count
             }
         }
         for index in manifest.pages.indices {
             if let hash = hashes[manifest.pages[index].id] { manifest.pages[index].inkHash = hash }
         }
         try writeManifest(manifest)
-        return SaveReceipt(manifest: manifest, inkHashes: hashes)
+        return SaveReceipt(manifest: manifest, inkHashes: hashes, inkBytes: bytes)
     }
 
     func writeManifest(_ manifest: NotebookManifest) throws {
@@ -247,13 +250,6 @@ actor NotebookPackage {
     func writeText(_ text: String, pageID: UUID) throws {
         try makeDirectoryInExistingPackage(textDirectory)
         try Data(text.utf8).write(to: textURL(pageID), options: .atomic)
-    }
-
-    /// The search text a v1 notebook brought with it, kept until every page has its own recognised text.
-    nonisolated static let legacyTextName = "legacy-v1.txt"
-
-    func removeLegacyText() {
-        try? FileManager.default.removeItem(at: textDirectory.appending(path: Self.legacyTextName))
     }
 
     func writeThumbnail(_ png: Data, pageID: UUID, key: String) throws {

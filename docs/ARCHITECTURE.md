@@ -78,6 +78,7 @@ A's one weakness is simulator footprint at 5×. We addressed it with the measure
   - `NotebookDocument` owns one `UndoManager`, and every stroke and page operation registers against the document, never against a view. Undo therefore survives canvas recycling.
   - Canvases return a `CanvasUndoProxy` as their undo manager. PencilKit wraps each stroke's registration in its own group and calls private grouping API. The proxy absorbs that, and forwards undo and redo (from the tool picker, ⌘Z or gestures) to the document's stack.
   - Filtering those registrations out on the shared stack instead leaves an empty undo step per stroke, and deferring the group crashes.
+  - Undo and redo hand the canvas a copy of the drawing with no history (`PKDrawing(strokes:)`). Given an earlier version of a drawing it has already seen, PencilKit brings the later strokes back with the next stroke.
 - **Tool picker.** A hidden first-responder anchor keeps one system `PKToolPicker` visible for every page (`stateAutosaveName` is set). New and reused canvases take the picker's current tool. Undo and redo leave the top bar while the picker is showing.
 - **Stroke end.** The main thread does four things only:
   1. copies the page's drawing into the document;
@@ -86,6 +87,38 @@ A's one weakness is simulator footprint at 5×. We addressed it with the measure
   4. schedules a save.
 
   The notebook's modification date is applied at save time, so a stroke never touches the observed manifest.
+
+## Pictures, stickers and bookmarks
+
+- **They live on the page.** A page's `items` (pictures and stickers, back to front, in page points) and its `bookmark` are extra keys on the page in the manifest, like a journal page's `date`. An older build keeps them as unknown keys; an item of a kind this build doesn't know is kept as read and not drawn.
+- **Under the ink.** `PageItemRenderer` draws items after the paper and before the ink in thumbnails, covers and exports, so a sticker is vector in an exported PDF. In the editor they are live views between the background chunks and the canvas, and the chunks skip them (`drawBackground(items: false)`), so moving one never redraws paper or touches the canvas.
+- **Arranging.** A finger tap (when fingers don't draw) or a touch and hold picks an item up. The selection view sits above the canvas, so touches on the item move it instead of drawing; pinch, twist or the corner handle resize and rotate it. The page's own scroll and zoom wait for those gestures. Each gesture, and each bar action (duplicate, forward, backward, delete), is one undo step through `NotebookDocument.updateItems`. Writing anywhere puts the item down.
+- **Files.** A placed picture is stored once in the package's assets, at most 1,600 px on its long side, as PNG when it has transparency. Garbage collection keeps any asset the manifest names, so a deleted picture's file goes when the editor closes.
+- **Bookmarks.** The Outline tab lists bookmarked pages, then the table of contents of any imported PDF (`PDFOutlineReader`, mapped through each page's PDF index, so reordering or deleting pages keeps entries on the right page). An export writes bookmarks as the PDF's outline.
+
+## Text boxes and links
+
+- **Two more kinds of item.** A text box (`TextBox`: the string, a size, bold, one of five tints, an alignment) and a link (`PageLink`: the target page's ID and an optional label) are entries in the same `items` list, so they are arranged, layered, undone and garbage-collected like pictures and stickers.
+- **Text is laid out in page points.** `TextBox.height(width:)` and `TextBox.draw` use the same attributed string everywhere, so a box wraps the same way in the editor, a thumbnail and an exported PDF, where it stays real text. A box's width is the user's; its height always follows the text and grows downwards (`fittedToText`). The corner handle scales the type, the side grip changes the width.
+- **Typing.** `editText()` puts a `UITextView` over the box, in the slot, with the type scaled to the baked zoom. The page keeps the old string until typing ends (Done, Escape, a tap elsewhere, a stroke, the keyboard going away, the scene leaving the foreground or the editor closing); then one `updateItems` writes it as one undo step. A box left empty is removed, by undoing its own Add when that is still the last action. While typing, the page stack hands every key to the text view and the toolbar's ⌘Z stands aside for the text view's own.
+- **Search.** `NotebookPage.typedText` joins a page's boxes. `HandwritingIndexer` writes it into the page's text file without recognising anything, and the file's `#ink:` stamp carries a hash of it only on pages that have typed text, so pages indexed before stay current.
+- **Links name themselves.** `LinkTitles` maps every page to its bookmark name or "Page N"; a link with no label shows that, so it stays right when pages move, and the page stack refreshes link views whenever the map changes. A link whose page was deleted greys out and says so. Thumbnails render without the map and show the label or a plain "Page".
+- **Following.** A finger tap on a link opens its page when fingers don't draw, and always while presenting; touch and hold picks it up instead. VoiceOver's double tap opens it. `EditorSession.follow` remembers the page it came from until the linked page is left, and the editor offers "Back to Page N".
+- **In a PDF.** An export registers a named destination at the top of every linked page and a link rectangle over each tab (`addDestination`, `setDestinationWithName`; both take PDF coordinates, which run up the page).
+- **Your own stickers.** `StickerCutout` lifts a photo's subject with `VNGenerateForegroundInstanceMaskRequest`, grows its shape in white (`CIMorphologyMaximum`) for the die-cut edge, and caps it at 900 px. They are kept as PNGs in `Stickers/` beside the library, not in a notebook. Placing one copies it into the notebook's assets as an ordinary picture marked with its `source`, and placing it again reuses that file, so a notebook stays self-contained. Where Vision finds no subject (and in the simulator, where the request can't run) the drawer offers the whole photo with a white edge instead.
+
+## Focus and presenting
+
+- `EditorSession.mode` is writing, focus or presenting. Focus hides the navigation bar, status bar and ribbons and leaves the tool picker. Presenting also hides the tool picker, turns drawing off, shows one whole page at a time (extra scroll inset lets the first and last page centre) and dims its neighbours.
+- **The laser** is a `UILongPressGestureRecognizer` with no delay on the page stack, accepting whatever would draw in the editor: the Pencil always, a finger when fingers draw (two fingers then scroll). `LaserTrailView` keeps 0.9 s of samples and redraws on a display link only while there is something to show. Nothing reaches the document.
+- The screen stays awake while presenting.
+- **A second screen.** The app delegate gives a scene with the `windowExternalDisplayNonInteractive` role to `ExternalDisplaySceneDelegate`, which only registers it with `ExternalDisplay`. No window is put on it until presenting starts, so the screen mirrors the iPad the rest of the time. While presenting, `PresentationStageController` shows the page on black: the page stack renders it once per page (background, items and ink, at twice the size that fits, within 12 megapixels), then sends only the part of the page showing on the iPad (`PresentationStage.pageFrame` fits that part to the screen) and the laser as fractions of the page. Ending the presentation, or closing the editor, removes the window and mirroring resumes. The first editor to present owns the screen until it stops.
+
+## Widgets and shortcuts
+
+- **Routing.** A widget link (`swiftscribe://today`, `quicknote`, `continue`, `notebook/<id>`) or an App Intent becomes an `AppAction`. The front window's `LibraryRootView` carries it out: it puts sheets away, asks an editor showing another notebook to save and close (`scribeCloseEditor`, the same path as the back button), then opens the target.
+- **Shortcuts** (`AppActions.swift`): Open Today's Journal Page, New Quick Note, Continue Writing and Open Notebook (with a notebook picker and search), offered to Siri and Spotlight through `AppShortcutsProvider`.
+- **Widgets** (`ScribeWidgets`): the app writes a `WidgetSnapshot` and the last notebook's cover image into the App Group container when it becomes ready and when it leaves the foreground (`WidgetBridge`), and reloads the timelines only when something changed. The widgets never open the library themselves. Timelines turn over at midnight so the week strip and date stay right. UI-test libraries (`-storageRoot`) never write a snapshot.
 
 ## One document per notebook
 
@@ -148,20 +181,9 @@ text/<pageID>.txt      recognised handwriting and PDF text, stamped with the ink
 - It is rebuilt from the manifests and `folders.json` whenever they are newer.
 - An index that can't be opened is set aside and rebuilt; there is no `fatalError` at launch.
 
-### v1 migration
+### v1 notebooks
 
-`V1Migrator` is explicit, idempotent and resumable:
-
-1. It reads a *copy* of the v1 SwiftData store.
-2. It builds each notebook in `<id>.migrating`: ink is split into pages with v1's layout maths and converted to page-local points (scaled by page width / 800), and assets are copied.
-3. It writes the manifest, then renames the folder into place.
-4. When every notebook has succeeded, it moves the v1 files to `Backups/v1/` unchanged.
-
-Migration tests run against `NotesAppTests/Fixtures/v1-library.json`, a library written by the real v1 code before it was removed. Migrated notebooks get first-page covers, as their v1 cards showed the first page, folders keep v1's A to Z order and a distinct cloth each, and their handwriting is recognised page by page in the background after launch.
-
-Folders keep a distinct cloth each; v1 purple becomes Plum. The migrator and its tests stay until at least the first stable public release.
-
-A rerun skips finished notebooks, including ones the user has deleted since (the log in `Library/migration-v1.json` remembers them), and restarts half-written ones. If the v1 database exists but can't be read, nothing is migrated or archived and the next launch tries again. Failures are shown in an alert at launch and in Settings.
+The converter for notebooks from the first version (`V1Migrator`) was removed on 2026-10-01. Notebooks it already converted keep working. Anything v1 left on disk (an unconverted store, `Backups/v1`, a notebook's `legacy-v1.txt` search text) is left untouched and the app no longer reads or manages it, except that `legacy-v1.txt` still counts towards search like any other text file.
 
 ## Background work and caches
 
@@ -219,16 +241,19 @@ All three targets build in the Swift 6 language mode with no warnings. Two thing
 ## Colour and accessibility
 
 - `inkSecondary` is for decoration, large text, borders and icons only. Small labels and metadata use `textSecondary`, which keeps 7:1 on paper, desk and surface in light, dark and Increase Contrast, so anti-aliased small text still clears Apple's audit (`DesignTokenTests`).
-- `AccessibilityAuditUITests` runs Apple's full audit over the empty and seeded library, search results, Recently Deleted, New Notebook, Settings, Change Cover (sheets at both ends of their scroll), the editor, the paper drawer (only its top at the large text size, where the audit misreads rows it scrolls back into view), the page navigator and Recordings, in light, dark and both with Increase Contrast (`-increaseContrast` sets the trait override), then Dynamic Type, clipping and contrast again at a large text size. A few issues are logged rather than failed: text on the system glass bars, PencilKit's tool picker handle, text behind a sheet that VoiceOver skips, unnamed contrast issues on a sheet scrolled so text sits under its glass bar, and Dynamic Type on the last row and footer of the Settings Form, which the audit flags whatever they contain (both scale fully at the largest size).
+- `AccessibilityAuditUITests` runs Apple's full audit over the empty and seeded library, search results, Recently Deleted, New Notebook, Settings, Change Cover (sheets at both ends of their scroll), the editor, the paper drawer (only its top at the large text size, where the audit misreads rows it scrolls back into view), the page navigator and its Outline tab, the sticker drawer, a selected sticker with the arrange bar, a text box being typed in, the link picker, a selected link, focus mode, presenting and Recordings, in light, dark and both with Increase Contrast (`-increaseContrast` sets the trait override), then Dynamic Type, clipping and contrast again at a large text size. A few issues are logged rather than failed: text on the system glass bars, PencilKit's tool picker handle, text behind a sheet that VoiceOver skips, unnamed contrast issues on a sheet scrolled so text sits under its glass bar, and Dynamic Type on the last row and footer of the Settings Form, which the audit flags whatever they contain (both scale fully at the largest size).
+- Text typed on a page is logged, not failed, for Dynamic Type: its size is the user's choice and it zooms with the page, as ink does. The controls round it scale as usual.
+- The audit runs in portrait: in landscape the iPadOS 27 simulator hands it a rotated screenshot, so contrast is sampled from the wrong pixels. It also skips text a sheet or the undo slip covers, text cut by the screen edge, text inside cover and page images, contrast in the paper popover (iPadOS reports its content about 49 pt low) and contrast inside sheets at the large text size. It also logs contrast reports for text on the editor's floating bars, which it makes on some runs whatever the colours (their pairs are covered by `DesignTokenTests`), and text-size reports that name no element. Each real failure prints an `AUDIT FAIL` line.
 - Layouts that change with text size use `AnyLayout`, not `ViewThatFits`: the audit can't follow text across `ViewThatFits`'s two copies and reports it as partly unscaled.
 - No text uses `caption2`: the audit reports it as partly unscaled, so the smallest style is `caption`.
 - A button holding both text and a light image (a paper miniature, a light cloth) is read as low-contrast text, so captions sit outside their button, as a cover's meta line does, and paper colour chips are filled with their own colour.
 
 ## Known limits
 
-- Undo keeps whole-page drawings, up to 200 steps. Memory therefore grows with the number of distinct pages edited in a session, not just with the 24-page ink cache. The fix is a stroke budget that drops the oldest steps; it should be sized from a device memory trace.
+- Undo keeps whole-page drawings. The number of steps shrinks as the pages being edited get heavier: 200 steps for light pages down to 20 for pages whose saved ink is over about 2.4 MB (`UndoBudget`, a 48 MB budget). The budget is an estimate and should be checked against a device memory trace.
 - Each library record carries its search text, so the shelf's query loads it. Moving search text into its own entity is a schema change worth making before release.
 - Lasso and ruler are page-scoped in the first release: each page is its own canvas, so neither can span two pages, and ink past a page edge is hidden. v1's single canvas allowed both. Cross-page lasso is a future feature, to be built as a selection layer over the per-page canvases, not by returning to one canvas.
 - ⌘F is claimed by a first-responder view in the library (the toolbar search swallows it otherwise). In the iPadOS 27 simulator under XCUITest, ⌘F never reaches the app at all while ⌘G on the same view does, so it needs a check on a device.
+- The second screen has been checked with a stand-in window (`-secondScreenInset`), not with a display: the simulator's external display can't be attached from a test. Lifting a subject out of a photo runs on a Mac with the same code but not in the simulator. Both need a check on a device.
 - Every figure above is from the simulator. The device checklist covers Pencil latency, hitches (Instruments), memory at 5× with the heavy fixture, palm rejection, and Pencil double-tap and squeeze.
 

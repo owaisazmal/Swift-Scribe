@@ -6,7 +6,18 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		57A1DE70000000000000000C /* ScribeWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 57A1DE700000000000000001 /* ScribeWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
+		57A1DE70000000000000000E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 96D9BDA72C13E3AC00726199 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 57A1DE700000000000000004;
+			remoteInfo = ScribeWidgets;
+		};
 		96D9BDC02C13E3B100726199 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 96D9BDA72C13E3AC00726199 /* Project object */;
@@ -23,13 +34,38 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		57A1DE70000000000000000B /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				57A1DE70000000000000000C /* ScribeWidgets.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		57A1DE700000000000000001 /* ScribeWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ScribeWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		96D9BDAF2C13E3AC00726199 /* NotesApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NotesApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		96D9BDBF2C13E3B100726199 /* NotesAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NotesAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		96D9BDC92C13E3B100726199 /* NotesAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NotesAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		57A1DE700000000000000002 /* ScribeWidgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = ScribeWidgets;
+			sourceTree = "<group>";
+		};
+		57A1DE700000000000000003 /* Shared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Shared;
+			sourceTree = "<group>";
+		};
 		96D9BDB12C13E3AC00726199 /* NotesApp */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = NotesApp;
@@ -48,6 +84,13 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		57A1DE700000000000000006 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		96D9BDAC2C13E3AC00726199 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -78,6 +121,8 @@
 				96D9BDB12C13E3AC00726199 /* NotesApp */,
 				96D9BDC22C13E3B100726199 /* NotesAppTests */,
 				96D9BDCC2C13E3B100726199 /* NotesAppUITests */,
+				57A1DE700000000000000002 /* ScribeWidgets */,
+				57A1DE700000000000000003 /* Shared */,
 				96D9BDB02C13E3AC00726199 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -88,6 +133,7 @@
 				96D9BDAF2C13E3AC00726199 /* NotesApp.app */,
 				96D9BDBF2C13E3B100726199 /* NotesAppTests.xctest */,
 				96D9BDC92C13E3B100726199 /* NotesAppUITests.xctest */,
+				57A1DE700000000000000001 /* ScribeWidgets.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -95,6 +141,27 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		57A1DE700000000000000004 /* ScribeWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 57A1DE700000000000000008 /* Build configuration list for PBXNativeTarget "ScribeWidgets" */;
+			buildPhases = (
+				57A1DE700000000000000005 /* Sources */,
+				57A1DE700000000000000006 /* Frameworks */,
+				57A1DE700000000000000007 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				57A1DE700000000000000002 /* ScribeWidgets */,
+				57A1DE700000000000000003 /* Shared */,
+			);
+			name = ScribeWidgets;
+			productName = ScribeWidgets;
+			productReference = 57A1DE700000000000000001 /* ScribeWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		96D9BDAE2C13E3AC00726199 /* NotesApp */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 96D9BDD32C13E3B100726199 /* Build configuration list for PBXNativeTarget "NotesApp" */;
@@ -102,12 +169,15 @@
 				96D9BDAB2C13E3AC00726199 /* Sources */,
 				96D9BDAC2C13E3AC00726199 /* Frameworks */,
 				96D9BDAD2C13E3AC00726199 /* Resources */,
+				57A1DE70000000000000000B /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				57A1DE70000000000000000D /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
+				57A1DE700000000000000003 /* Shared */,
 				96D9BDB12C13E3AC00726199 /* NotesApp */,
 			);
 			name = NotesApp;
@@ -167,6 +237,9 @@
 				LastSwiftUpdateCheck = 1530;
 				LastUpgradeCheck = 1530;
 				TargetAttributes = {
+					57A1DE700000000000000004 = {
+						CreatedOnToolsVersion = 16.0;
+					};
 					96D9BDAE2C13E3AC00726199 = {
 						CreatedOnToolsVersion = 15.3;
 					};
@@ -181,7 +254,7 @@
 				};
 			};
 			buildConfigurationList = 96D9BDAA2C13E3AC00726199 /* Build configuration list for PBXProject "NotesApp" */;
-						developmentRegion = en;
+			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
@@ -196,11 +269,19 @@
 				96D9BDAE2C13E3AC00726199 /* NotesApp */,
 				96D9BDBE2C13E3B100726199 /* NotesAppTests */,
 				96D9BDC82C13E3B100726199 /* NotesAppUITests */,
+				57A1DE700000000000000004 /* ScribeWidgets */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		57A1DE700000000000000007 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		96D9BDAD2C13E3AC00726199 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -225,6 +306,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		57A1DE700000000000000005 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		96D9BDAB2C13E3AC00726199 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -249,6 +337,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		57A1DE70000000000000000D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 57A1DE700000000000000004 /* ScribeWidgets */;
+			targetProxy = 57A1DE70000000000000000E /* PBXContainerItemProxy */;
+		};
 		96D9BDC12C13E3B100726199 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 96D9BDAE2C13E3AC00726199 /* NotesApp */;
@@ -262,6 +355,56 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		57A1DE700000000000000009 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Config/ScribeWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Config/ScribeWidgets-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Swift Scribe";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.owais.NotesApp.ScribeWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 2;
+			};
+			name = Debug;
+		};
+		57A1DE70000000000000000A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Config/ScribeWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Config/ScribeWidgets-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Swift Scribe";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.owais.NotesApp.ScribeWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 2;
+			};
+			name = Release;
+		};
 		96D9BDD12C13E3B100726199 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -387,6 +530,7 @@
 				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "AppIcon-Tomato AppIcon-Moss AppIcon-Oxblood AppIcon-Mustard AppIcon-Print";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Config/NotesApp.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"NotesApp/Preview Content\"";
@@ -396,7 +540,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "Swift Scribe";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Swift Scribe records audio alongside your notes when you tap the record button.";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Swift Scribe adds photos you pick as pages in your notebooks.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Swift Scribe adds photos you pick as pages or pictures in your notebooks.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -421,6 +565,7 @@
 				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "AppIcon-Tomato AppIcon-Moss AppIcon-Oxblood AppIcon-Mustard AppIcon-Print";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Config/NotesApp.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"NotesApp/Preview Content\"";
@@ -430,7 +575,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "Swift Scribe";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Swift Scribe records audio alongside your notes when you tap the record button.";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Swift Scribe adds photos you pick as pages in your notebooks.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Swift Scribe adds photos you pick as pages or pictures in your notebooks.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -524,6 +669,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		57A1DE700000000000000008 /* Build configuration list for PBXNativeTarget "ScribeWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				57A1DE700000000000000009 /* Debug */,
+				57A1DE70000000000000000A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		96D9BDAA2C13E3AC00726199 /* Build configuration list for PBXProject "NotesApp" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

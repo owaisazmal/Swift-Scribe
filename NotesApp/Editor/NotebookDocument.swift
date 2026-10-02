@@ -41,6 +41,16 @@ final class DocumentUndoManager: UndoManager {
     }()
 }
 
+/// Undo steps hold whole-page drawings, so the heavier the pages being edited, the fewer steps are kept.
+enum UndoBudget {
+    static let bytes = 48 << 20
+    static let levels = 20...200
+
+    static func levels(forPageBytes pageBytes: Int) -> Int {
+        min(max(bytes / max(pageBytes, 1), levels.lowerBound), levels.upperBound)
+    }
+}
+
 struct DocumentNotice: Identifiable, Hashable, Sendable {
     enum Kind: Sendable { case quarantined, recovered, readOnly, unreadablePages, saveFailed }
     let id = UUID()
@@ -67,6 +77,7 @@ final class NotebookDocument {
     let isReadOnly: Bool
 
     @ObservationIgnored let undoManager = DocumentUndoManager()
+    @ObservationIgnored private var heaviestEditedPage = 0
     @ObservationIgnored weak var inkObserver: InkObserver?
     /// The editor's recorder, so closing a window can stop a recording before the last save.
     @ObservationIgnored weak var recorder: NotebookRecorder?
@@ -143,7 +154,7 @@ final class NotebookDocument {
         manifest = load.manifest
         isReadOnly = load.isReadOnly
         indexedSignature = IndexSignature(load.manifest)
-        undoManager.levelsOfUndo = 200
+        undoManager.levelsOfUndo = UndoBudget.levels.upperBound
         if manifest.pages.isEmpty, !isReadOnly {
             manifest.pages = [manifest.defaults.newPage()]
             manifestVersion += 1
@@ -316,9 +327,10 @@ final class NotebookDocument {
         undoManager.setActionName(String(localized: "Ink"))
     }
 
-    /// Replaces a page's ink from the model side and tells a live canvas to show it.
+    /// Replaces a page's ink from the model side and tells a live canvas to show it. The copy matters: given an
+    /// earlier version of a drawing it has seen, PencilKit brings the later strokes back with the next stroke.
     func replaceInk(_ pageID: UUID, with drawing: PKDrawing) {
-        setInk(pageID, drawing)
+        setInk(pageID, PKDrawing(strokes: drawing.strokes))
         inkObserver?.document(self, didReplaceInkOf: pageID)
         inkChanged()
     }
@@ -417,7 +429,7 @@ final class NotebookDocument {
         }
     }
 
-    private func updatePage(_ pageID: UUID, actionName: String, _ change: (inout NotebookPage) -> Void) {
+    func updatePage(_ pageID: UUID, actionName: String, _ change: (inout NotebookPage) -> Void) {
         guard !isReadOnly, let index = index(of: pageID) else { return }
         let before = manifest.pages[index]
         change(&manifest.pages[index])
@@ -614,6 +626,10 @@ final class NotebookDocument {
                 if inkModifiedAt == written { inkModifiedAt = nil }
                 let inked = pending.versions.keys.filter { (receipt.inkHashes[$0] ?? nil) != nil }
                 if !inked.isEmpty { onInkSaved?(inked, written) }
+            }
+            if let heaviest = receipt.inkBytes.values.max(), heaviest > heaviestEditedPage {
+                heaviestEditedPage = heaviest
+                undoManager.levelsOfUndo = UndoBudget.levels(forPageBytes: heaviest)
             }
             if manifestVersion == pending.manifestVersion { savedManifestVersion = pending.manifestVersion }
             failures = 0

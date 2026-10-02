@@ -33,6 +33,12 @@ struct EditorScreen: View {
             guard (note.object as? UIScene)?.session.persistentIdentifier == sceneID else { return }
             closeWithWindow()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .scribeCloseEditor)) { note in
+            guard (note.object as? UUID) == notebookID else { return }
+            guard let document else { return onClose() }
+            document.recorder?.shutdown()
+            close()
+        }
         .alert("Your latest changes aren't saved yet", isPresented: Binding(get: { unsavedReason != nil },
                                                                             set: { if !$0 { unsavedReason = nil } })) {
             Button("Try Again") { close() }

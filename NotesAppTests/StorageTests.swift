@@ -40,7 +40,6 @@ final class ManifestCodecTests: XCTestCase {
         manifest.modifiedAt = fixedDate.addingTimeInterval(60)
         manifest.recordings = [RecordingEntry(id: UUID(), file: "r.m4a", createdAt: fixedDate, duration: 12.5)]
         manifest.library = LibraryState(isFavorite: true, deletedAt: fixedDate, folderID: UUID(), lastOpenedAt: fixedDate, currentPage: 2)
-        manifest.migratedFrom = "v1"
         return manifest
     }
 

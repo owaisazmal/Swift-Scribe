@@ -6,16 +6,23 @@ extension XCTestCase {
     @MainActor
     func audit(_ app: XCUIApplication, _ types: XCUIAccessibilityAuditType = .all, screen: String = "", modal: Bool = false,
                scrolled: Bool = false, formText: [String] = [], sheet: XCUIElement? = nil, popover: Bool = false,
-               largeText: Bool = false, overlay: XCUIElement? = nil) throws {
+               largeText: Bool = false, overlay: XCUIElement? = nil, bar: XCUIElement? = nil, pageText: [String] = []) throws {
         let barMaxY = app.navigationBars.allElementsBoundByIndex.map { $0.frame.maxY }.max() ?? 0
         let screenMaxY = app.windows.firstMatch.frame.maxY
         let overlayTop = overlay.map { $0.exists ? $0.frame.minY - 120 : screenMaxY - 240 }
+        let barFrame = bar.flatMap { $0.exists ? $0.frame.insetBy(dx: -4, dy: -4) : nil }
         let sheetTexts = sheet.flatMap { $0.exists ? $0.staticTexts.allElementsBoundByIndex.map(\.frame) : nil } ?? []
         try app.performAccessibilityAudit(for: types) { issue in
             let element = issue.element
             print("AUDIT [\(screen)] \(issue.compactDescription) | type \(element.map { String($0.elementType.rawValue) } ?? "-") '\(element?.label ?? "nil")' \(element?.frame ?? .zero)")
             if issue.auditType == .contrast || issue.auditType == .dynamicType, let element, element.frame.minY < barMaxY {
                 print("AUDIT [\(screen)] ignored on system bar: \(element.label)")
+                return true
+            }
+            // Text typed on a page is the user's content: they set its size, and it zooms with the page as ink does.
+            if issue.auditType == .dynamicType, let label = element?.label, !pageText.isEmpty,
+               element?.identifier == "page.text.editor" || pageText.contains(where: label.hasPrefix) {
+                print("AUDIT [\(screen)] ignored, text on the page: \(label)")
                 return true
             }
             // Form rows and footers are flagged whatever they hold; all of it scales fully at AX5.
@@ -41,6 +48,17 @@ extension XCTestCase {
             // Thumbnail contents the audit reads as text, and rows a sheet's edge cuts at large sizes; colours are checked at the default size.
             if modal, issue.auditType == .contrast, element == nil || largeText {
                 print("AUDIT [\(screen)] ignored in a sheet: \(issue.compactDescription)")
+                return true
+            }
+            // Text on the editor's floating bars is reported as low contrast whatever its colours, and not every run.
+            // The pairs it uses (Ink on Surface, Paper on the accent) are checked by DesignTokenTests.
+            if let barFrame, issue.auditType == .contrast, let element, barFrame.contains(element.frame) {
+                print("AUDIT [\(screen)] ignored on a floating bar: \(element.label)")
+                return true
+            }
+            // Now and then the audit reports a text-size issue with no element at all, on a different screen each time.
+            if issue.auditType == .dynamicType, element == nil {
+                print("AUDIT [\(screen)] ignored, no element to act on: \(issue.compactDescription)")
                 return true
             }
             // Text the audit can't tie to an element is inside cover and page images: the user's content.

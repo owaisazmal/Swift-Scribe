@@ -3,6 +3,10 @@ import UIKit
 import PencilKit
 import os
 
+private struct SharedSlide: @unchecked Sendable {
+    let image: UIImage
+}
+
 struct PageStack: UIViewControllerRepresentable {
     let session: EditorSession
 
@@ -114,14 +118,37 @@ final class PageBackgroundChunk: UIView {
     nonisolated override func draw(_ rect: CGRect) {
         guard let ctx = UIGraphicsGetCurrentContext() else { return }
         ctx.translateBy(x: -region.minX * unit, y: -region.minY * unit)
-        PageRenderer.drawBackground(page, assets: assets, in: ctx, size: CGSize(width: page.size.width * unit, height: page.size.height * unit))
+        PageRenderer.drawBackground(page, assets: assets, in: ctx, size: CGSize(width: page.size.width * unit, height: page.size.height * unit), items: false)
     }
 }
 
 final class PageSlotView: UIView {
-    let page: NotebookPage
+    var page: NotebookPage
     var chunks: [Int: PageBackgroundChunk] = [:]
     weak var canvas: PageCanvasView?
+    private(set) var itemViews: [UUID: PageItemView] = [:]
+
+    /// Pictures, stickers, text and links sit above the paper and below the canvas, back to front.
+    func syncItems(assets: URL, scale: CGFloat, links: LinkTitles, onActivate: @escaping (UUID) -> Void) {
+        let items = page.items.filter { $0.content != .unknown }
+        let keep = Set(items.map(\.id))
+        for (id, view) in itemViews where !keep.contains(id) {
+            view.removeFromSuperview()
+            itemViews[id] = nil
+        }
+        for item in items {
+            let view = itemViews[item.id] ?? PageItemView(item: item, assets: assets)
+            view.update(item, onDark: page.effectivePaperColor.isDark, links: links)
+            view.onActivate = onActivate
+            view.layout(scale: scale)
+            itemViews[item.id] = view
+            if let canvas, canvas.superview === self { insertSubview(view, belowSubview: canvas) } else { addSubview(view) }
+        }
+    }
+
+    func layoutItems(scale: CGFloat) {
+        for view in itemViews.values { view.layout(scale: scale) }
+    }
 
     init(page: NotebookPage) {
         self.page = page
@@ -136,7 +163,7 @@ final class PageSlotView: UIView {
 
 @MainActor
 final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanvasViewDelegate, PKToolPickerObserver,
-                                 InkObserver, EditorCanvasControlling {
+                                 InkObserver, EditorCanvasControlling, UIGestureRecognizerDelegate, UIDropInteractionDelegate, UITextViewDelegate {
     private let session: EditorSession
     private var document: NotebookDocument { session.document }
     private let scrollView = UIScrollView()
@@ -162,6 +189,20 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     private var isBaking = false
     private var lastBounds: CGRect = .zero
     private var toolPickerSuppressed = false
+    private let laser = LaserTrailView()
+    private lazy var laserGesture = UILongPressGestureRecognizer(target: self, action: #selector(pointLaser))
+    private(set) var isPresenting = false
+    private var selectionView: ItemSelectionView?
+    private var linkTitles = LinkTitles()
+    private var textView: UITextView?
+    private var typing: ItemSelection?
+    private var keyboardOverlap: CGFloat = 0
+    private var mirrored: String?
+    private var fingersDraw = false
+    private lazy var itemTap = UITapGestureRecognizer(target: self, action: #selector(tappedPage))
+    private lazy var itemHold = UILongPressGestureRecognizer(target: self, action: #selector(heldPage))
+    private var zoomBeforePresenting: CGFloat?
+    private var lastSafeTop: CGFloat = 0
     private var firstInkPage: UUID?
     private var firstInkReported = false
     private let openedAt = CACurrentMediaTime()
@@ -178,6 +219,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         document.inkObserver = self
         document.onStructureChange = { [weak self] in self?.pagesDidChange() }
         pages = document.pages
+        linkTitles = LinkTitles(pages: pages)
         layout = PageStackLayout(pages: pages)
     }
 
@@ -207,6 +249,23 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         anchor.undoProxy = undoProxy
         anchor.frame = .zero
         view.addSubview(anchor)
+        laser.frame = view.bounds
+        laser.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        view.addSubview(laser)
+        laserGesture.minimumPressDuration = 0
+        laserGesture.allowableMovement = .greatestFiniteMagnitude
+        laserGesture.cancelsTouchesInView = false
+        laserGesture.delegate = self
+        laserGesture.isEnabled = false
+        view.addGestureRecognizer(laserGesture)
+        view.addInteraction(UIDropInteraction(delegate: self))
+        itemTap.allowedTouchTypes = [NSNumber(value: UITouch.TouchType.direct.rawValue)]
+        itemHold.minimumPressDuration = 0.45
+        for recognizer in [itemTap, itemHold] {
+            recognizer.cancelsTouchesInView = false
+            recognizer.delegate = self
+            scrollView.addGestureRecognizer(recognizer)
+        }
         toolPicker.addObserver(self)
         toolPicker.colorUserInterfaceStyle = .light
         toolPicker.stateAutosaveName = "SwiftScribe.ToolPicker"
@@ -216,6 +275,11 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
             self.updatePageEdges()
         }
         NotificationCenter.default.addObserver(self, selector: #selector(sceneDidActivate), name: UIScene.didActivateNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(keyboardChanged), name: UIResponder.keyboardWillChangeFrameNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(secondScreenChanged), name: .scribeExternalDisplayChanged, object: nil)
+        for name in [UIScene.willDeactivateNotification, Notification.Name.scribeCloseEditor] {
+            NotificationCenter.default.addObserver(self, selector: #selector(finishTyping), name: name, object: nil)
+        }
     }
 
     /// Fingers and the trackpad scroll and zoom; the Pencil never does.
@@ -231,9 +295,25 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
+        endTextEditing()
+        ExternalDisplay.shared.end(for: self)
         toolPicker.setVisible(false, forFirstResponder: anchor)
         for canvas in canvases.values { toolPicker.setVisible(false, forFirstResponder: canvas) }
         anchor.resignFirstResponder()
+        UIApplication.shared.isIdleTimerDisabled = false
+    }
+
+    override func viewSafeAreaInsetsDidChange() {
+        super.viewSafeAreaInsetsDidChange()
+        let top = view.safeAreaInsets.top
+        guard lastBounds != .zero, top != lastSafeTop else { return }
+        lastSafeTop = top
+        if isPresenting {
+            present(page: pendingPage ?? currentPage)
+        } else {
+            updateInsets()
+            scrollView.contentOffset = clamped(scrollView.contentOffset)
+        }
     }
 
     override func viewDidLayoutSubviews() {
@@ -247,14 +327,20 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         let tallest = layout.frames.map(\.height).max() ?? 1
         minimumZoom = min(1, bounds.height / (tallest + PageStackLayout.margin * 2) / fitScale)
         for slot in slots.values { removeChunks(slot) }
-        if isFirst { firstInkPage = pages.indices.contains(page) ? pages[page].id : nil }
+        if isFirst {
+            firstInkPage = pages.indices.contains(page) ? pages[page].id : nil
+            lastSafeTop = view.safeAreaInsets.top
+        }
         bake(zoom: zoom)
         scrollToPage(page, animated: false)
         updateWindow(force: true)
+        if isPresenting { present(page: page) }
     }
 
     override var keyCommands: [UIKeyCommand]? {
         guard !toolPickerSuppressed else { return [] }
+        // While typing, every key belongs to the text box.
+        guard textView == nil else { return [UIKeyCommand(title: String(localized: "Done"), action: #selector(finishTyping), input: UIKeyCommand.inputEscape)] }
         let commands = [
             UIKeyCommand(title: String(localized: "Next Page"), action: #selector(nextPage), input: UIKeyCommand.inputPageDown),
             UIKeyCommand(title: String(localized: "Previous Page"), action: #selector(previousPage), input: UIKeyCommand.inputPageUp),
@@ -269,12 +355,21 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
             UIKeyCommand(title: String(localized: "Fit Width"), action: #selector(fitWidth), input: "0", modifierFlags: .command),
             UIKeyCommand(title: String(localized: "Fit Page"), action: #selector(fitWholePage), input: "9", modifierFlags: .command),
         ]
-        for command in commands { command.wantsPriorityOverSystemBehavior = true }
-        return commands
+        let presenting = !isPresenting ? [] : [
+            UIKeyCommand(title: String(localized: "Next Page"), action: #selector(nextPage), input: UIKeyCommand.inputRightArrow),
+            UIKeyCommand(title: String(localized: "Previous Page"), action: #selector(previousPage), input: UIKeyCommand.inputLeftArrow),
+        ]
+        let selected = session.selection == nil ? [] : [
+            UIKeyCommand(title: String(localized: "Delete"), action: #selector(deleteSelectedItem), input: UIKeyCommand.inputDelete),
+            UIKeyCommand(action: #selector(deleteSelectedItem), input: "\u{8}"),
+            UIKeyCommand(title: String(localized: "Done"), action: #selector(clearSelection), input: UIKeyCommand.inputEscape),
+        ]
+        for command in commands + presenting + selected { command.wantsPriorityOverSystemBehavior = true }
+        return commands + presenting + selected
     }
 
-    @objc private func nextPage() { session.go(to: min((pendingPage ?? currentPage) + 1, pages.count - 1)) }
-    @objc private func previousPage() { session.go(to: max((pendingPage ?? currentPage) - 1, 0)) }
+    @objc private func nextPage() { session.step(1) }
+    @objc private func previousPage() { session.step(-1) }
     @objc private func lineDown() { scrollBy(viewportFraction: 0.12, animated: true) }
     @objc private func lineUp() { scrollBy(viewportFraction: -0.12, animated: true) }
     @objc private func screenDown() { scrollBy(viewportFraction: 0.9, animated: true) }
@@ -294,12 +389,14 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         let background: PageBackground
         let paperColorRaw: String
         let size: CGSize
+        let day: String?
 
         init(_ page: NotebookPage) {
             id = page.id
             background = page.background
             paperColorRaw = page.paperColorRaw
             size = page.size
+            day = page.day
         }
     }
 
@@ -321,7 +418,9 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
             position(slot, at: index)
             for chunk in slot.chunks.values { position(chunk) }
             if let canvas = slot.canvas { place(canvas, in: slot) }
+            slot.layoutItems(scale: bakedScale)
         }
+        showSelection()
         updateInsets()
         isBaking = false
     }
@@ -341,7 +440,10 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         let vertical = max(0, (scrollView.bounds.height - scrollView.contentSize.height) / 2)
         let obscured = toolPicker.isVisible ? toolPicker.frameObscured(in: view) : .null
         let bottom = obscured.isNull ? vertical : max(vertical, view.bounds.maxY - obscured.minY)
-        scrollView.contentInset = UIEdgeInsets(top: vertical + view.safeAreaInsets.top, left: horizontal, bottom: bottom, right: horizontal)
+        // Room to centre the first and last page while presenting.
+        let slack = isPresenting ? scrollView.bounds.height / 2 : 0
+        scrollView.contentInset = UIEdgeInsets(top: max(vertical + view.safeAreaInsets.top, slack), left: horizontal,
+                                               bottom: max(bottom, slack, textView == nil ? 0 : keyboardOverlap), right: horizontal)
     }
 
     private func clamped(_ offset: CGPoint) -> CGPoint {
@@ -466,6 +568,18 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         let page = currentPage
         if pendingPage == nil, page != session.currentPage { session.pageDidChange(page) }
         updateInkAppearance()
+        dimOtherPages()
+        mirrorPresentation()
+    }
+
+    /// While presenting, the pages either side of the one being shown step back.
+    private func dimOtherPages() {
+        let shown = pendingPage ?? session.currentPage
+        let shownID = isPresenting && pages.indices.contains(shown) ? pages[shown].id : nil
+        for (id, slot) in slots {
+            let alpha: CGFloat = shownID == nil || id == shownID ? 1 : 0.25
+            if slot.alpha != alpha { slot.alpha = alpha }
+        }
     }
 
     /// The picker's swatches show ink as the current page will: light on Chalkboard.
@@ -483,10 +597,12 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         position(slot, at: index)
         contentView.addSubview(slot)
         slots[page.id] = slot
+        if page.hasItems { syncItems(in: slot) }
         return slot
     }
 
     private func removeSlot(_ id: UUID) {
+        if session.selection?.pageID == id { select(nil) }
         recycleCanvas(id)
         guard let slot = slots.removeValue(forKey: id) else { return }
         removeChunks(slot)
@@ -578,6 +694,8 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         slot.addSubview(canvas)
         slot.canvas = canvas
         canvases[page.id] = canvas
+        if let selectionView, selectionView.superview === slot { slot.bringSubviewToFront(selectionView) }
+        if let textView, textView.superview === slot { slot.bringSubviewToFront(textView) }
         if toolPicker.isVisible { toolPicker.setVisible(true, forFirstResponder: canvas) }
         if let ink = document.loadedInk(page.id) {
             show(ink, in: canvas)
@@ -598,7 +716,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         canvas.strokeCount = nil
         isApplyingDrawing = false
         canvas.isLoaded = true
-        setDrawingEnabled(!document.isReadOnly, canvas)
+        setDrawingEnabled(!document.isReadOnly && !isPresenting, canvas)
         if !firstInkReported, canvas.pageID == firstInkPage, ink.strokes.isEmpty {
             DispatchQueue.main.async { [weak self] in self?.reportFirstInk() }
         }
@@ -657,6 +775,11 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         document.canvasDidChangeInk(id, to: canvas.drawing)
     }
 
+    /// Writing anywhere puts a selected picture down.
+    func canvasViewDidBeginUsingTool(_ canvasView: PKCanvasView) {
+        if session.selection != nil { select(nil) }
+    }
+
     func canvasViewDidFinishRendering(_ canvasView: PKCanvasView) {
         guard !firstInkReported, (canvasView as? PageCanvasView)?.pageID == firstInkPage,
               (canvasView as? PageCanvasView)?.isLoaded == true else { return }
@@ -682,15 +805,307 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     private func pagesDidChange() {
         let updated = document.pages
         let updatedKeys = updated.map(SlotKey.init), currentKeys = pages.map(SlotKey.init)
+        let titles = LinkTitles(pages: updated)
+        let renamed = titles != linkTitles
+        linkTitles = titles
         guard updatedKeys.elementsEqual(currentKeys, by: Self.sameSlot) else {
             relayout(updated, changed: Self.changedIDs(updatedKeys, currentKeys))
+            refreshItems(all: renamed)
             return
         }
         pages = updated
+        refreshItems(all: renamed)
+    }
+
+    // MARK: Pictures, stickers, text and links
+
+    private func syncItems(in slot: PageSlotView) {
+        slot.syncItems(assets: document.package.assetsDirectory, scale: bakedScale, links: linkTitles) { [weak self, weak slot] itemID in
+            guard let self, let slot else { return }
+            self.activate(ItemSelection(pageID: slot.page.id, itemID: itemID))
+        }
+        if let typing, typing.pageID == slot.page.id { slot.itemViews[typing.itemID]?.isHidden = true }
+    }
+
+    /// After any change to the pages: slots pick up their page's current items, and the selection follows its item.
+    /// A page that moved or was renamed changes what the links to it say, so then every slot is gone over.
+    private func refreshItems(all: Bool = false) {
+        for (id, slot) in slots {
+            guard let index = index(of: id) else { continue }
+            let page = pages[index]
+            let changed = slot.page.extra["items"] != page.extra["items"]
+            slot.page = page
+            if changed || (all && page.hasItems) { syncItems(in: slot) }
+        }
+        showSelection()
+    }
+
+    private func item(_ selection: ItemSelection) -> PageItem? {
+        slots[selection.pageID]?.page.items.first { $0.id == selection.itemID }
+    }
+
+    /// What VoiceOver's double tap does: a link opens its page, anything else is picked up.
+    private func activate(_ selection: ItemSelection) {
+        if let link = item(selection)?.link {
+            session.follow(link, from: selection.pageID)
+        } else if !isPresenting, !document.isReadOnly {
+            select(selection)
+        }
+    }
+
+    private func selectedItem() -> (slot: PageSlotView, item: PageItem)? {
+        guard let selection = session.selection, let slot = slots[selection.pageID],
+              let item = slot.page.items.first(where: { $0.id == selection.itemID }) else { return nil }
+        return (slot, item)
+    }
+
+    func select(_ selection: ItemSelection?) {
+        if textView != nil, selection != typing { endTextEditing() }
+        if session.selection != selection { session.selection = selection }
+        showSelection()
+    }
+
+    /// Puts the stitched outline round the selected item, or takes it away when the item or its page is gone.
+    private func showSelection() {
+        guard !isPresenting, !document.isReadOnly, let (slot, item) = selectedItem() else {
+            discardTextEditor()
+            selectionView?.removeFromSuperview()
+            selectionView = nil
+            if session.selection != nil { session.selection = nil }
+            return
+        }
+        let view = selectionView ?? ItemSelectionView(item: item, pageSize: slot.page.size)
+        if view.superview !== slot {
+            view.removeFromSuperview()
+            slot.addSubview(view)
+        }
+        slot.bringSubviewToFront(view)
+        view.pageSize = slot.page.size
+        view.scale = bakedScale
+        if !view.isChanging { view.show(item) }
+        view.onChange = { [weak self] item, final in self?.selectedItemChanged(item, final: final) }
+        view.onTap = { [weak self] in self?.editText() }
+        selectionView = view
+        layoutTextEditor()
+    }
+
+    private func selectedItemChanged(_ item: PageItem, final: Bool) {
+        guard let selection = session.selection, let slot = slots[selection.pageID] else { return }
+        slot.itemViews[item.id]?.update(item, onDark: slot.page.effectivePaperColor.isDark, links: linkTitles)
+        slot.itemViews[item.id]?.layout(scale: bakedScale)
+        selectionView?.show(item)
+        guard final else { return }
+        document.updateItems(onPage: selection.pageID, actionName: String(localized: "Arrange")) { items in
+            if let index = items.firstIndex(where: { $0.id == item.id }) { items[index] = item }
+        }
+    }
+
+    /// The topmost picture or sticker under a point in the scroll view.
+    private func item(at point: CGPoint) -> ItemSelection? {
+        guard bakedScale > 0 else { return nil }
+        for slot in slots.values where slot.page.hasItems {
+            let local = contentView.convert(point, from: scrollView)
+            guard slot.frame.contains(local) else { continue }
+            let onPage = CGPoint(x: (local.x - slot.frame.minX) / bakedScale, y: (local.y - slot.frame.minY) / bakedScale)
+            if let hit = slot.page.items.last(where: { $0.content != .unknown && $0.contains(onPage, slop: 6) }) {
+                return ItemSelection(pageID: slot.page.id, itemID: hit.id)
+            }
+        }
+        return nil
+    }
+
+    private func isOnSelection(_ gesture: UIGestureRecognizer) -> Bool {
+        guard let selectionView else { return false }
+        return selectionView.point(inside: gesture.location(in: selectionView), with: nil)
+    }
+
+    /// A finger tap opens a link or picks up a picture when fingers don't draw; any tap elsewhere puts the selected one down.
+    /// While presenting nothing is drawn, so a tap on a link always opens it.
+    @objc private func tappedPage(_ gesture: UITapGestureRecognizer) {
+        guard !isOnSelection(gesture) else { return }
+        let hit = isPresenting || !fingersDraw ? item(at: gesture.location(in: scrollView)) : nil
+        if let hit, let link = item(hit)?.link { return session.follow(link, from: hit.pageID) }
+        guard !isPresenting, !document.isReadOnly else { return }
+        if hit != nil || session.selection != nil { select(hit) }
+    }
+
+    /// Touch and hold picks one up with a finger or the Pencil, and drops the dot the hold would have drawn.
+    @objc private func heldPage(_ gesture: UILongPressGestureRecognizer) {
+        guard gesture.state == .began, !isPresenting, !document.isReadOnly, !isOnSelection(gesture),
+              let hit = item(at: gesture.location(in: scrollView)) else { return }
+        if let canvas = canvases[hit.pageID], canvas.drawingGestureRecognizer.isEnabled {
+            canvas.drawingGestureRecognizer.isEnabled = false
+            canvas.drawingGestureRecognizer.isEnabled = true
+        }
+        select(hit)
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
+
+    // MARK: Typing in a text box
+
+    /// Puts a text view over the selected text box. The page keeps the old text until typing ends.
+    func editText() {
+        guard textView == nil, !isPresenting, !document.isReadOnly, let selection = session.selection,
+              let (slot, item) = selectedItem(), let box = item.text else { return }
+        let view = UITextView()
+        view.backgroundColor = .clear
+        view.textContainerInset = .zero
+        view.textContainer.lineFragmentPadding = 0
+        view.isScrollEnabled = false
+        view.text = box.string
+        view.delegate = self
+        view.accessibilityIdentifier = "page.text.editor"
+        view.accessibilityLabel = String(localized: "Text box")
+        slot.addSubview(view)
+        textView = view
+        typing = selection
+        slot.itemViews[item.id]?.isHidden = true
+        selectionView?.isEditing = true
+        session.isEditingText = true
+        layoutTextEditor()
+        view.becomeFirstResponder()
+        view.selectedRange = NSRange(location: (view.text as NSString).length, length: 0)
+    }
+
+    /// The box as it would be saved now: what has been typed, as tall as that needs.
+    private func liveTextItem() -> (slot: PageSlotView, item: PageItem)? {
+        guard let textView, let (slot, item) = selectedItem(), var box = item.text else { return nil }
+        box.string = textView.text
+        var live = item
+        live.content = .text(box)
+        return (slot, live.fittedToText())
+    }
+
+    private func layoutTextEditor() {
+        guard let textView, let (slot, item) = liveTextItem(), let box = item.text else { return }
+        let font = box.font(scale: bakedScale), color = box.tint.color(onDark: slot.page.effectivePaperColor.isDark)
+        if textView.font != font { textView.font = font }
+        if textView.textColor != color { textView.textColor = color }
+        if textView.textAlignment != box.alignment.textAlignment { textView.textAlignment = box.alignment.textAlignment }
+        textView.transform = .identity
+        textView.bounds = CGRect(x: 0, y: 0, width: item.size.width * bakedScale, height: item.size.height * bakedScale)
+        textView.center = CGPoint(x: item.center.x * bakedScale, y: item.center.y * bakedScale)
+        textView.transform = CGAffineTransform(rotationAngle: item.rotation)
+        selectionView?.show(item)
+        slot.bringSubviewToFront(textView)
+    }
+
+    func textViewDidChange(_ textView: UITextView) {
+        layoutTextEditor()
+        revealTextEditor()
+    }
+
+    func textViewDidEndEditing(_ textView: UITextView) {
+        endTextEditing()
+    }
+
+    @objc private func finishTyping() { endTextEditing() }
+
+    /// Saves what was typed as one undo step. A box left empty is taken off the page.
+    private func endTextEditing() {
+        guard let textView, let typing else { return }
+        let string = textView.text ?? ""
+        discardTextEditor()
+        if !toolPickerSuppressed { anchor.becomeFirstResponder() }
+        if string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            if document.undoManager.canUndo, document.undoManager.undoActionName == EditorSession.addTextAction, item(typing)?.text?.string.isEmpty == true {
+                document.undoManager.undo()
+            } else {
+                document.updateItems(onPage: typing.pageID, actionName: String(localized: "Delete")) { $0.removeAll { $0.id == typing.itemID } }
+            }
+        } else {
+            document.updateItems(onPage: typing.pageID, actionName: String(localized: "Edit Text")) { items in
+                guard let index = items.firstIndex(where: { $0.id == typing.itemID }), var box = items[index].text else { return }
+                box.string = string
+                items[index].content = .text(box)
+                items[index] = items[index].fittedToText()
+            }
+        }
+    }
+
+    private func discardTextEditor() {
+        guard let textView else { return }
+        self.textView = nil
+        textView.delegate = nil
+        textView.removeFromSuperview()
+        if let typing { slots[typing.pageID]?.itemViews[typing.itemID]?.isHidden = false }
+        typing = nil
+        selectionView?.isEditing = false
+        if session.isEditingText { session.isEditingText = false }
+        updateInsets()
+    }
+
+    @objc private func keyboardChanged(_ note: Notification) {
+        guard let frame = (note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue, let window = view.window else { return }
+        let covered = view.convert(frame, from: window.screen.coordinateSpace).intersection(view.bounds)
+        keyboardOverlap = covered.isNull ? 0 : max(0, view.bounds.maxY - covered.minY)
+        guard textView != nil else { return }
+        updateInsets()
+        revealTextEditor()
+    }
+
+    private func revealTextEditor() {
+        guard let textView, let slot = textView.superview else { return }
+        scrollView.scrollRectToVisible(scrollView.convert(textView.frame, from: slot).insetBy(dx: 0, dy: -24), animated: true)
+    }
+
+    // MARK: Dropping and pasting pictures
+
+    private var acceptsPictures: Bool { !document.isReadOnly && !isPresenting }
+
+    func dropInteraction(_ interaction: UIDropInteraction, canHandle session: UIDropSession) -> Bool {
+        acceptsPictures && session.canLoadObjects(ofClass: UIImage.self)
+    }
+
+    func dropInteraction(_ interaction: UIDropInteraction, sessionDidUpdate session: UIDropSession) -> UIDropProposal {
+        UIDropProposal(operation: acceptsPictures ? .copy : .forbidden)
+    }
+
+    func dropInteraction(_ interaction: UIDropInteraction, performDrop session: UIDropSession) {
+        let local = contentView.convert(session.location(in: view), from: view)
+        guard effectiveScale > 0, let index = layout.frames.indices.first(where: {
+            layout.frames[$0].insetBy(dx: -PageStackLayout.margin, dy: -PageStackLayout.margin / 2).contains(CGPoint(x: local.x / bakedScale, y: local.y / bakedScale))
+        }) else { return }
+        let frame = layout.frames[index]
+        let point = CGPoint(x: min(max(local.x / bakedScale - frame.minX, 0), frame.width), y: min(max(local.y / bakedScale - frame.minY, 0), frame.height))
+        session.loadObjects(ofClass: UIImage.self) { [weak self] objects in
+            self?.place(objects.compactMap { $0 as? UIImage }, onPage: index, at: point)
+        }
+    }
+
+    private func place(_ images: [UIImage], onPage index: Int?, at point: CGPoint?) {
+        let editor = session
+        document.perform {
+            for image in images { try? await editor.addPicture(image, onPage: index, at: point) }
+        }
+    }
+
+    override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
+        if action == #selector(paste(_:)) { return acceptsPictures && !toolPickerSuppressed && UIPasteboard.general.hasImages }
+        return super.canPerformAction(action, withSender: sender)
+    }
+
+    override func paste(_ sender: Any?) {
+        guard acceptsPictures, let images = UIPasteboard.general.images, !images.isEmpty else { return }
+        place(images, onPage: nil, at: nil)
+    }
+
+    @objc private func deleteSelectedItem() { session.deleteSelection() }
+    @objc private func clearSelection() { select(nil) }
+
+    /// The middle of what's showing of a page, in page points: where a new picture or sticker lands.
+    func visibleCenter(ofPage index: Int) -> CGPoint? {
+        guard pages.indices.contains(index), effectiveScale > 0 else { return nil }
+        let frame = layout.frames[index]
+        let area = readableArea
+        let visible = CGRect(x: (scrollView.contentOffset.x + area.minX) / effectiveScale, y: (scrollView.contentOffset.y + area.minY) / effectiveScale,
+                             width: area.width / effectiveScale, height: area.height / effectiveScale).intersection(frame)
+        guard !visible.isNull, !visible.isEmpty else { return CGPoint(x: frame.width / 2, y: frame.height / 2) }
+        return CGPoint(x: visible.midX - frame.minX, y: visible.midY - frame.minY)
     }
 
     private static func sameSlot(_ a: SlotKey, _ b: SlotKey) -> Bool {
-        a.id == b.id && a.background == b.background && a.paperColorRaw == b.paperColorRaw && a.size == b.size
+        a.id == b.id && a.background == b.background && a.paperColorRaw == b.paperColorRaw && a.size == b.size && a.day == b.day
     }
 
     private static func changedIDs(_ updated: [SlotKey], _ current: [SlotKey]) -> Set<UUID> {
@@ -726,10 +1141,10 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     // MARK: EditorCanvasControlling
 
     func setToolPickerVisible(_ visible: Bool) {
-        let shown = visible && !toolPickerSuppressed && !document.isReadOnly
+        let shown = visible && !toolPickerSuppressed && !document.isReadOnly && !isPresenting
         toolPicker.setVisible(shown, forFirstResponder: anchor)
         for canvas in canvases.values { toolPicker.setVisible(shown, forFirstResponder: canvas) }
-        if !toolPickerSuppressed { anchor.becomeFirstResponder() }
+        if !toolPickerSuppressed, textView == nil { anchor.becomeFirstResponder() }
     }
 
     func setToolPickerSuppressed(_ suppressed: Bool) {
@@ -754,18 +1169,148 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     /// switch, which only applies while the tool picker is showing.
     private func updateScrollTouches() {
         let fingersDraw = switch drawingPolicy {
+        case _ where isPresenting: fingersPoint
         case _ where document.isReadOnly: false
         case .anyInput: true
         case .pencilOnly: false
         default: toolPicker.isVisible && !UIPencilInteraction.prefersPencilOnlyDrawing
         }
+        self.fingersDraw = fingersDraw
         scrollView.panGestureRecognizer.minimumNumberOfTouches = fingersDraw ? 2 : 1
+        let pencil = NSNumber(value: UITouch.TouchType.pencil.rawValue)
+        laserGesture.allowedTouchTypes = fingersPoint ? Self.scrollTouchTypes + [pencil] : [pencil]
+    }
+
+    // MARK: Presenting
+
+    /// While presenting, whatever writes in the editor points instead: the Pencil always, a finger when fingers draw.
+    private var fingersPoint: Bool {
+        switch drawingPolicy {
+        case .anyInput: true
+        case .pencilOnly: false
+        default: !UIPencilInteraction.prefersPencilOnlyDrawing
+        }
+    }
+
+    func setPresenting(_ presenting: Bool) {
+        guard presenting != isPresenting else { return }
+        isPresenting = presenting
+        UIApplication.shared.isIdleTimerDisabled = presenting
+        laserGesture.isEnabled = presenting
+        laser.clear()
+        mirrored = nil
+        if presenting { ExternalDisplay.shared.begin(for: self) } else { ExternalDisplay.shared.end(for: self) }
+        if presenting { select(nil) }
+        for canvas in canvases.values where canvas.isLoaded { setDrawingEnabled(!document.isReadOnly && !presenting, canvas) }
+        setToolPickerVisible(session.isToolPickerVisible)
+        updateScrollTouches()
+        guard isViewLoaded, lastBounds != .zero else { return }
+        if presenting {
+            zoomBeforePresenting = zoom
+            updateInsets()
+            present(page: currentPage)
+        } else {
+            let page = currentPage
+            updateInsets()
+            if let zoomBeforePresenting { bake(zoom: zoomBeforePresenting) }
+            zoomBeforePresenting = nil
+            scrollToPage(page, animated: false)
+            updateWindow(force: true)
+        }
+    }
+
+    /// Shows one whole page, the way a slide is shown.
+    func present(page index: Int) {
+        guard pages.indices.contains(index) else { return }
+        pendingPage = index
+        fit(.page)
+    }
+
+    func setLaserColor(_ color: LaserColor) {
+        laser.color = color.uiColor
+    }
+
+    @objc private func pointLaser(_ gesture: UILongPressGestureRecognizer) {
+        let point = gesture.location(in: laser)
+        switch gesture.state {
+        case .began:
+            laser.begin(at: point)
+            mirrorLaser(.began(onPresentedPage(point)))
+        case .changed:
+            laser.move(to: point)
+            mirrorLaser(.moved(onPresentedPage(point)))
+        default:
+            laser.end()
+            mirrorLaser(.ended)
+        }
+    }
+
+    // MARK: The second screen
+
+    private var presentedPage: Int? {
+        let index = pendingPage ?? session.currentPage
+        return isPresenting && pages.indices.contains(index) ? index : nil
+    }
+
+    /// A point in the laser's view as a fraction of the presented page.
+    private func onPresentedPage(_ point: CGPoint) -> CGPoint {
+        guard let index = presentedPage, effectiveScale > 0 else { return .zero }
+        let frame = layout.frames[index], local = contentView.convert(point, from: laser)
+        return CGPoint(x: (local.x / bakedScale - frame.minX) / frame.width, y: (local.y / bakedScale - frame.minY) / frame.height)
+    }
+
+    private func mirrorLaser(_ event: LaserEvent) {
+        ExternalDisplay.shared.laser(event, color: laser.color, by: self)
+    }
+
+    @objc private func secondScreenChanged() {
+        mirrored = nil
+        mirrorPresentation()
+    }
+
+    /// Keeps a second screen on the page being presented, and on the part of it the iPad is zoomed in on.
+    private func mirrorPresentation() {
+        guard let index = presentedPage, effectiveScale > 0, let pixels = ExternalDisplay.shared.pixelSize(for: self) else { return }
+        let page = pages[index], frame = layout.frames[index], area = readableArea
+        let visible = CGRect(x: (scrollView.contentOffset.x + area.minX) / effectiveScale, y: (scrollView.contentOffset.y + area.minY) / effectiveScale,
+                             width: area.width / effectiveScale, height: area.height / effectiveScale).intersection(frame)
+        let whole = CGRect(x: 0, y: 0, width: 1, height: 1)
+        ExternalDisplay.shared.setViewport(visible.isNull || visible.isEmpty ? whole : CGRect(
+            x: (visible.minX - frame.minX) / frame.width, y: (visible.minY - frame.minY) / frame.height,
+            width: visible.width / frame.width, height: visible.height / frame.height), by: self)
+        let key = "\(page.id)-\(page.thumbnailKey)-\(Int(pixels.width))x\(Int(pixels.height))"
+        guard key != mirrored else { return }
+        mirrored = key
+        let assets = document.package.assetsDirectory, titles = linkTitles
+        let width = PresentationStage.renderWidth(pageSize: page.size, pixels: pixels)
+        Task { [weak self] in
+            guard let self else { return }
+            let ink = await self.document.ink(page.id)
+            let image = await Task.detached(priority: .userInitiated) {
+                SharedSlide(image: PageRenderer.image(of: page, ink: ink, assets: assets, width: width, links: titles))
+            }.value.image
+            guard self.mirrored == key else { return }
+            ExternalDisplay.shared.show(image, pageSize: page.size, by: self)
+        }
+    }
+
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+        [laserGesture, itemTap, itemHold].contains { $0 === gestureRecognizer || $0 === other }
+    }
+
+    /// Two fingers are scrolling or zooming, not pointing.
+    private func dropLaser() {
+        guard isPresenting, laser.isTracking else { return }
+        laser.clear()
+        mirrorLaser(.cleared)
+        laserGesture.isEnabled = false
+        laserGesture.isEnabled = true
     }
 
     // MARK: PKToolPickerObserver
 
     func toolPickerVisibilityDidChange(_ toolPicker: PKToolPicker) {
-        if !toolPickerSuppressed, session.isToolPickerVisible != toolPicker.isVisible {
+        if !toolPickerSuppressed, textView == nil, session.isToolPickerVisible != toolPicker.isVisible {
             session.isToolPickerVisible = toolPicker.isVisible
         }
         updateInsets()
@@ -796,10 +1341,12 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
 
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
         pendingPage = nil
+        dropLaser()
     }
 
     func scrollViewWillBeginZooming(_ scrollView: UIScrollView, with view: UIView?) {
         pendingPage = nil
+        dropLaser()
     }
 
     func scrollViewDidZoom(_ scrollView: UIScrollView) {

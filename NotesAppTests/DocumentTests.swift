@@ -10,6 +10,13 @@ private final class RecordingObserver: InkObserver {
 
 @MainActor
 final class DocumentTests: XCTestCase {
+    func testUndoLevelsShrinkAsPagesGetHeavier() {
+        XCTAssertEqual(UndoBudget.levels(forPageBytes: 0), 200)
+        XCTAssertEqual(UndoBudget.levels(forPageBytes: 100_000), 200)
+        XCTAssertEqual(UndoBudget.levels(forPageBytes: 1 << 20), 48)
+        XCTAssertEqual(UndoBudget.levels(forPageBytes: 8 << 20), 20, "never fewer than twenty steps")
+    }
+
     private func makeDocument(pages: Int = 4, root: StorageRoot? = nil) async throws -> (NotebookDocument, StorageRoot) {
         let root = root ?? temporaryRoot(self)
         let manifest = NotebookManifest(title: "Doc", defaults: PageDefaults(template: .narrowRuled, paperColor: .white, pageSize: .letter),

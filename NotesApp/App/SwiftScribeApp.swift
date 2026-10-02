@@ -1,8 +1,20 @@
 import SwiftUI
 import SwiftData
 
+/// Only here to give a second screen its own scene; every other scene is SwiftUI's.
+final class ScribeAppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication, configurationForConnecting connectingSceneSession: UISceneSession,
+                     options: UIScene.ConnectionOptions) -> UISceneConfiguration {
+        let configuration = UISceneConfiguration(name: nil, sessionRole: connectingSceneSession.role)
+        if connectingSceneSession.role == .windowExternalDisplayNonInteractive { configuration.delegateClass = ExternalDisplaySceneDelegate.self }
+        return configuration
+    }
+}
+
 @main
 struct SwiftScribeApp: App {
+    @UIApplicationDelegateAdaptor(ScribeAppDelegate.self) private var delegate
+
     var body: some Scene {
         WindowGroup {
             ScribeRoot()
@@ -18,15 +30,6 @@ struct ScribeRoot: View {
         ZStack {
             LibraryRootView()
                 .opacity(app.phase == .ready ? 1 : 0)
-            if app.phase == .migrating {
-                VStack(spacing: Space.x4) {
-                    ProgressView().controlSize(.large)
-                    Text("Moving your notebooks to the new format…").displayTextFont(19, relativeTo: .title3)
-                    Text("Your originals are kept as a backup.").foregroundStyle(Color.textSecondary)
-                }
-                .foregroundStyle(Color.ink)
-                .accessibilityElement(children: .combine)
-            }
         }
         .background(Color.paper.ignoresSafeArea())
         .environment(app)
@@ -38,17 +41,14 @@ struct ScribeRoot: View {
             if LaunchOptions.arguments.contains("-framePacing") { FramePacingWindow.install() }
             #endif
             await app.start()
+            await WidgetBridge.update(app)
         }
         .onChange(of: scenePhase) { _, phase in
             if phase != .active {
                 app.flushOpenDocuments()
                 app.activity.flush()
+                Task { await WidgetBridge.update(app) }
             }
-        }
-        .alert("Some notebooks weren't moved", isPresented: $app.showsMigrationProblem) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text("\(app.migrationProblem ?? "") Your original notebooks are untouched, and Swift Scribe will try again the next time it opens.")
         }
     }
 }

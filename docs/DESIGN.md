@@ -102,6 +102,30 @@ The styles:
 - At accessibility text sizes, the grid becomes a list, led by a Continue writing row.
 - **Empty states look like the library.** A new library shows a small illustrated shelf (ghost spines leaning on a cloth notebook) above "Your shelf is ready."; an empty folder says so by name and offers a new notebook there; empty Favourites shows the ribbon.
 
+## On the page
+
+- **Ribbons.** The page ribbon wears the notebook's cloth. Beside it hangs a slimmer bookmark ribbon: a Surface ghost with a Hairline edge until the page is bookmarked, then Mustard with an OnMustard bookmark. Bookmarked pages carry a small mustard ribbon on their navigator thumbnail.
+- **Floating bars.** The arrange bar (top, while something on the page is selected), the way back from a link (top) and the presenter's bar (bottom) are one style: a Surface capsule with a Hairline edge and a soft shadow, 44 pt targets, never blurred, and a filled Done.
+- **Selection.** A selected picture, sticker, text box or link gets the stitched outline (mustard dashes over an ink line, so it shows on any paper) and one round handle at its lower corner.
+- **Stickers** are drawn in code (`Sticker`), 100 units wide, in three families.
+  - Marks: star, heart, check, exclamation, question, arrow, flag, a marker ring and a highlighter line. Solid marks have a white die-cut border so they read on ruled paper.
+  - Notes and tape: three sticky notes with a folded corner, three striped washi tapes with pinked ends, a cream label with the cloth label's double hairline, and a speech bubble.
+  - Stamps: IMPORTANT, TO DO, DONE and IDEA, a double rule round heavy tracked capitals, slightly transparent like ink.
+  - Colours come from the cloth palette (tomato, mustard, moss, cobalt) and the label cream. They are content, like covers, and never invert in dark mode.
+- **Stickers of your own** keep the die-cut look: the subject of a photo with a white edge about 2% of its long side. In the drawer they come first, after a dashed "From Photo…" tile.
+- **Text boxes** are set in the system face, Regular or Bold, at Small (13), Body (17), Large (24) or Title (34), in five tints from the cloth palette: Ink, Tomato, Cobalt, Moss and Plum. On Charcoal and Chalkboard each tint switches to a lighter value. While selected a text box has two handles: the round one at its lower left scales the type, the pill on its right edge changes the width.
+- **Links** are an index tab: a Mustard square with an ink arrow, then the page's name in semibold on label cream, with a white die-cut edge. A link to a deleted page has a grey square. After following one, a floating "Back to Page N" sits where the arrange bar would.
+- **The second screen** shows only the page on black, and the laser drawn larger so it reads from across a room. The presenter's bar on the iPad gains a small screen symbol while it is in use.
+- **Focus mode** leaves one control: a 44 pt Surface circle at the top right to come back.
+- **The laser** is red `#FF3B2F` or green `#22D36B` with a white core and a glow, and a tail that fades over 0.9 s.
+
+## Widgets
+
+- Paper ground and Ink text in the app's light and dark values; headings in the system serif (the app's fonts aren't bundled in the extension), metadata in small caps.
+- **Continue Writing** shows the cover exactly as the shelf draws it (the app renders it), the title, "Page 3 of 12" and, in the medium size, the week strip.
+- **This Week** is the page count for the week over seven leaves, filled on the days written, with today's initial in heavy type. A run of days is mentioned only from two days up, and never as a streak to keep.
+- **Today's Page** is a tear-off calendar leaf: weekday, a large day number, the month, and whether today has been written.
+
 ## App icon
 
 The Home Screen icon is a Clothbound notebook on the desk. It's drawn in code by `Scripts/AppIcon` (Core Graphics, Core Text and ImageIO, no UIKit or AppKit), so every variant and alternate comes from one source.

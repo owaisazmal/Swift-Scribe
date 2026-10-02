@@ -2,21 +2,21 @@ import SwiftUI
 import SwiftData
 import os
 
-/// Process-wide state shared by every window: storage, the library index, and launch-time migration.
+/// Process-wide state shared by every window: storage and the library index.
 @MainActor
 @Observable
 final class AppModel {
     static let shared = AppModel()
 
-    enum Phase: Equatable { case starting, migrating, ready }
+    enum Phase: Equatable { case starting, ready }
 
     let root: StorageRoot
     let container: ModelContainer
     let library: LibraryStore
     let activity: WritingActivity
     private(set) var phase: Phase = .starting
-    private(set) var migrationReport: MigrationReport?
-    var showsMigrationProblem = false
+    /// Set by a shortcut; the front window's library takes it and carries it out.
+    var pendingAction: AppAction?
     @ObservationIgnored private let indexWasRecovered: Bool
     @ObservationIgnored private var started = false
     @ObservationIgnored private let signposter = OSSignposter(subsystem: "com.owais.NotesApp", category: "app")
@@ -32,11 +32,14 @@ final class AppModel {
         library.onPermanentlyDeleted = { [activity] in activity.forget(notebooks: $0) }
     }
 
+    /// Safe to call from anywhere: later callers wait for the first one to finish.
     func start() async {
-        guard !started else { return }
+        guard !started else {
+            while phase != .ready { try? await Task.sleep(for: .milliseconds(50)) }
+            return
+        }
         started = true
         let interval = signposter.beginInterval("Launch")
-        if LaunchOptions.seedV1Fixture { await LaunchOptions.seedV1(into: root) }
         #if DEBUG
         if root.packageIDs().isEmpty {
             if let count = LaunchOptions.value("-seedLibrary").flatMap(Int.init) { await LibrarySeed.write(count: count, root: root) }
@@ -50,59 +53,14 @@ final class AppModel {
         #endif
         let root = root
         Task.detached(priority: .utility) { LibraryStore.sweepDeleted(root: root) }
-        let migrator = V1Migrator(root: root)
-        if migrator.isNeeded {
-            phase = .migrating
-            let report = await Task.detached(priority: .userInitiated) { await migrator.run() }.value
-            migrationReport = report
-            showsMigrationProblem = !report.isComplete
-        }
-        await LibraryIndex.refresh(root: root, context: container.mainContext,
-                                   full: indexWasRecovered || !(migrationReport?.migrated.isEmpty ?? true))
+        await LibraryIndex.refresh(root: root, context: container.mainContext, full: indexWasRecovered)
         await activity.load()
         library.purgeExpiredTrash()
         phase = .ready
-        let pending = await Task.detached(priority: .utility) { Self.notebooksWithLegacyText(root: root) }.value
-        if !pending.isEmpty { indexMigratedHandwriting(pending) }
         Task.detached(priority: .background) { CoverCache.shared.sweepDisk() }
         signposter.endInterval("Launch", interval)
     }
 
-    /// Migrated notebooks whose pages haven't all been recognised yet, including any left over from an earlier launch.
-    nonisolated static func notebooksWithLegacyText(root: StorageRoot) -> [UUID] {
-        root.packageIDs().filter { id in
-            let file = root.package(id).appending(path: "text/\(NotebookPackage.legacyTextName)")
-            return FileManager.default.fileExists(atPath: file.path(percentEncoded: false))
-        }
-    }
-
-    /// v1 kept one search text per notebook. Recognising each migrated page, one notebook at a time in the
-    /// background, gives them page-level search results without opening each one.
-    private func indexMigratedHandwriting(_ ids: [UUID]) {
-        let root = root, library = library
-        Task(priority: .background) {
-            for id in ids {
-                let package = NotebookPackage(root: root, id: id)
-                guard let pages = try? await package.readManifest().manifest.pages else { continue }
-                let text = await HandwritingIndexer.shared.index(HandwritingIndexer.Job(package: package, pages: pages))
-                library.updateSearchText(text, for: id)
-            }
-        }
-    }
-
-    /// What went wrong moving v1 notebooks, in words for the alert and Settings. Nil when nothing did.
-    var migrationProblem: String? {
-        guard let report = migrationReport, !report.isComplete else { return nil }
-        if let storeError = report.storeError {
-            return String(localized: "Swift Scribe couldn't read your notebook library (\(storeError)), so nothing was moved yet.")
-        }
-        let titles = report.failed.keys.map { report.titles[$0] ?? String(localized: "Untitled") }.sorted()
-        return titles.count == 1
-            ? String(localized: "“\(titles[0])” couldn't be moved to the new format yet.")
-            : String(localized: "\(titles.count) notebooks couldn't be moved to the new format yet: \(titles.formatted(.list(type: .and))).")
-    }
-
-    /// Finishes pending writes for every open notebook, with background time if the app is leaving the foreground.
     func flushOpenDocuments() {
         let documents = DocumentRegistry.shared.openDocuments.filter(\.hasUnsavedChanges)
         guard !documents.isEmpty else { return }
@@ -135,13 +93,4 @@ enum LaunchOptions {
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return StorageRoot(url: url)
     }()
-
-    static var seedV1Fixture: Bool { arguments.contains("-seedV1Fixture") }
-
-    /// Writes a small v1 library (store plus drawings) so the migration can be exercised end to end in UI tests.
-    static func seedV1(into root: StorageRoot) async {
-        guard !FileManager.default.fileExists(atPath: root.v1Store.path(percentEncoded: false)),
-              root.packageIDs().isEmpty else { return }
-        await V1Seed.write(root: root)
-    }
 }

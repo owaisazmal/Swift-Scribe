@@ -43,14 +43,15 @@ final class AccessibilityAuditUITests: XCTestCase {
         XCTAssertTrue(textbook.waitForExistence(timeout: 90))
         sleep(1)
 
+        var pageText: [String] = []
         func check(_ screen: String, modal: Bool = false, scrolled: Bool = false, formText: [String] = [], sheet: XCUIElement? = nil,
-                   popover: Bool = false, overlay: XCUIElement? = nil) throws {
+                   popover: Bool = false, overlay: XCUIElement? = nil, bar: XCUIElement? = nil) throws {
             let attachment = XCTAttachment(screenshot: app.screenshot())
             attachment.name = "\(mode) \(screen)"
             attachment.lifetime = .keepAlways
             add(attachment)
             try audit(app, checks, screen: "\(mode) \(screen)", modal: modal, scrolled: scrolled, formText: formText, sheet: sheet, popover: popover,
-                      largeText: mode == "AX-L", overlay: overlay)
+                      largeText: mode == "AX-L", overlay: overlay, bar: bar, pageText: pageText)
         }
 
         /// Audits a sheet at the top, then again scrolled to the end, so text below the fold is checked while it's on screen.
@@ -110,6 +111,7 @@ final class AccessibilityAuditUITests: XCTestCase {
         let biology = app.buttons["notebook.Cell Biology 1"]
         XCTAssertTrue(biology.waitForExistence(timeout: 10))
         biology.press(forDuration: 1.2)
+        if !app.buttons["Delete"].firstMatch.waitForExistence(timeout: 5) { biology.press(forDuration: 1.5) }
         app.buttons["Delete"].firstMatch.tap()
         XCTAssertTrue(app.buttons["Undo"].waitForExistence(timeout: 5))
         sleep(1)
@@ -165,7 +167,64 @@ final class AccessibilityAuditUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Done"].firstMatch.waitForExistence(timeout: 10))
         sleep(1)
         try check("page navigator", modal: true)
+        app.buttons["Outline"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["No Bookmarks Yet"].waitForExistence(timeout: 5))
+        try check("page outline", modal: true)
         app.buttons["Done"].firstMatch.tap()
+
+        app.buttons["Add"].firstMatch.tap()
+        let stickers = app.buttons["Sticker…"].firstMatch
+        XCTAssertTrue(stickers.waitForExistence(timeout: 5))
+        stickers.tap()
+        XCTAssertTrue(app.navigationBars["Stickers"].waitForExistence(timeout: 10))
+        sleep(1)
+        try check("sticker drawer", modal: true)
+        app.buttons["sticker.noteYellow"].tap()
+        XCTAssertTrue(app.buttons["editor.arrange.done"].waitForExistence(timeout: 5))
+        sleep(1)
+        try check("sticker selected", bar: app.otherElements["editor.arrange.bar"])
+        app.buttons["editor.arrange.done"].tap()
+
+        app.buttons["Add"].firstMatch.tap()
+        app.buttons["Text Box"].firstMatch.tap()
+        let typing = app.textViews["page.text.editor"]
+        XCTAssertTrue(typing.waitForExistence(timeout: 10))
+        typing.typeText("Chapter notes")
+        pageText = ["Chapter notes", "Text box", "Link to "]
+        sleep(1)
+        try check("text box", bar: app.otherElements["editor.arrange.bar"])
+        app.buttons["editor.arrange.done"].tap()
+
+        app.buttons["Add"].firstMatch.tap()
+        app.buttons["Link to a Page…"].firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["Link to a Page"].waitForExistence(timeout: 10))
+        sleep(1)
+        try check("link picker", modal: true)
+        if app.buttons["link.page.2"].exists {
+            app.buttons["link.page.2"].tap()
+            XCTAssertTrue(app.buttons["editor.arrange.done"].waitForExistence(timeout: 5))
+            sleep(1)
+            try check("link selected", bar: app.otherElements["editor.arrange.bar"])
+            app.buttons["editor.arrange.done"].tap()
+        } else {
+            app.buttons["Cancel"].firstMatch.tap()
+        }
+
+        app.buttons["More"].firstMatch.tap()
+        app.buttons["Focus Mode"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["editor.focus.exit"].waitForExistence(timeout: 5))
+        sleep(1)
+        try check("focus mode")
+        app.buttons["editor.focus.exit"].tap()
+        XCTAssertTrue(app.buttons["editor.ribbon"].waitForExistence(timeout: 5))
+        app.buttons["More"].firstMatch.tap()
+        app.buttons["Present"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["editor.present.done"].waitForExistence(timeout: 5))
+        sleep(1)
+        try check("presenting", bar: app.otherElements["editor.present.bar"])
+        app.buttons["editor.present.done"].tap()
+        XCTAssertTrue(app.buttons["editor.ribbon"].waitForExistence(timeout: 5))
+
         app.buttons["Recordings"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["No Recordings"].firstMatch.waitForExistence(timeout: 5))
         try check("recordings", modal: true)
