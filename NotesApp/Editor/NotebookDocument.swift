@@ -161,16 +161,16 @@ final class NotebookDocument {
         }
         if load.needsSave, !isReadOnly { manifestVersion += 1 }
         for file in load.quarantined {
-            notices.append(DocumentNotice(kind: .quarantined, message: "A damaged file (\(file)) was set aside and kept. The notebook opened from its last good copy."))
+            notices.append(DocumentNotice(kind: .quarantined, message: String(localized: "A damaged file (\(file)) was set aside and kept. The notebook opened from its last good copy.")))
         }
         if !load.recoveredPageIDs.isEmpty {
-            notices.append(DocumentNotice(kind: .recovered, message: "Recovered \(load.recoveredPageIDs.count) page(s) written just before the app last quit. They're at the end."))
+            notices.append(DocumentNotice(kind: .recovered, message: String(localized: "Recovered \(load.recoveredPageIDs.count) page(s) written just before the app last quit. They're at the end.")))
         }
         if !manifest.opaquePages.isEmpty {
-            notices.append(DocumentNotice(kind: .unreadablePages, message: "\(manifest.opaquePages.count) page(s) were made by a newer version of Swift Scribe and are hidden here. They're kept unchanged."))
+            notices.append(DocumentNotice(kind: .unreadablePages, message: String(localized: "\(manifest.opaquePages.count) page(s) were made by a newer version of Swift Scribe and are hidden here. They're kept unchanged.")))
         }
         if isReadOnly {
-            notices.append(DocumentNotice(kind: .readOnly, message: "This notebook was saved by a newer version of Swift Scribe, so it opens read-only."))
+            notices.append(DocumentNotice(kind: .readOnly, message: String(localized: "This notebook was saved by a newer version of Swift Scribe, so it opens read-only.")))
         }
         if manifestVersion != savedManifestVersion { scheduleSave(after: .zero) }
     }
@@ -270,8 +270,9 @@ final class NotebookDocument {
             }
         case .quarantined(let file):
             damagedPages.insert(pageID)
-            let number = index(of: pageID).map { " \($0 + 1)" } ?? ""
-            notices.append(DocumentNotice(kind: .quarantined, message: "The ink on page\(number) couldn't be read. The original file was kept as \(file), and the page starts empty."))
+            let message = index(of: pageID).map { String(localized: "The ink on page \($0 + 1) couldn't be read. The original file was kept as \(file), and the page starts empty.") }
+                ?? String(localized: "The ink on a page couldn't be read. The original file was kept as \(file), and the page starts empty.")
+            notices.append(DocumentNotice(kind: .quarantined, message: message))
             if let index = index(of: pageID) {
                 manifest.pages[index].inkHash = nil
                 manifestVersion += 1
@@ -300,6 +301,7 @@ final class NotebookDocument {
         setInk(pageID, drawing)
         if let before { registerInkUndo(pageID, restoring: before, then: drawing) }
         inkChanged()
+        recorder?.noteInk(onPage: pageID)
         if editedSinceOpen.insert(pageID).inserted {
             Task.detached(priority: .utility) { await HandwritingIndexer.shared.cancel(page: pageID) }
         }
@@ -333,6 +335,25 @@ final class NotebookDocument {
         setInk(pageID, PKDrawing(strokes: drawing.strokes))
         inkObserver?.document(self, didReplaceInkOf: pageID)
         inkChanged()
+    }
+
+    /// Replaces the ink of several pages as one undo step, for ink moved between pages. Every page named must have
+    /// its ink in memory; one that hasn't leaves the whole change undone.
+    @discardableResult
+    func updateInk(_ changes: [UUID: PKDrawing], actionName: String) -> Bool {
+        guard !isReadOnly, !changes.isEmpty, changes.keys.allSatisfy({ inks[$0] != nil && index(of: $0) != nil }) else { return false }
+        applyInk(changes, actionName: actionName)
+        return true
+    }
+
+    private func applyInk(_ changes: [UUID: PKDrawing], actionName: String) {
+        var before: [UUID: PKDrawing] = [:]
+        for (pageID, drawing) in changes {
+            before[pageID] = inks[pageID]?.drawing ?? PKDrawing()
+            replaceInk(pageID, with: drawing)
+        }
+        undoManager.registerUndo(withTarget: self) { $0.applyInk(before, actionName: actionName) }
+        undoManager.setActionName(actionName)
     }
 
     // MARK: Pages
@@ -648,7 +669,7 @@ final class NotebookDocument {
             let wait = min(retryBase * (1 << min(failures - 1, 6)), .seconds(60))
             saveState = .failed(error.localizedDescription, retryIn: wait)
             if !notices.contains(where: { $0.kind == .saveFailed }) {
-                notices.append(DocumentNotice(kind: .saveFailed, message: "Couldn't save your latest changes. Swift Scribe will keep trying; nothing has been lost."))
+                notices.append(DocumentNotice(kind: .saveFailed, message: String(localized: "Couldn't save your latest changes. Swift Scribe will keep trying; nothing has been lost.")))
             }
             signposter.endInterval("Save", interval)
             pendingSave = Task { [self] in

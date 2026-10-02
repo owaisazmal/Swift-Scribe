@@ -14,6 +14,7 @@ final class AppModel {
     let container: ModelContainer
     let library: LibraryStore
     let activity: WritingActivity
+    let sync: SyncCenter
     private(set) var phase: Phase = .starting
     /// Set by a shortcut; the front window's library takes it and carries it out.
     var pendingAction: AppAction?
@@ -29,7 +30,11 @@ final class AppModel {
         indexWasRecovered = recovered
         library = LibraryStore(root: root, context: container.mainContext)
         activity = WritingActivity(root: root)
+        sync = SyncCenter(root: root)
         library.onPermanentlyDeleted = { [activity] in activity.forget(notebooks: $0) }
+        sync.busy = { Set(DocumentRegistry.shared.openDocuments.map(\.id)) }
+        sync.onLibraryChanged = { [library] _ in await library.reloadFromDisk() }
+        library.onIndexSaved = { [sync] in sync.schedule() }
     }
 
     /// Safe to call from anywhere: later callers wait for the first one to finish.
@@ -44,6 +49,7 @@ final class AppModel {
         if root.packageIDs().isEmpty {
             if let count = LaunchOptions.value("-seedLibrary").flatMap(Int.init) { await LibrarySeed.write(count: count, root: root) }
             if LaunchOptions.arguments.contains("-seedLongPDF") { await LibrarySeed.writeLongPDF(root: root) }
+            if LaunchOptions.arguments.contains("-seedReplay") { await ReplaySeed.write(root: root) }
             await DailyJournal.seedForTests(root: root)
         }
         if LaunchOptions.arguments.contains("-seedActivity") { await WritingActivity.seedForTests(root: root) }
@@ -57,6 +63,10 @@ final class AppModel {
         await activity.load()
         library.purgeExpiredTrash()
         phase = .ready
+        Task {
+            await sync.resolve()
+            await sync.syncNow()
+        }
         Task.detached(priority: .background) { CoverCache.shared.sweepDisk() }
         signposter.endInterval("Launch", interval)
     }
@@ -72,6 +82,7 @@ final class AppModel {
         Task {
             for document in documents { await document.flush() }
             activity.flush()
+            await sync.syncNow()
             if task != .invalid { UIApplication.shared.endBackgroundTask(task) }
         }
     }

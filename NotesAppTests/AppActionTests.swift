@@ -25,12 +25,15 @@ final class AppActionTests: XCTestCase {
         return manifest.id
     }
 
-    func testLinksBecomeActions() {
+    func testLinksBecomeActions() throws {
         let id = UUID()
         XCTAssertEqual(AppAction(url: URL(string: "swiftscribe://today")!), .today)
         XCTAssertEqual(AppAction(url: URL(string: "swiftscribe://quicknote")!), .quickNote)
         XCTAssertEqual(AppAction(url: URL(string: "swiftscribe://continue")!), .continueWriting)
         XCTAssertEqual(AppAction(url: URL(string: "swiftscribe://notebook/\(id.uuidString)")!), .open(id))
+        let page = UUID()
+        XCTAssertEqual(AppAction(url: try XCTUnwrap(AppAction.url(forNotebook: id, page: page))), .open(id, page: page), "a link in an exported PDF comes back to its page")
+        XCTAssertEqual(AppAction(url: try XCTUnwrap(AppAction.url(forNotebook: id))), .open(id))
         XCTAssertNil(AppAction(url: URL(string: "swiftscribe://notebook/not-an-id")!))
         XCTAssertNil(AppAction(url: URL(string: "swiftscribe://delete-everything")!))
         XCTAssertNil(AppAction(url: URL(string: "https://today")!))

@@ -88,6 +88,13 @@ A's one weakness is simulator footprint at 5×. We addressed it with the measure
 
   The notebook's modification date is applied at save time, so a stroke never touches the observed manifest.
 
+## Draw and hold
+
+- **Knowing the pen rested.** PencilKit doesn't say how a stroke ended, so `StrokeHoldRecognizer`, a gesture recogniser on the page stack that never recognises, watches the touch that draws and records how long it stayed within 6 pt before lifting.
+- **Reading the shape.** When a stroke lands after a rest of 0.45 s or more, with an inking tool and the ruler off, `ShapeRecognizer` looks at its points. An open stroke is a line if it stays within 7% of its length from the chord (made level or upright within three degrees), or a run of straight pieces if looking three times more closely finds no more corners (a curve keeps gaining them). A closed stroke is compared with the ellipse round it (level, or along its longer direction) and with the polygon through its corners; four near-square corners become a true rectangle. Anything else, and anything smaller than 24 pt, is left as drawn.
+- **Redrawing it.** `ShapeSnap.snapped` builds a new stroke in the same ink, weight, opacity and creation date. PencilKit's path is a smooth curve through its control points, so each corner is given three times to keep it sharp.
+- **Its own undo step.** The tidied stroke is applied one run-loop pass later, after the stroke's own undo group has closed, so the first Undo gives the hand-drawn stroke back and the second removes it.
+
 ## Pictures, stickers and bookmarks
 
 - **They live on the page.** A page's `items` (pictures and stickers, back to front, in page points) and its `bookmark` are extra keys on the page in the manifest, like a journal page's `date`. An older build keeps them as unknown keys; an item of a kind this build doesn't know is kept as read and not drawn.
@@ -105,6 +112,7 @@ A's one weakness is simulator footprint at 5×. We addressed it with the measure
 - **Links name themselves.** `LinkTitles` maps every page to its bookmark name or "Page N"; a link with no label shows that, so it stays right when pages move, and the page stack refreshes link views whenever the map changes. A link whose page was deleted greys out and says so. Thumbnails render without the map and show the label or a plain "Page".
 - **Following.** A finger tap on a link opens its page when fingers don't draw, and always while presenting; touch and hold picks it up instead. VoiceOver's double tap opens it. `EditorSession.follow` remembers the page it came from until the linked page is left, and the editor offers "Back to Page N".
 - **In a PDF.** An export registers a named destination at the top of every linked page and a link rectangle over each tab (`addDestination`, `setDestinationWithName`; both take PDF coordinates, which run up the page).
+- **Links out of the notebook.** A link's `destination` is a page, another notebook (with an optional page and the title it had when the link was made) or a web address. They are written under different keys (`target`, `notebook` and `page`, `url`), so an older build keeps one it can't read rather than showing a missing page. Only `http` and `https` addresses are read. The editor looks up the titles of the notebooks it links to (`EditorSession.notebookTitles`), so those links follow a rename and grey out when the notebook is deleted. Following one asks the window (`EditorWindow.openNotebook`) to save and close this editor and open the other notebook, which then offers "Back to" the page it came from. In a PDF a web link is a URL annotation, and a link to a notebook is a `swiftscribe://notebook/<id>?page=<id>` address that opens the app.
 - **Your own stickers.** `StickerCutout` lifts a photo's subject with `VNGenerateForegroundInstanceMaskRequest`, grows its shape in white (`CIMorphologyMaximum`) for the die-cut edge, and caps it at 900 px. They are kept as PNGs in `Stickers/` beside the library, not in a notebook. Placing one copies it into the notebook's assets as an ordinary picture marked with its `source`, and placing it again reuses that file, so a notebook stays self-contained. Where Vision finds no subject (and in the simulator, where the request can't run) the drawer offers the whole photo with a white edge instead.
 
 ## Focus and presenting
@@ -114,11 +122,36 @@ A's one weakness is simulator footprint at 5×. We addressed it with the measure
 - The screen stays awake while presenting.
 - **A second screen.** The app delegate gives a scene with the `windowExternalDisplayNonInteractive` role to `ExternalDisplaySceneDelegate`, which only registers it with `ExternalDisplay`. No window is put on it until presenting starts, so the screen mirrors the iPad the rest of the time. While presenting, `PresentationStageController` shows the page on black: the page stack renders it once per page (background, items and ink, at twice the size that fits, within 12 megapixels), then sends only the part of the page showing on the iPad (`PresentationStage.pageFrame` fits that part to the screen) and the laser as fractions of the page. Ending the presentation, or closing the editor, removes the window and mirroring resumes. The first editor to present owns the screen until it stops.
 
+- **Presenter notes.** A page's `notes` is one more extra key on the page in the manifest, changed through `updatePage` so it is one undo step. It is not part of the page's appearance key, so thumbnails, exports and the second screen never show it, but it joins the page's typed text for search. While presenting, `PresenterPanel` sits beside the page stack (in the same `HStack`, so the page is refitted to the room that is left) whenever a second screen is showing, or when asked for from the bar: the elapsed time and the clock, the next page's thumbnail (tap to go there) and the notes. When the page stack is resized while presenting it keeps the session's page, since the scroll position is mid-change.
+
+## Selecting ink across pages
+
+- **A mode, not a tool.** `EditorMode.selecting` puts `InkLassoOverlay` over the page stack and turns drawing off. The overlay takes the touches itself (a canvas underneath holds a drag back for half a second), so one finger or the Pencil draws the lasso and two fingers still scroll and zoom.
+- **Catching.** The outline is kept in stack points (page points offset by where the page sits in the stack). A loop encloses itself; a straight drag is taken as the diagonal of a box. On each page with a canvas, a stroke is caught when at least 60% of its sampled points are inside (`InkLasso.strokes`).
+- **Moving.** While dragged, the caught strokes are drawn by the overlay as pictures and the canvases show their pages without them. On drop, `InkLasso.moved` gives each stroke a translation; a stroke whose middle lands on another page is taken out of its page's drawing and appended to that page's, with its transform adjusted for the two pages' origins. In the gap between pages it goes to the nearer one. Duplicate makes new strokes 18 pt down and right; Delete removes them.
+- **One undo step.** `NotebookDocument.updateInk` replaces the ink of every page involved and registers one undo that puts them all back. It refuses a change that names a page whose ink isn't in memory, and the lasso only reaches pages that have a canvas, which are pinned. An undo or redo under a selection lets the selection go, since the strokes it named have moved.
+
+## Replaying a recording
+
+- **Nothing extra is stored for the ink.** PencilKit dates every stroke. `ReplayTimeline` compares those dates with the recording's start and length, and keeps, for each stroke written inside it, its time, page and place in the page's drawing. A new recording stores when it began (`startedAt`) and which pages were written on (`pages`), so a replay reads only those; an older one is taken to have begun its length before it was saved, and every page is read.
+- **Faint, not hidden.** While replaying, each live canvas shows a copy of its page's drawing in which strokes still to come have 16% of their opacity (`ReplayInk`), so the page keeps its shape. The copies are new strokes, not the old ones with their ink changed, because a canvas keeps what it has drawn for a stroke it knows. A canvas is only given a new drawing when the set of faint strokes on its page changes, and the document is never touched.
+- **The mode.** `EditorMode.replaying` hides the chrome and the tool picker, turns drawing, selection and undo off (`CanvasUndoProxy.isSuspended`), and shows `ReplayBar`: play or pause, a scrubber and Done. The recorder reports its position ten times a second; the session passes it to the canvas and turns to the page being written on when that page changes, and otherwise leaves you where you scrolled. A tap on ink written during the recording seeks to its time. When the sound ends the replay waits at the end rather than closing.
+- The editor's cover can no longer be pulled shut by a drag (`interactiveDismissDisabled`): with drawing off, a sideways finger drag on the page dismissed it through the zoom transition, skipping the save-and-close path.
+
 ## Widgets and shortcuts
 
 - **Routing.** A widget link (`swiftscribe://today`, `quicknote`, `continue`, `notebook/<id>`) or an App Intent becomes an `AppAction`. The front window's `LibraryRootView` carries it out: it puts sheets away, asks an editor showing another notebook to save and close (`scribeCloseEditor`, the same path as the back button), then opens the target.
 - **Shortcuts** (`AppActions.swift`): Open Today's Journal Page, New Quick Note, Continue Writing and Open Notebook (with a notebook picker and search), offered to Siri and Spotlight through `AppShortcutsProvider`.
 - **Widgets** (`ScribeWidgets`): the app writes a `WidgetSnapshot` and the last notebook's cover image into the App Group container when it becomes ready and when it leaves the foreground (`WidgetBridge`), and reloads the timelines only when something changed. The widgets never open the library themselves. Timelines turn over at midnight so the week strip and date stay right. UI-test libraries (`-storageRoot`) never write a snapshot.
+
+## Two notebooks in one window
+
+- **`EditorPanes`** is what the library presents: the window's editor, and, when `EditorWindow.beside` is set, a second `EditorScreen` next to it with a draggable divider (30% to 70%). They sit side by side when the window is wider than tall and one above the other otherwise. The first editor keeps its identity when the second arrives or leaves, so it is never rebuilt.
+- **Each pane is a whole editor**: its own document, session, undo stack, page stack and bars. The picker leaves out the notebook already open and any notebook open in another window, so the one-editor-per-notebook rule holds.
+- **One tool picker.** The first page stack to appear makes the `PKToolPicker` and leaves it with the window; the second takes the same one, so a tool chosen in one pane is the tool in the other and the picker doesn't swap as the Pencil moves between them. The window lets go of it when the editor closes.
+- **The active pane.** A recogniser that already watches every touch on the pages tells the window which notebook was touched last. Only that pane registers the SwiftUI keyboard shortcuts (⌘Z, ⌘N, ⌘D, ⌘W and the rest), and its anchor takes first responder so the page stack's key commands and the picker's undo go to it.
+- **Narrow panes.** Below 620 pt a pane's bar keeps Back, the title, undo, redo, Add and More; recording, the recordings list and the tools switch move into More. Layout decisions that used the horizontal size class use the pane's width too.
+- **Closing.** The second pane has its own Close, which saves and closes it like any editor. Back to the library on the first pane first asks the second to save and close (`EditorScreen.beforeClose`) and only then closes itself, so a failed save in either keeps the editors up. A widget link or shortcut that needs the window does the same. The pair is restored with the scene.
 
 ## One document per notebook
 
@@ -177,10 +210,29 @@ text/<pageID>.txt      recognised handwriting and PDF text, stamped with the ink
 
 ### Library index
 
-- SwiftData holds the library index (`LibraryIndexSchemaV2`): notebook records with their cover fields, folders, and one `NotebookSearchText` row per notebook. Search text is not a relationship of the record, so the shelf's queries never read it; a search fetches only the IDs of matching titles and matching text rows (`LibraryIndex.notebookIDs`).
-- A store written by the first schema migrates in place (a lightweight stage that drops the record's search text and adds the table). The refresh that follows gives every notebook without a row its text from the package's `text/` files, the same way a rebuilt index gets it.
+- SwiftData holds the library index (`LibraryIndexSchemaV3`): notebook records with their cover fields, folders, and one `NotebookSearchText` row per notebook. Search text is not a relationship of the record, so the shelf's queries never read it; a search fetches only the IDs of matching titles and matching text rows (`LibraryIndex.notebookIDs`).
+- A store written by an earlier schema migrates in place: a lightweight stage drops the record's search text and adds the table, and another gives folders their parent. The refresh that follows gives every notebook without a row its text from the package's `text/` files, the same way a rebuilt index gets it.
 - It is rebuilt from the manifests and `folders.json` whenever they are newer.
+- **Folders inside folders.** A folder's `parent` is a key in `folders.json` and `parentID` in the index; an older build keeps the key and shows the folder at the top level. `FolderTree` turns the flat list into sidebar rows and answers what is inside what. A folder whose parent is missing, or whose parents loop, is shown at the top level, so a damaged file never hides one. Folders are numbered in sidebar order after every change, parents before their children, so a plain sort by index is that order. Deleting a folder moves its notebooks and its folders up to the folder it sat in. Nesting stops at five levels.
 - An index that can't be opened is set aside and rebuilt; there is no `fatalError` at launch.
+
+### Backup and restore
+
+- **One file.** `LibraryBackup.create` writes `Library/` (every package, `folders.json`, `activity.json`) and `Stickers/` into an Apple Archive compressed with LZFSE, named `Swift Scribe Backup <date>.scribebackup`, with a small `backup.json` (version, date, the daily journal's ID). Open notebooks are saved first. `thumbs/` folders are left out; they are a cache.
+- **Restore only adds.** The archive is unpacked into a temporary folder (entries with absolute paths or `..` are skipped, and symbolic links are removed), then merged: a notebook the library doesn't have is moved in under its own ID; one that is identical (same modification date and pages) is left alone; one that differs is moved in under a new ID as "Title (from backup)", so nothing in the library is ever replaced. Folders the library lacks are appended, stickers are added by file name, and the writing history is merged day by day. The index is refreshed afterwards, which also reads the restored notebooks' search text.
+- A backup from a newer version is refused, not half-read.
+
+### iCloud sync
+
+Experimental: everything below is tested with a plain folder standing in for iCloud (`SyncTests` plays two devices against it, and `SyncUITests` launches the app twice with two storage roots and `-cloudFolder`). It has not run against a real iCloud container.
+
+- **The library never moves.** The app always works in `Application Support/Library`. Sync (`LibrarySync`) copies whole notebooks between that and a folder in the app's iCloud container (`<container>/Sync`), so the editor never reads a file that iCloud hasn't downloaded, and turning sync off changes nothing on the device. The default entitlements carry no iCloud keys; `Config/NotesApp-iCloud.entitlements` adds them. Without them the container doesn't resolve and Settings says so.
+- **One rule per notebook.** A small file on the device (`sync-state.json`) remembers each notebook's modification date the last time both sides agreed. From the three dates (here, there, agreed): unchanged here and changed there is pulled; the reverse is pushed; changed on both is a conflict. In a conflict the newer version keeps the notebook's ID everywhere and the older is kept as a notebook of its own, "Title (conflicted copy)", so nothing written is lost. Nothing is merged inside a notebook.
+- **Deletes.** A notebook that was in step and is gone from the device was deleted here: a marker goes in `Deleted/` and the synced copy is removed. Another device removes its copy only if it hasn't changed since they agreed; one that has been written in since is uploaded again and the marker removed.
+- **Copying.** A push mirrors the package into the container: files that differ are copied (through a temporary name, then swapped in), files that are gone are removed, the manifest goes last, and `thumbs/` and files set aside as damaged stay behind. A pull assembles the notebook beside the library, checks its manifest reads, and swaps it in whole. Writes to the container go through `NSFileCoordinator`.
+- **Folders and stickers** are merged three ways on which ones exist, using the sets remembered from the last sync, so an add and a delete on different devices both carry over. For a folder both sides have, the more recently written `folders.json` wins. The writing history is not synced.
+- **When.** `SyncCenter` syncs at launch, when the app comes to the front or leaves it, a few seconds after any change to the library index, and when the container reports new manifests (`NSMetadataQuery`). A notebook open in an editor is skipped until it closes; a notebook whose manifest can't be read yet waits. After a sync that changed the device the index is rebuilt from the files.
+- **Not done:** live updates to a notebook that is open on two devices at once, and progress for large uploads.
 
 ### v1 notebooks
 
@@ -191,7 +243,7 @@ The converter for notebooks from the first version (`V1Migrator`) was removed on
 - **Off the main thread:**
   - thumbnails (`PageThumbnailer`, cached in `thumbs/`);
   - covers (`CoverRenderer` and `CoverCache`: an 80 MB memory LRU plus `Caches/Covers`, kept under 150 MB). Renders stop when their cell scrolls away, disk hits are decoded before they reach the main thread, and the New Notebook preview never touches either cache;
-  - PDF export (`NotebookExporter`): streamed to disk a page at a time, with progress; cancelling or dismissing the sheet stops it;
+  - PDF export (`NotebookExporter`): streamed to disk a page at a time, with progress; cancelling or dismissing the sheet stops it. Pages can also be exported as PNGs, one file a page at twice its size in points;
   - handwriting OCR (`HandwritingIndexer`, per page by ink hash). Rendering and Vision run off the indexer actor so an edit's cancel gets through, and a page already being read is never read twice;
   - library search: debounced, matched by a SwiftData predicate on a background context, then each matching notebook's per-page text is read for page-level results (`PageSearch`) that open the editor at that page. Results refresh whenever the index is saved;
   - PDF parsing on import.
@@ -237,6 +289,7 @@ None of these are device numbers. Pencil latency and hitches need the device che
 All three targets build in the Swift 6 language mode with no warnings. Two things matter at runtime:
 
 - `CATiledLayer` calls `draw(_:)` on background threads, so both tiled views mark it `nonisolated`.
+- A new window is laid out by whichever thread commits a Core Animation transaction first, and the tile threads commit their own. The second screen's window is created while tiles are being drawn, so its first layout could land on a tile thread, where the main-actor check traps. `ExternalDisplay.open` lays the window out and flushes the transaction on the main thread as soon as it is shown, and the stage's `viewDidLayoutSubviews` is `nonisolated` and defers to the main thread if it is ever called off it.
 - `CanvasUndoProxy` keeps its notification tokens `nonisolated(unsafe)`: they're only read again in `deinit`, when nothing else can reach them.
 
 ## Colour and accessibility
@@ -249,11 +302,19 @@ All three targets build in the Swift 6 language mode with no warnings. Two thing
 - No text uses `caption2`: the audit reports it as partly unscaled, so the smallest style is `caption`.
 - A button holding both text and a light image (a paper miniature, a light cloth) is read as low-contrast text, so captions sit outside their button, as a cover's meta line does, and paper colour chips are filled with their own colour.
 
+## Languages
+
+- Every string the app shows goes through `String(localized:)`, a SwiftUI text literal or a `LocalizedStringResource`, and is translated in a string catalog: `NotesApp/Resources/Localizable.xcstrings` for the app, `InfoPlist.xcstrings` for the permission prompts and file type names, `AppShortcuts.xcstrings` for the Siri phrases, and `ScribeWidgets/Localizable.xcstrings` for the widgets. English is the source language; Spanish, French and German are filled in.
+- Names stored in a notebook are never translated values: paper templates, colours, stickers and cover styles are stored by their raw values and only their display names are localized.
+- Counts are pairs of strings ("1 page", "%lld pages") chosen in code, which is right for the four languages shipped and wrong for languages with more plural forms; those need the catalog's plural variations.
+- `LocalizationUITests` launches the app in each language and checks a few known strings; the accessibility audit runs in English only.
+
 ## Known limits
 
 - Undo keeps whole-page drawings. The number of steps shrinks as the pages being edited get heavier: 200 steps for light pages down to 20 for pages whose saved ink is over about 2.4 MB (`UndoBudget`, a 48 MB budget). The budget is an estimate and should be checked against a device memory trace.
-- Lasso and ruler are page-scoped in the first release: each page is its own canvas, so neither can span two pages, and ink past a page edge is hidden. v1's single canvas allowed both. Cross-page lasso is a future feature, to be built as a selection layer over the per-page canvases, not by returning to one canvas.
+- PencilKit's own lasso and ruler are page-scoped: each page is its own canvas, so neither can span two pages, and ink past a page edge is hidden. Selecting ink across pages is a mode of the editor instead (see "Selecting ink across pages"). The ruler can't be done that way: its position and angle aren't readable or settable, and a stroke can't leave its canvas, so a ruler across pages would have nothing to rule.
 - ⌘F is claimed by a first-responder view in the library (the toolbar search swallows it otherwise). In the iPadOS 27 simulator under XCUITest, ⌘F never reaches the app at all while ⌘G on the same view does, so it needs a check on a device.
+- iCloud sync has only run against a folder standing in for iCloud (see "iCloud sync"). Downloading files that iCloud has evicted, file coordination with the iCloud daemon and the metadata query are written but have never executed.
 - The second screen has been checked with a stand-in window (`-secondScreenInset`), not with a display: the simulator's external display can't be attached from a test. Lifting a subject out of a photo runs on a Mac with the same code but not in the simulator. Both need a check on a device.
 - Every figure above is from the simulator. The device checklist covers Pencil latency, hitches (Instruments), memory at 5× with the heavy fixture, palm rejection, and Pencil double-tap and squeeze.
 

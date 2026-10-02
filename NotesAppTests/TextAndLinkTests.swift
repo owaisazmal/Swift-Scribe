@@ -140,7 +140,7 @@ final class TextAndLinkTests: XCTestCase {
         session.go(to: 1)
         XCTAssertNil(session.linkReturn, "leaving the linked page puts the way back away")
 
-        document.removePages([link.target])
+        document.removePages([try XCTUnwrap(link.target)])
         session.go(to: 0)
         session.follow(link, from: document.pages[0].id)
         XCTAssertEqual(session.currentPage, 0, "a link to a deleted page goes nowhere")
@@ -163,6 +163,84 @@ final class TextAndLinkTests: XCTestCase {
         XCTAssertEqual(annotation.bounds.midX, 200, accuracy: 2)
         XCTAssertEqual(annotation.bounds.midY, 792 - 150, accuracy: 2, "the tappable area sits on the tab")
         XCTAssertTrue(pdf.page(at: 1)?.annotations.isEmpty ?? false)
+    }
+
+    func testLinksToTheWebAndToOtherNotebooksSurviveTheManifest() throws {
+        var page = paper.newPage()
+        let notebook = UUID(), there = UUID()
+        let url = try XCTUnwrap(WebAddress.url(from: "www.example.com/guide"))
+        XCTAssertEqual(url.absoluteString, "https://www.example.com/guide", "an address typed without a scheme is taken as https")
+        XCTAssertEqual(WebAddress.display(url), "example.com/guide")
+        XCTAssertNil(WebAddress.url(from: "not an address"))
+        XCTAssertNil(WebAddress.url(from: "javascript:alert(1)"))
+        XCTAssertNil(WebAddress.url(from: "file:///etc/passwd"), "only web addresses are opened")
+        let links = [PageLink(.web(url), label: "Guide"), PageLink(.notebook(notebook, page: there, name: "Physics")),
+                     PageLink(.notebook(notebook, page: nil, name: "Physics")), PageLink(target: there)]
+        page.items = links.enumerated().map { index, link in
+            PageItem(content: .link(link), center: CGPoint(x: 100, y: 100 + CGFloat(index) * 50), size: CGSize(width: 120, height: 30))
+        }
+        let decoded = try XCTUnwrap(ManifestCodec.decodePage(ManifestCodec.encodePage(page)))
+        XCTAssertEqual(decoded.items.compactMap(\.link), links)
+
+        var changed = decoded.items[0]
+        changed.content = .link(PageLink(target: there))
+        XCTAssertNil(changed.json.objectValue?["url"], "a link that changes what it opens drops the old address")
+        let object = try XCTUnwrap(decoded.items[1].json.objectValue)
+        XCTAssertNil(object["target"], "an older version sees a link it can't read and keeps it, rather than a page that's missing")
+    }
+
+    func testALinkToANotebookFollowsItsTitle() {
+        let notebook = UUID()
+        let link = PageLink(.notebook(notebook, page: nil, name: "Physics"))
+        XCTAssertEqual(LinkTitles().title(for: link), "Physics", "without the library it keeps the name it was made with")
+        XCTAssertTrue(LinkTitles().resolves(link))
+        let renamed = LinkTitles(notebooks: [notebook: "Physics II"])
+        XCTAssertEqual(renamed.title(for: link), "Physics II")
+        XCTAssertTrue(renamed.resolves(link))
+        let gone = LinkTitles(notebooks: [:])
+        XCTAssertFalse(gone.resolves(link), "a notebook that was deleted greys its links out")
+        XCTAssertEqual(gone.title(for: link), "Physics")
+        XCTAssertEqual(LinkTitles().title(for: PageLink(.web(URL(string: "https://www.swift.org")!))), "swift.org")
+        XCTAssertEqual(LinkTitles().title(for: PageLink(.web(URL(string: "https://www.swift.org")!), label: "Swift")), "Swift")
+        XCTAssertNotEqual(LinkTitles(notebooks: [:]), LinkTitles(notebooks: [notebook: "A"]), "a rename is a change the page stack redraws for")
+    }
+
+    func testFollowingALinkOutOfTheNotebook() async throws {
+        let document = try await makeDocument()
+        let session = EditorSession(document: document)
+        var opened: [URL] = [], notebooks: [(UUID, UUID?, UUID)] = []
+        session.openURL = { opened.append($0) }
+        session.openNotebook = { notebooks.append(($0, $1, $2)) }
+        let url = URL(string: "https://example.com")!, other = UUID(), there = UUID(), here = document.pages[0].id
+
+        session.addLink(PageLink(.web(url)))
+        XCTAssertEqual(document.pages[0].items.first?.size, PageLinkArt.size(for: "example.com"))
+        session.follow(PageLink(.web(url)), from: here)
+        XCTAssertEqual(opened, [url])
+        XCTAssertEqual(session.currentPage, 0)
+        XCTAssertNil(session.linkReturn)
+
+        session.follow(PageLink(.notebook(other, page: there, name: "Physics")), from: here)
+        XCTAssertEqual(notebooks.count, 1)
+        XCTAssertEqual(notebooks.first?.0, other)
+        XCTAssertEqual(notebooks.first?.1, there)
+        XCTAssertEqual(notebooks.first?.2, here, "the notebook it opens can offer the way back to this page")
+    }
+
+    func testAnExportKeepsLinksOutOfTheNotebook() async throws {
+        let document = try await makeDocument()
+        let url = URL(string: "https://example.com/guide")!, other = UUID(), there = UUID()
+        let web = PageItem(content: .link(PageLink(.web(url))), center: CGPoint(x: 200, y: 150), size: CGSize(width: 100, height: 30))
+        let notebook = PageItem(content: .link(PageLink(.notebook(other, page: there, name: "Physics"))), center: CGPoint(x: 200, y: 500), size: CGSize(width: 100, height: 30))
+        document.updateItems(onPage: document.pages[0].id, actionName: "Add Link") { $0 += [web, notebook] }
+
+        let file = try await NotebookExporter.export(.init(title: "Chemistry", pages: document.pages, inMemoryInk: [:], package: document.package)) { _ in }
+        let pdf = try XCTUnwrap(PDFDocument(url: file))
+        let annotations = try XCTUnwrap(pdf.page(at: 0)?.annotations.filter { $0.type == "Link" }).sorted { $0.bounds.midY > $1.bounds.midY }
+        XCTAssertEqual(annotations.count, 2)
+        XCTAssertEqual(annotations.first?.url, url)
+        XCTAssertEqual(try XCTUnwrap(annotations.first).bounds.midY, 792 - 150, accuracy: 2, "the tappable area sits on the tab")
+        XCTAssertEqual(annotations.last?.url.flatMap(AppAction.init(url:)), .open(other, page: there), "a link to another notebook opens Swift Scribe at its page")
     }
 
     private func darkPixels(in image: UIImage, rect: CGRect) -> Int {

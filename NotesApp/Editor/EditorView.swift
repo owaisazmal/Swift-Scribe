@@ -17,6 +17,12 @@ protocol EditorCanvasControlling: AnyObject {
     func visibleCenter(ofPage index: Int) -> CGPoint?
     func select(_ selection: ItemSelection?)
     func editText()
+    func linksDidChange()
+    func showReplay(_ timeline: ReplayTimeline?, at time: TimeInterval)
+    func paneBecameActive()
+    func setSelectingInk(_ selecting: Bool)
+    func duplicateInkSelection()
+    func deleteInkSelection()
 }
 
 struct ItemSelection: Equatable {
@@ -26,8 +32,10 @@ struct ItemSelection: Equatable {
 
 enum PageFit { case width, page }
 
-/// Focus hides the chrome and leaves the tools; presenting hides both and turns the Pencil into a laser pointer.
-enum EditorMode: Equatable { case writing, focus, presenting }
+/// Focus hides the chrome and leaves the tools; presenting hides both and turns the Pencil into a laser pointer;
+/// replaying plays a recording while the ink written during it appears as it was written; selecting picks ink out
+/// across pages to move, copy or delete.
+enum EditorMode: Equatable { case writing, focus, presenting, replaying, selecting }
 
 @MainActor
 @Observable
@@ -44,6 +52,11 @@ final class EditorSession {
     /// The page a link was followed from, while the page it opened is still showing.
     private(set) var linkReturn: UUID?
     private(set) var mode = EditorMode.writing
+    /// How many strokes the lasso across pages has caught.
+    var inkSelectionCount = 0
+    /// The recording being replayed with its ink.
+    private(set) var replay: ReplayTimeline?
+    @ObservationIgnored private var replayPage: UUID?
     var laserColor = LaserColor.red {
         didSet { canvas?.setLaserColor(laserColor) }
     }
@@ -54,6 +67,15 @@ final class EditorSession {
         }
     }
     @ObservationIgnored weak var canvas: EditorCanvasControlling?
+    /// The titles of the notebooks this one links to. Nil until they've been looked up.
+    @ObservationIgnored var notebookTitles: [UUID: String]? {
+        didSet { if notebookTitles != oldValue { canvas?.linksDidChange() } }
+    }
+    /// Called when a touch lands on the pages, so a window showing two notebooks knows which one is being worked on.
+    @ObservationIgnored var onTouchDown: (() -> Void)?
+    @ObservationIgnored var openURL: (URL) -> Void = { UIApplication.shared.open($0) }
+    /// Opens another notebook, at a page if the link names one; the last value is the page the link sits on.
+    @ObservationIgnored var openNotebook: ((UUID, UUID?, UUID) -> Void)?
 
     init(document: NotebookDocument, initialPageID: UUID? = nil) {
         self.document = document
@@ -77,9 +99,52 @@ final class EditorSession {
     }
 
     func enter(_ newMode: EditorMode) {
-        guard newMode != mode else { return }
+        guard newMode != mode, newMode != .replaying || replay != nil else { return }
+        guard newMode != .selecting || !document.isReadOnly else { return }
+        if mode == .replaying { stopReplay() }
+        if mode == .selecting { canvas?.setSelectingInk(false) }
         mode = newMode
         canvas?.setPresenting(newMode == .presenting)
+        if newMode == .selecting { canvas?.setSelectingInk(true) }
+    }
+
+    // MARK: Replaying a recording
+
+    /// Plays a recording from its start with the page as it was: ink written later in the recording is faint until
+    /// the sound reaches it. Reads the pages written on during the recording, or every page for an older recording.
+    func beginReplay(_ recording: RecordingEntry) async -> Bool {
+        guard mode != .presenting, mode != .replaying, !recorder.isRecording else { return false }
+        let ids = recording.inkedPages?.filter { document.index(of: $0) != nil } ?? document.pages.map(\.id)
+        var drawings: [UUID: PKDrawing] = [:]
+        for id in ids { drawings[id] = await document.ink(id) }
+        guard mode != .presenting, mode != .replaying, recorder.beginReplay(recording) else { return false }
+        replay = ReplayTimeline(recording: recording, drawings: drawings)
+        replayPage = nil
+        recorder.onPlaybackTime = { [weak self] in self?.showReplay(at: $0) }
+        enter(.replaying)
+        showReplay(at: 0)
+        return true
+    }
+
+    /// Shows the ink as it was at `time`, and turns to the page being written on when that changes.
+    func showReplay(at time: TimeInterval) {
+        guard let replay else { return }
+        canvas?.showReplay(replay, at: time)
+        guard let page = replay.page(at: time), page != replayPage, let index = document.index(of: page) else { return }
+        replayPage = page
+        if index != currentPage { go(to: index) }
+    }
+
+    func seekReplay(to time: TimeInterval) {
+        guard replay != nil else { return }
+        recorder.seek(to: time)
+    }
+
+    private func stopReplay() {
+        recorder.onPlaybackTime = nil
+        recorder.stopPlayback()
+        replay = nil
+        canvas?.showReplay(nil, at: 0)
     }
 
     /// A page forward or back. While presenting, each page is shown whole.
@@ -95,20 +160,31 @@ final class EditorSession {
 
     // MARK: Links
 
-    func addLink(to target: UUID) {
-        let link = PageLink(target: target)
-        addItem(.link(link), size: PageLinkArt.size(for: LinkTitles(pages: document.pages).title(for: link)), actionName: String(localized: "Add Link"))
+    func addLink(to target: UUID) { addLink(PageLink(target: target)) }
+
+    func addLink(_ link: PageLink) {
+        let title = LinkTitles(pages: document.pages, notebooks: notebookTitles).title(for: link)
+        addItem(.link(link), size: PageLinkArt.size(for: title), actionName: String(localized: "Add Link"))
     }
 
-    /// Opens the page a link points at and remembers where it was followed from.
+    /// Opens what a link points at. For a page of this notebook it remembers where it was followed from.
     func follow(_ link: PageLink, from origin: UUID) {
-        guard let index = document.index(of: link.target) else {
-            AccessibilityNotification.Announcement(String(localized: "The page this link opened was deleted")).post()
-            return
+        switch link.destination {
+        case .page(let target):
+            guard let index = document.index(of: target) else {
+                AccessibilityNotification.Announcement(String(localized: "The page this link opened was deleted")).post()
+                return
+            }
+            canvas?.select(nil)
+            show(index)
+            linkReturn = document.index(of: origin) == index ? nil : origin
+        case .web(let url):
+            canvas?.select(nil)
+            openURL(url)
+        case .notebook(let notebook, let page, _):
+            canvas?.select(nil)
+            openNotebook?(notebook, page, origin)
         }
-        canvas?.select(nil)
-        show(index)
-        linkReturn = document.index(of: origin) == index ? nil : origin
     }
 
     func goBack() {
@@ -291,8 +367,13 @@ fileprivate struct EditorContent: View {
     let close: () -> Void
 
     @Environment(LibraryStore.self) private var store
+    @Environment(EditorWindow.self) private var window: EditorWindow?
+    @Environment(\.editorPane) private var pane
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @State private var paneWidth: CGFloat = 1024
+    @State private var pickingBeside = false
+    @State private var showingRecordingsSheet = false
     @State private var showingPages = false
     @State private var showingRecordings = false
     @State private var importingPDF = false
@@ -316,50 +397,117 @@ fileprivate struct EditorContent: View {
     @State private var linkLabel = ""
     @State private var namingBookmark: UUID?
     @State private var bookmarkName = ""
+    @State private var editingNotes: NotesTarget?
+    @State private var presenterPanel: Bool?
+    @State private var presentingSince = Date.now
+
+    private struct NotesTarget: Identifiable {
+        let id: UUID
+    }
+
+    /// Notes and the next page sit beside the page while a second screen shows it, or when asked for.
+    private var showsPresenterPanel: Bool {
+        session.mode == .presenting && !isCompact && (presenterPanel ?? ExternalDisplay.shared.isShowing)
+    }
+
+    /// A pane beside another notebook has about half a window: its bar keeps the essentials and the rest move into More.
+    private var isNarrow: Bool { paneWidth < 620 }
+    private var isCompact: Bool { sizeClass == .compact || isNarrow }
+
+    /// With two notebooks in the window, keyboard shortcuts go to the one last touched.
+    private var isActivePane: Bool { pane == .single || window?.active == nil || window?.active == document.id }
+
+    private func shortcut(_ key: KeyEquivalent, _ modifiers: EventModifiers = .command, always: Bool = false) -> KeyboardShortcut? {
+        isActivePane && (always || !isPresentingModal) ? KeyboardShortcut(key, modifiers: modifiers) : nil
+    }
 
     fileprivate var document: NotebookDocument { session.document }
     private var cloth: ClothColor { document.manifest.cover.cloth }
 
     var body: some View {
+        sheets(layout)
+    }
+
+    private var layout: some View {
         NavigationStack {
-            PageStack(session: session)
-                .ignoresSafeArea(edges: .bottom)
-                .background(Color.desk.ignoresSafeArea())
-                .background {
-                    Group {
-                        Button("Page After Current") { session.addPage(after: session.currentPage) }
-                            .keyboardShortcut("n", modifiers: .command)
-                            .disabled(document.isReadOnly)
-                        Button("Focus Mode") { enter(session.mode == .focus ? .writing : .focus) }
-                            .keyboardShortcut("f", modifiers: [.command, .control])
-                        Button("Present") { enter(session.mode == .presenting ? .writing : .presenting) }
-                            .keyboardShortcut(.return, modifiers: [.command, .option])
-                        if session.mode != .writing {
-                            Button("Done") { enter(.writing) }.keyboardShortcut(.cancelAction)
-                        }
+            HStack(spacing: 0) {
+                pageStack
+                if showsPresenterPanel {
+                    PresenterPanel(session: session, since: presentingSince) {
+                        if let page = currentPage { editingNotes = NotesTarget(id: page.id) }
                     }
-                    .hidden()
-                    .accessibilityHidden(true)
+                    .frame(width: 300)
+                    .transition(.move(edge: .trailing))
                 }
-                .overlay(alignment: .topTrailing) {
-                    switch session.mode {
-                    case .writing: ribbons
-                    case .focus: focusExit
-                    case .presenting: EmptyView()
-                    }
-                }
-                .overlay(alignment: .top) { banners }
-                .overlay(alignment: .top) {
-                    if session.selection != nil, session.mode != .presenting { arrangeBar } else if session.linkReturn != nil { returnBar }
-                }
-                .overlay(alignment: .bottom) { if session.mode == .presenting { presentationBar } }
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar { toolbar }
-                .toolbarBackground(.hidden, for: .navigationBar)
-                .toolbar(session.mode == .writing ? .visible : .hidden, for: .navigationBar)
+            }
+            .background(Color.desk.ignoresSafeArea())
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { paneWidth = $0 }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { toolbar }
+            .toolbarBackground(.hidden, for: .navigationBar)
+            .toolbar(session.mode == .writing ? .visible : .hidden, for: .navigationBar)
         }
         .statusBarHidden(session.mode != .writing)
         .persistentSystemOverlays(session.mode == .writing ? .automatic : .hidden)
+    }
+
+    private var pageStack: some View {
+        PageStack(session: session, window: window)
+            .ignoresSafeArea(edges: .bottom)
+            .background {
+                Group {
+                    Button("Page After Current") { session.addPage(after: session.currentPage) }
+                        .keyboardShortcut(shortcut("n", always: true))
+                        .disabled(document.isReadOnly || session.mode == .replaying || session.mode == .selecting)
+                    Button("Focus Mode") { enter(session.mode == .focus ? .writing : .focus) }
+                        .keyboardShortcut(shortcut("f", [.command, .control], always: true))
+                    Button("Present") { enter(session.mode == .presenting ? .writing : .presenting) }
+                        .keyboardShortcut(shortcut(.return, [.command, .option], always: true))
+                    if session.mode != .writing {
+                        Button("Done") { enter(.writing) }.keyboardShortcut(shortcut(.escape, [], always: true))
+                    }
+                }
+                .hidden()
+                .accessibilityHidden(true)
+            }
+            .overlay(alignment: .topTrailing) {
+                switch session.mode {
+                case .writing: ribbons
+                case .focus: focusExit
+                case .presenting, .replaying, .selecting: EmptyView()
+                }
+            }
+            .overlay(alignment: .top) { banners }
+            .overlay(alignment: .top) {
+                if session.mode == .selecting { inkBar } else if session.selection != nil, session.mode != .presenting { arrangeBar } else { returnBar }
+            }
+            .overlay(alignment: .bottom) {
+                if session.mode == .presenting {
+                    presentationBar
+                } else if session.mode == .replaying {
+                    ReplayBar(session: session) { enter(.writing) }
+                        .floatingBar()
+                        .padding(.bottom, Space.x5)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+    }
+
+    /// The editor's sheets, alerts and observers, kept apart from the layout so each stays quick to type-check.
+    private func sheets<Content: View>(_ content: Content) -> some View {
+        content
+        .sheet(item: $editingNotes) { target in PresenterNotesSheet(document: document, pageID: target.id) }
+        .sheet(isPresented: $pickingBeside) {
+            BesidePicker(current: document.id) { id in
+                window?.beside = OpenNotebook(id: id)
+                window?.active = id
+            }
+        }
+        .sheet(isPresented: $showingRecordingsSheet) {
+            recordingList { showingRecordingsSheet = false }
+                .presentationDetents([.medium, .large])
+                .presentationBackground(Color.surface)
+        }
         .sheet(isPresented: $showingPages) {
             PageNavigator(session: session)
         }
@@ -385,17 +533,18 @@ fileprivate struct EditorContent: View {
             }
         }
         .sheet(isPresented: $pickingLink) {
-            LinkPicker(session: session) { target in
-                session.addLink(to: target)
+            LinkSheet(session: session) { link in
+                session.addLink(link)
+                refreshNotebookTitles()
                 announce(String(localized: "Link added to the page"))
             }
         }
         .alert("Rename Link", isPresented: $renamingLink) {
-            TextField("Page name", text: $linkLabel)
+            TextField("Name", text: $linkLabel)
             Button("Cancel", role: .cancel) {}
             Button("Save") { session.setLinkLabel(linkLabel) }
         } message: {
-            Text("Leave it empty to name the link after its page.")
+            Text("Leave it empty to name the link after what it opens.")
         }
         .confirmationDialog("Delete page \(session.currentPage + 1)?", isPresented: $confirmingDelete, titleVisibility: .visible) {
             Button("Delete Page", role: .destructive) {
@@ -435,7 +584,12 @@ fileprivate struct EditorContent: View {
         .onAppear {
             knownPages = Set(document.pages.map(\.id))
             document.noteCurrentPage(session.currentPage)
+            session.openNotebook = { openLinkedNotebook($0, page: $1, from: $2) }
+            session.onTouchDown = { if pane != .single, window?.active != document.id { window?.active = document.id } }
+            refreshNotebookTitles()
         }
+        .onChange(of: window?.active) { if pane != .single, window?.active == document.id { session.canvas?.paneBecameActive() } }
+        .onChange(of: store.indexVersion) { refreshNotebookTitles() }
         .onReceive(NotificationCenter.default.publisher(for: .NSUndoManagerDidCloseUndoGroup)) { _ in session.refreshUndoState() }
         .onReceive(NotificationCenter.default.publisher(for: .NSUndoManagerDidUndoChange)) { _ in session.refreshUndoState() }
         .onReceive(NotificationCenter.default.publisher(for: .NSUndoManagerDidRedoChange)) { _ in session.refreshUndoState() }
@@ -447,17 +601,23 @@ fileprivate struct EditorContent: View {
     }
 
     private var isPresentingModal: Bool {
-        showingPages || showingRecordings || export != nil || importingPDF || showingPhotoPicker || renaming || goToPage || paperMode != nil
-            || editingCover != nil || namingBookmark != nil || showingStickers || pickingLink || renamingLink
+        showingPages || showingRecordings || showingRecordingsSheet || pickingBeside || export != nil || importingPDF || showingPhotoPicker || renaming || goToPage || paperMode != nil
+            || editingCover != nil || namingBookmark != nil || showingStickers || pickingLink || renamingLink || editingNotes != nil
     }
 
     private func enter(_ mode: EditorMode) {
         guard !isPresentingModal else { return }
+        if mode == .presenting {
+            presentingSince = .now
+            presenterPanel = nil
+        }
         withAnimation(Motion.adaptive(Motion.standard, reduceMotion: reduceMotion)) { session.enter(mode) }
         switch mode {
         case .writing: announce(String(localized: "Back to writing"))
         case .focus: announce(String(localized: "Focus mode. The toolbar is hidden."))
         case .presenting: announce(String(localized: "Presenting. Drag on the page to point."))
+        case .replaying: announce(String(localized: "Replaying. Ink appears as it was written; tap ink to jump to that moment."))
+        case .selecting: announce(String(localized: "Selecting ink. Draw round ink on any page, then drag it."))
         }
     }
 
@@ -484,32 +644,47 @@ fileprivate struct EditorContent: View {
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
         ToolbarItem(placement: .topBarLeading) {
-            Button { session.canvas?.select(nil); session.recorder.shutdown(); close() } label: { Label("Library", systemImage: "chevron.backward") }
-                .keyboardShortcut("w", modifiers: .command)
-                .accessibilityIdentifier("editor.back")
+            Button {
+                session.canvas?.select(nil)
+                session.recorder.shutdown()
+                if window?.linkReturn?.destination == document.id { window?.linkReturn = nil }
+                close()
+            } label: {
+                if pane == .secondary { Label("Close", systemImage: "xmark") } else { Label("Library", systemImage: "chevron.backward") }
+            }
+            .keyboardShortcut(shortcut("w", always: true))
+            .accessibilityIdentifier(pane == .secondary ? "editor.close.pane" : "editor.back")
         }
         ToolbarItem(placement: .principal) { titleMenu }
         ToolbarItemGroup(placement: .topBarTrailing) {
             Button { document.undoManager.undo() } label: { Label("Undo", systemImage: "arrow.uturn.backward") }
-                .keyboardShortcut(isPresentingModal || session.isEditingText ? nil : KeyboardShortcut("z", modifiers: .command))
+                .keyboardShortcut(session.isEditingText ? nil : shortcut("z"))
                 .disabled(!session.canUndo)
                 .accessibilityIdentifier("editor.undo")
             Button { document.undoManager.redo() } label: { Label("Redo", systemImage: "arrow.uturn.forward") }
-                .keyboardShortcut(isPresentingModal || session.isEditingText ? nil : KeyboardShortcut("z", modifiers: [.command, .shift]))
+                .keyboardShortcut(session.isEditingText ? nil : shortcut("z", [.command, .shift]))
                 .disabled(!session.canRedo)
                 .accessibilityIdentifier("editor.redo")
         }
         ToolbarItemGroup(placement: .topBarTrailing) {
             addMenu
-            recordButton
-            recordingsButton
-            Button { session.toggleToolPicker() } label: {
-                Label(session.isToolPickerVisible ? "Hide Tools" : "Show Tools",
-                      systemImage: session.isToolPickerVisible ? "pencil.tip.crop.circle.fill" : "pencil.tip.crop.circle")
+            if !isNarrow {
+                recordButton
+                recordingsButton
+                toolsButton
+            } else if session.recorder.isRecording {
+                recordButton
             }
-            .disabled(document.isReadOnly)
             moreMenu
         }
+    }
+
+    private var toolsButton: some View {
+        Button { session.toggleToolPicker() } label: {
+            Label(session.isToolPickerVisible ? "Hide Tools" : "Show Tools",
+                  systemImage: session.isToolPickerVisible ? "pencil.tip.crop.circle.fill" : "pencil.tip.crop.circle")
+        }
+        .disabled(document.isReadOnly)
     }
 
     private var titleMenu: some View {
@@ -519,7 +694,23 @@ fileprivate struct EditorContent: View {
             if !document.isReadOnly {
                 Button { editingCover = store.record(document.id) } label: { Label("Change Cover…", systemImage: "book.closed") }
             }
-            Button { export = ExportJob(document: document) } label: { Label("Export as PDF…", systemImage: "square.and.arrow.up") }
+            Menu {
+                Button { export = ExportJob(document: document) } label: { Label("Notebook as a PDF…", systemImage: "doc.richtext") }
+                Button { export = ExportJob(document: document, format: .images) } label: { Label("Every Page as an Image…", systemImage: "photo.on.rectangle") }
+                if let page = currentPage {
+                    Button { export = ExportJob(document: document, format: .images, pages: [page]) } label: { Label("This Page as an Image…", systemImage: "photo") }
+                }
+            } label: { Label("Export", systemImage: "square.and.arrow.up") }
+            if let window, pane == .single, !isNarrow, sizeClass != .compact {
+                Divider()
+                Button { pickingBeside = true } label: { Label("Open Another Notebook Beside…", systemImage: "rectangle.split.2x1") }
+                    .disabled(window.beside != nil)
+            } else if pane == .primary, let beside = window?.beside {
+                Divider()
+                Button { NotificationCenter.default.post(name: .scribeCloseEditor, object: beside.id) } label: {
+                    Label("Close the Other Notebook", systemImage: "rectangle")
+                }
+            }
         } label: {
             HStack(spacing: Space.x2) {
                 SpineChip(cloth: cloth)
@@ -534,11 +725,23 @@ fileprivate struct EditorContent: View {
     private var recordingsButton: some View {
         Button { showingRecordings = true } label: { Label("Recordings", systemImage: "waveform") }
             .popover(isPresented: $showingRecordings) {
-                RecordingList(recorder: session.recorder)
+                recordingList { showingRecordings = false }
                     .frame(minWidth: 320, minHeight: 280)
                     .presentationBackground(Color.surface)
                     .presentationCompactAdaptation(.sheet)
             }
+    }
+
+    private func recordingList(dismiss: @escaping () -> Void) -> some View {
+        RecordingList(recorder: session.recorder) { recording in
+            dismiss()
+            Task {
+                try? await Task.sleep(for: .milliseconds(350))
+                if await session.beginReplay(recording) {
+                    announce(String(localized: "Replaying. Ink appears as it was written; tap ink to jump to that moment."))
+                }
+            }
+        }
     }
 
     fileprivate var currentPage: NotebookPage? {
@@ -578,7 +781,7 @@ fileprivate struct EditorContent: View {
         }
         .buttonStyle(.plain)
         .disabled(document.isReadOnly)
-        .keyboardShortcut(isPresentingModal ? nil : KeyboardShortcut("d", modifiers: .command))
+        .keyboardShortcut(shortcut("d"))
         .contextMenu {
             if let page, marked, !document.isReadOnly {
                 Button { bookmarkName = page.bookmark ?? ""; namingBookmark = page.id } label: { Label("Name Bookmark…", systemImage: "pencil") }
@@ -615,7 +818,7 @@ fileprivate struct EditorContent: View {
             .shadow(color: .black.opacity(0.15), radius: 1, y: 1)
         }
         .buttonStyle(.plain)
-        .keyboardShortcut(isPresentingModal ? nil : KeyboardShortcut("p", modifiers: [.command, .shift]))
+        .keyboardShortcut(shortcut("p", [.command, .shift]))
         .simultaneousGesture(LongPressGesture(minimumDuration: 0.4).onEnded { _ in goToText = ""; goToPage = true })
         .accessibilityLabel(Text("Page \(session.currentPage + 1) of \(document.pages.count)"))
         .accessibilityHint(Text("Opens the page navigator. Touch and hold to go to a page."))
@@ -651,14 +854,14 @@ fileprivate struct EditorContent: View {
                 textStyleMenu(box)
             }
             if let link = item?.link {
-                arrangeButton("Open Linked Page", "arrow.turn.down.right") {
+                arrangeButton("Open Link", "arrow.turn.down.right") {
                     if let page = session.selection?.pageID { session.follow(link, from: page) }
                 }
-                .disabled(document.index(of: link.target) == nil)
+                .disabled(link.target.map { document.index(of: $0) == nil } ?? false)
                 .accessibilityIdentifier("editor.arrange.open")
                 arrangeButton("Rename Link", "pencil") { linkLabel = link.label; renamingLink = true }
             }
-            if sizeClass == .compact, item?.text != nil || item?.link != nil {
+            if isCompact, item?.text != nil || item?.link != nil {
                 Menu {
                     Button { session.duplicateSelection() } label: { Label("Duplicate", systemImage: "plus.square.on.square") }
                     Button { session.moveSelection(forward: true) } label: { Label("Bring Forward", systemImage: "square.2.layers.3d.top.filled") }
@@ -709,29 +912,71 @@ fileprivate struct EditorContent: View {
         .accessibilityIdentifier("editor.arrange.style")
     }
 
-    /// After a link was followed: the way back to the page it was on.
+    /// While ink is being selected across pages: what to do, then what can be done with what was caught.
+    private var inkBar: some View {
+        let count = session.inkSelectionCount
+        return HStack(spacing: 0) {
+            Text(count == 0 ? String(localized: "Draw round ink on any page")
+                            : count == 1 ? String(localized: "1 stroke. Drag it to move it.") : String(localized: "\(count) strokes. Drag them to move them."))
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.ink)
+                .lineLimit(1)
+                .padding(.trailing, Space.x2)
+                .accessibilityIdentifier("editor.ink.status")
+            if count > 0 {
+                arrangeButton("Duplicate", "plus.square.on.square") { session.canvas?.duplicateInkSelection() }
+                    .accessibilityIdentifier("editor.ink.duplicate")
+                arrangeButton("Delete", "trash") { session.canvas?.deleteInkSelection() }
+                    .foregroundStyle(Color.tomato)
+                    .accessibilityIdentifier("editor.ink.delete")
+            }
+            arrangeButton("Undo", "arrow.uturn.backward") { document.undoManager.undo() }
+                .disabled(!session.canUndo)
+                .accessibilityIdentifier("editor.ink.undo")
+            Divider().frame(height: 24).padding(.horizontal, Space.x2)
+            barDone { enter(.writing) }
+                .accessibilityIdentifier("editor.ink.done")
+        }
+        .floatingBar()
+        .padding(.top, Space.x2)
+        .transition(.move(edge: .top).combined(with: .opacity))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(Text("Select Ink"))
+        .accessibilityIdentifier("editor.ink.bar")
+    }
+
+    /// After a link was followed: the way back to the page it was on, or to the notebook it was in.
     @ViewBuilder
     private var returnBar: some View {
         if let index = session.linkReturn.flatMap(document.index(of:)) {
-            HStack(spacing: 0) {
-                Button { session.goBack() } label: {
-                    Label("Back to Page \(index + 1)", systemImage: "arrow.uturn.backward")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Color.ink)
-                        .lineLimit(1)
-                        .fixedSize()
-                        .frame(minHeight: 44)
-                }
-                .accessibilityIdentifier("editor.link.back")
-                Button { session.dismissLinkReturn() } label: { Image(systemName: "xmark").font(.footnote.weight(.bold)).frame(width: 44, height: 44) }
-                    .foregroundStyle(Color.textSecondary)
-                    .accessibilityLabel(Text("Dismiss"))
-            }
-            .padding(.leading, Space.x2)
-            .floatingBar()
-            .padding(.top, Space.x2)
-            .transition(.move(edge: .top).combined(with: .opacity))
+            returnBar(String(localized: "Back to Page \(index + 1)"), back: { session.goBack() }, dismiss: { session.dismissLinkReturn() })
+        } else if let origin = window?.linkReturn, origin.destination == document.id, session.mode == .writing {
+            returnBar(String(localized: "Back to \(origin.title)"), back: {
+                window?.linkReturn = nil
+                window?.openNotebook?(origin.origin, origin.page)
+            }, dismiss: { window?.linkReturn = nil })
         }
+    }
+
+    private func returnBar(_ title: String, back: @escaping () -> Void, dismiss: @escaping () -> Void) -> some View {
+        HStack(spacing: 0) {
+            Button(action: back) {
+                Label(title, systemImage: "arrow.uturn.backward")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color.ink)
+                    .lineLimit(1)
+                    .frame(minHeight: 44)
+            }
+            .accessibilityIdentifier("editor.link.back")
+            Button(action: dismiss) { Image(systemName: "xmark").font(.footnote.weight(.bold)).frame(width: 44, height: 44) }
+                .foregroundStyle(Color.textSecondary)
+                .accessibilityLabel(Text("Dismiss"))
+        }
+        .padding(.leading, Space.x2)
+        .frame(maxWidth: 420)
+        .floatingBar()
+        .padding(.top, Space.x2)
+        .transition(.move(edge: .top).combined(with: .opacity))
     }
 
     /// Filled, like the library slip's Undo.
@@ -771,6 +1016,19 @@ fileprivate struct EditorContent: View {
                     .frame(width: 32, height: 44)
                     .accessibilityLabel(Text("Showing on the second screen"))
                     .accessibilityIdentifier("editor.present.screen")
+            }
+            if !isCompact {
+                Button {
+                    let shows = showsPresenterPanel
+                    withAnimation(Motion.adaptive(Motion.standard, reduceMotion: reduceMotion)) { presenterPanel = !shows }
+                } label: {
+                    Image(systemName: "sidebar.trailing")
+                        .symbolVariant(showsPresenterPanel ? .fill : .none)
+                        .frame(width: 44, height: 44)
+                }
+                .accessibilityLabel(Text("Notes and Next Page"))
+                .accessibilityValue(Text(showsPresenterPanel ? "Showing" : "Hidden"))
+                .accessibilityIdentifier("editor.present.notes")
             }
             Button {
                 session.laserColor = session.laserColor == .red ? .green : .red
@@ -813,7 +1071,7 @@ fileprivate struct EditorContent: View {
                 HStack(spacing: Space.x2) {
                     Image(systemName: "stop.fill")
                         .symbolEffect(.breathe, options: .repeating, isActive: !reduceMotion)
-                    if sizeClass != .compact {
+                    if !isCompact {
                         Text(Duration.seconds(seconds).formatted(.time(pattern: .minuteSecond)))
                             .monospacedDigit()
                             .contentTransition(reduceMotion ? .opacity : .numericText(value: Double(seconds)))
@@ -846,7 +1104,7 @@ fileprivate struct EditorContent: View {
             Button { photoBecomesPage = false; showingPhotoPicker = true } label: { Label("Picture on This Page…", systemImage: "photo.on.rectangle.angled") }
             Button { showingStickers = true } label: { Label("Sticker…", systemImage: "seal") }
             Button { session.addText() } label: { Label("Text Box", systemImage: "character.textbox") }
-            Button { pickingLink = true } label: { Label("Link to a Page…", systemImage: "link") }
+            Button { pickingLink = true } label: { Label("Link…", systemImage: "link") }
         } label: {
             Label("Add", systemImage: "plus")
         }
@@ -861,6 +1119,18 @@ fileprivate struct EditorContent: View {
     private var moreMenu: some View {
         Menu {
             let current = document.pages.indices.contains(session.currentPage) ? document.pages[session.currentPage] : nil
+            if isNarrow {
+                if !session.recorder.isRecording {
+                    Button { session.recorder.startRecording() } label: { Label("Record Audio", systemImage: "mic") }
+                        .disabled(document.isReadOnly)
+                }
+                Button { showingRecordingsSheet = true } label: { Label("Recordings", systemImage: "waveform") }
+                Button { session.toggleToolPicker() } label: {
+                    Label(session.isToolPickerVisible ? "Hide Tools" : "Show Tools", systemImage: "pencil.tip.crop.circle")
+                }
+                .disabled(document.isReadOnly)
+                Divider()
+            }
             if let current, current.template != nil, !document.isReadOnly {
                 Button { paperMode = .change(pageID: current.id) } label: { Label("Change Paper…", systemImage: "paintpalette") }
             }
@@ -880,8 +1150,15 @@ fileprivate struct EditorContent: View {
             Button { session.canvas?.fit(.width) } label: { Label("Fit Width", systemImage: "arrow.left.and.right") }
             Button { session.canvas?.fit(.page) } label: { Label("Fit Page", systemImage: "arrow.up.and.down") }
             Divider()
+            if !document.isReadOnly {
+                Button { enter(.selecting) } label: { Label("Select Ink Across Pages", systemImage: "lasso") }
+            }
+            Divider()
             Button { enter(.focus) } label: { Label("Focus Mode", systemImage: "arrow.up.left.and.arrow.down.right") }
             Button { enter(.presenting) } label: { Label("Present", systemImage: "play.rectangle") }
+            if let current, !document.isReadOnly {
+                Button { editingNotes = NotesTarget(id: current.id) } label: { Label("Presenter Notes…", systemImage: "note.text") }
+            }
             Divider()
             Picker(selection: $session.drawingInput) {
                 ForEach(DrawingInput.allCases) { Text($0.displayName).tag($0) }
@@ -932,6 +1209,29 @@ fileprivate struct EditorContent: View {
 }
 
 extension EditorContent {
+    /// Looks up the notebooks this one links to, so their links carry the current titles and grey out once a notebook is gone.
+    fileprivate func refreshNotebookTitles() {
+        var titles: [UUID: String] = [:]
+        for page in document.pages where page.hasItems {
+            for item in page.items {
+                guard case .notebook(let id, _, _)? = item.link?.destination, titles[id] == nil,
+                      let record = store.record(id), !record.isTrashed else { continue }
+                titles[id] = record.title
+            }
+        }
+        session.notebookTitles = titles
+    }
+
+    fileprivate func openLinkedNotebook(_ id: UUID, page: UUID?, from origin: UUID) {
+        guard let record = store.record(id), !record.isTrashed else {
+            errorMessage = String(localized: "The notebook this link opened is no longer in your library.")
+            return
+        }
+        guard let window, let open = window.openNotebook else { return }
+        window.linkReturn = NotebookReturn(origin: document.id, page: origin, title: document.title, destination: id)
+        open(id, page)
+    }
+
     fileprivate func addSticker(_ sticker: CustomSticker) async {
         do {
             try await session.addSticker(sticker)
@@ -1039,10 +1339,13 @@ struct NoticeBanner: View {
 
 struct RecordingList: View {
     let recorder: NotebookRecorder
+    /// Replays a recording with its ink.
+    var replay: ((RecordingEntry) -> Void)?
 
     var body: some View {
         NavigationStack {
             List {
+              Section {
                 ForEach(Array(recorder.recordings.enumerated()), id: \.element.id) { index, recording in
                     HStack(spacing: Space.x3) {
                         Button { recorder.togglePlayback(recording) } label: {
@@ -1059,6 +1362,16 @@ struct RecordingList: View {
                         Spacer()
                         Text(Duration.seconds(recording.duration).formatted(.time(pattern: .minuteSecond)))
                             .font(.callout.monospacedDigit()).foregroundStyle(Color.textSecondary)
+                        if let replay {
+                            Button { replay(recording) } label: {
+                                Image(systemName: "pencil.and.scribble").font(.title3).frame(width: 44, height: 44)
+                            }
+                            .buttonStyle(.borderless)
+                            .disabled(recorder.isRecording)
+                            .accessibilityLabel(Text("Replay with Ink"))
+                            .accessibilityHint(Text("Plays the recording while the ink written during it appears"))
+                            .accessibilityIdentifier("recording.replay.\(index + 1)")
+                        }
                     }
                     .swipeActions {
                         if !recorder.isReadOnly {
@@ -1066,6 +1379,12 @@ struct RecordingList: View {
                         }
                     }
                 }
+              } footer: {
+                if replay != nil, !recorder.recordings.isEmpty {
+                    Text("The pencil replays a recording with your ink: what you wrote appears as it was written, and tapping ink jumps to that moment.")
+                        .foregroundStyle(Color.textSecondary)
+                }
+              }
             }
             .overlay {
                 if recorder.recordings.isEmpty {

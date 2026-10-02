@@ -60,7 +60,17 @@ struct LibrarySidebar: View {
     @Query(filter: #Predicate<NotebookRecord> { $0.deletedAt == nil }) private var notebooks: [NotebookRecord]
     @State private var editingFolder: FolderRecord?
     @State private var creatingFolder = false
+    @State private var creatingInside: FolderRecord?
     @State private var folderName = ""
+    @AppStorage("sidebar.collapsedFolders") private var collapsedRaw = ""
+
+    private var collapsed: Set<UUID> { Set(collapsedRaw.split(separator: ",").compactMap { UUID(uuidString: String($0)) }) }
+
+    private func toggle(_ folder: FolderRecord) {
+        var ids = collapsed
+        if !ids.insert(folder.id).inserted { ids.remove(folder.id) }
+        collapsedRaw = ids.map(\.uuidString).sorted().joined(separator: ",")
+    }
 
     /// One pass over the notebooks for every count, instead of one per folder.
     private var counts: (favorites: Int, byFolder: [UUID: Int]) {
@@ -75,6 +85,9 @@ struct LibrarySidebar: View {
 
     var body: some View {
         let counts = counts
+        let tree = FolderTree(folders: folders)
+        let byID = Dictionary(folders.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let rows = tree.rows(collapsed: collapsed).compactMap { row in byID[row.id].map { (row: row, folder: $0) } }
         List(selection: $scope) {
             Section {
                 row(String(localized: "All notebooks"), icon: "books.vertical", count: notebooks.count).tag(LibraryScope.all)
@@ -82,8 +95,8 @@ struct LibrarySidebar: View {
                 row(String(localized: "Recently deleted"), icon: "trash", count: nil, bounces: changes.trashBumps).tag(LibraryScope.trash)
             }
             Section {
-                ForEach(folders) { folder in
-                    folderRow(folder, count: counts.byFolder[folder.id] ?? 0)
+                ForEach(rows, id: \.row.id) { row, folder in
+                    folderRow(folder, row: row, tree: tree, count: tree.subtree(folder.id).reduce(0) { $0 + (counts.byFolder[$1] ?? 0) })
                         .tag(LibraryScope.folder(folder.id))
                         .dropDestination(for: NotebookReference.self) { items, _ in
                             let ids = Set(items.map(\.id))
@@ -91,10 +104,10 @@ struct LibrarySidebar: View {
                             changes.move(moved, to: folder, in: store, undoManager: undoManager)
                             return !moved.isEmpty
                         }
-                        .contextMenu { folderMenu(folder) }
+                        .contextMenu { folderMenu(folder, tree: tree) }
                 }
-                .onMove { store.moveFolders(folders, from: $0, to: $1) }
-                Button { folderName = ""; creatingFolder = true } label: {
+                .onMove { store.moveFolders(rows.map(\.folder), from: $0, to: $1) }
+                Button { folderName = ""; creatingInside = nil; creatingFolder = true } label: {
                     if dynamicTypeSize.isAccessibilitySize {
                         Text("New Folder")
                     } else {
@@ -119,10 +132,14 @@ struct LibrarySidebar: View {
             TextField("Name", text: $folderName)
             Button("Cancel", role: .cancel) {}
             Button("Create") {
-                if let folder = store.createFolder(name: folderName, cloth: ClothColor.allCases[folders.count % ClothColor.allCases.count]) {
+                let cloth = creatingInside?.cloth ?? ClothColor.allCases[folders.count % ClothColor.allCases.count]
+                if let folder = store.createFolder(name: folderName, cloth: cloth, parent: creatingInside) {
+                    if let creatingInside, collapsed.contains(creatingInside.id) { toggle(creatingInside) }
                     scope = .folder(folder.id)
                 }
             }
+        } message: {
+            if let creatingInside { Text("Inside \(creatingInside.name)") }
         }
         .alert("Rename Folder", isPresented: Binding(get: { editingFolder != nil }, set: { if !$0 { editingFolder = nil } })) {
             TextField("Name", text: $folderName)
@@ -154,24 +171,58 @@ struct LibrarySidebar: View {
         .accessibilityAddTraits(.isButton)
     }
 
-    private func folderRow(_ folder: FolderRecord, count: Int) -> some View {
-        HStack(spacing: Space.x3) {
+    /// A folder inside another is indented under it; one that holds folders has a chevron that folds them away.
+    private func folderRow(_ folder: FolderRecord, row: FolderTree.Row, tree: FolderTree, count: Int) -> some View {
+        let folded = collapsed.contains(folder.id)
+        return HStack(spacing: Space.x3) {
             SpineChip(cloth: folder.cloth)
             Text(folder.name).lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
             Spacer()
             if count > 0, !dynamicTypeSize.isAccessibilitySize {
                 Text(count, format: .number).font(.subheadline.monospacedDigit()).foregroundStyle(.primary)
             }
+            if row.hasChildren {
+                Button { withAnimation(Motion.adaptive(Motion.standard, reduceMotion: reduceMotion)) { toggle(folder) } } label: {
+                    Image(systemName: "chevron.down")
+                        .font(.footnote.weight(.semibold))
+                        .rotationEffect(.degrees(folded ? -90 : 0))
+                        .frame(width: 28, height: 28)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(Color.textSecondary)
+                .accessibilityHidden(true)
+            }
         }
-        .accessibilityElement(children: .combine)
+        .padding(.leading, CGFloat(row.depth) * Space.x4)
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel(count == 1 ? String(localized: "\(folder.name), folder, 1 notebook")
                                        : String(localized: "\(folder.name), folder, \(count) notebooks"))
+        .accessibilityValue(tree.parent(of: folder.id).map { String(localized: "Inside \(tree.name(of: $0))") } ?? "")
         .accessibilityAddTraits(.isButton)
+        .accessibilityActions {
+            if row.hasChildren { Button(folded ? "Show Folders Inside" : "Hide Folders Inside") { toggle(folder) } }
+        }
+        .accessibilityIdentifier("folder.\(folder.name)")
     }
 
     @ViewBuilder
-    private func folderMenu(_ folder: FolderRecord) -> some View {
+    private func folderMenu(_ folder: FolderRecord, tree: FolderTree) -> some View {
         Button { folderName = folder.name; editingFolder = folder } label: { Label("Rename", systemImage: "pencil") }
+        if tree.canAddFolder(inside: folder.id) {
+            Button { folderName = ""; creatingInside = folder; creatingFolder = true } label: { Label("New Folder Inside", systemImage: "folder.badge.plus") }
+        }
+        let places = folders.filter { $0.id != folder.parentID && tree.canMove(folder.id, into: $0.id) }
+        if folder.parentID != nil || !places.isEmpty {
+            Menu {
+                if folder.parentID != nil {
+                    Button { store.moveFolder(folder, into: nil) } label: { Label("Top Level", systemImage: "arrow.up.to.line") }
+                }
+                ForEach(places) { place in
+                    Button(tree.path(of: place.id)) { store.moveFolder(folder, into: place) }
+                }
+            } label: { Label("Move Into", systemImage: "arrow.turn.down.right") }
+        }
         Button { store.sortFoldersByName(folders) } label: { Label("Sort Shelves A to Z", systemImage: "textformat") }
         Menu {
             ForEach(ClothColor.allCases) { cloth in

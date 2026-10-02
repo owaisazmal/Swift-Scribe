@@ -60,10 +60,13 @@ enum NotebookStarter: String, CaseIterable, Identifiable {
 
     func accessibilityLabel(for id: UUID) -> String {
         let spec = spec(for: id)
-        let paper = "\(template.displayName) \(paperColor.displayName)".lowercased()
+        // Names are lowercased mid-sentence in English only; German keeps its nouns capitalised.
+        let english = Bundle.main.preferredLocalizations.first?.hasPrefix("en") ?? true
+        func name(_ text: String) -> String { english ? text.lowercased() : text }
+        let paper = name("\(template.displayName) \(paperColor.displayName)")
         let cover = spec.style == .print
-            ? String(localized: "\(spec.inks.0.displayName.lowercased()) and \(spec.inks.1.displayName.lowercased()) print")
-            : String(localized: "\(spec.cloth.displayName.lowercased()) cloth")
+            ? String(localized: "\(name(spec.inks.0.displayName)) and \(name(spec.inks.1.displayName)) print")
+            : String(localized: "\(name(spec.cloth.displayName)) cloth")
         return String(localized: "\(title) starter: \(paper) paper, \(cover)")
     }
 }

@@ -44,9 +44,11 @@ struct ScribeRoot: View {
             await WidgetBridge.update(app)
         }
         .onChange(of: scenePhase) { _, phase in
+            if phase == .active { app.sync.schedule(after: .seconds(1)) }
             if phase != .active {
                 app.flushOpenDocuments()
                 app.activity.flush()
+                app.sync.schedule(after: .seconds(1))
                 Task { await WidgetBridge.update(app) }
             }
         }

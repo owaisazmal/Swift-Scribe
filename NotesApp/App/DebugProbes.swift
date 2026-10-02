@@ -162,6 +162,51 @@ private final class PassThroughWindow: UIWindow {
     }
 }
 
+/// A notebook with a silent recording and ink dated inside it, for trying the replay.
+enum ReplaySeed {
+    static func write(root: StorageRoot) async {
+        let paper = PageDefaults(template: .narrowRuled, paperColor: .white, pageSize: .letter)
+        var manifest = NotebookManifest(title: "Lecture Replay", defaults: paper, pages: [paper.newPage(), paper.newPage()])
+        let package = NotebookPackage(root: root, id: manifest.id)
+        let start = Date.now.addingTimeInterval(-3600), duration: TimeInterval = 20, file = "\(UUID().uuidString).wav"
+        try? await package.create(manifest)
+        try? FileManager.default.createDirectory(at: package.assetsDirectory, withIntermediateDirectories: true)
+        try? silence(seconds: duration).write(to: package.assetURL(file))
+        var entry = RecordingEntry(id: UUID(), file: file, createdAt: start.addingTimeInterval(duration), duration: duration)
+        entry.startedAt = start
+        entry.inkedPages = manifest.pages.map(\.id)
+        manifest.recordings = [entry]
+        let first = [stroke(y: 140, at: start.addingTimeInterval(-60)), stroke(y: 220, at: start.addingTimeInterval(2)),
+                     stroke(y: 300, at: start.addingTimeInterval(6)), stroke(y: 380, at: start.addingTimeInterval(10))]
+        let second = [stroke(y: 160, at: start.addingTimeInterval(14)), stroke(y: 240, at: start.addingTimeInterval(18))]
+        _ = try? await package.write(SaveSnapshot(manifest: manifest, ink: [manifest.pages[0].id: PKDrawing(strokes: first),
+                                                                              manifest.pages[1].id: PKDrawing(strokes: second)]))
+    }
+
+    static func stroke(y: CGFloat, at date: Date) -> PKStroke {
+        let points = (0...12).map { index in
+            PKStrokePoint(location: CGPoint(x: 120 + CGFloat(index) * 30, y: y + 12 * sin(CGFloat(index))), timeOffset: Double(index) * 0.05,
+                          size: CGSize(width: 4, height: 4), opacity: 1, force: 1, azimuth: 0, altitude: .pi / 2)
+        }
+        return PKStroke(ink: PKInk(.pen, color: .black), path: PKStrokePath(controlPoints: points, creationDate: date))
+    }
+
+    /// A mono 16-bit WAV file of silence.
+    static func silence(seconds: TimeInterval, rate: Int = 8000) -> Data {
+        let bytes = Int(seconds * Double(rate)) * 2
+        var data = Data()
+        func append<T: FixedWidthInteger>(_ value: T) { withUnsafeBytes(of: value.littleEndian) { data.append(contentsOf: $0) } }
+        data.append(contentsOf: Array("RIFF".utf8))
+        append(UInt32(36 + bytes))
+        data.append(contentsOf: Array("WAVEfmt ".utf8))
+        append(UInt32(16)); append(UInt16(1)); append(UInt16(1)); append(UInt32(rate)); append(UInt32(rate * 2)); append(UInt16(2)); append(UInt16(16))
+        data.append(contentsOf: Array("data".utf8))
+        append(UInt32(bytes))
+        data.append(Data(count: bytes))
+        return data
+    }
+}
+
 enum LibrarySeed {
     /// Writes `count` notebooks with a mix of cover styles and a few folders, for scrolling tests.
     static func write(count: Int, root: StorageRoot) async {

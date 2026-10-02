@@ -110,6 +110,10 @@ final class ExternalDisplay {
         }
         window.rootViewController = stage
         window.isHidden = false
+        // A new window is laid out by whichever thread commits a transaction first, and the page's tiles are drawn on
+        // background threads that commit their own. Committing here keeps the stage's first layout on the main thread.
+        window.layoutIfNeeded()
+        CATransaction.flush()
         self.window = window
         self.stage = stage
         isShowing = true
@@ -159,11 +163,17 @@ final class PresentationStageController: UIViewController {
         view.addSubview(trail)
     }
 
-    override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        // A dot sized for a tablet at arm's length is lost on a projector.
-        trail.weight = max(1, min(view.bounds.width, view.bounds.height) / 480)
-        place()
+    /// Core Animation can lay a window out from a tile-drawing thread; then this waits for the main thread.
+    nonisolated override func viewDidLayoutSubviews() {
+        guard Thread.isMainThread else {
+            return DispatchQueue.main.async { [weak self] in self?.view.setNeedsLayout() }
+        }
+        MainActor.assumeIsolated {
+            super.viewDidLayoutSubviews()
+            // A dot sized for a tablet at arm's length is lost on a projector.
+            trail.weight = max(1, min(view.bounds.width, view.bounds.height) / 480)
+            place()
+        }
     }
 
     func show(_ image: UIImage, pageSize: CGSize) {

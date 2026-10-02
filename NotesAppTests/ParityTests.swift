@@ -96,7 +96,7 @@ final class ParityTests: XCTestCase {
         let job = try await ExportJob.forNotebook(manifest.id, root: root)
         let deadline = Date().addingTimeInterval(20)
         while case .running = job.state, Date() < deadline { try await Task.sleep(for: .milliseconds(20)) }
-        guard case .finished(let url) = job.state else { return XCTFail("export ended as \(job.state)") }
+        guard case .finished(let urls) = job.state, let url = urls.first else { return XCTFail("export ended as \(job.state)") }
         XCTAssertEqual(PDFDocument(url: url)?.pageCount, 3)
         XCTAssertEqual(url.lastPathComponent, "Biology.pdf")
     }

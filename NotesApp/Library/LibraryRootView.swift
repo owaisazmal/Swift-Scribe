@@ -31,7 +31,9 @@ struct LibraryRootView: View {
     @State private var openingToday = false
     @State private var triedRestore = false
     @State private var performingAction = false
+    @State private var window = EditorWindow()
     @SceneStorage("scribe.openNotebook") private var restoredNotebook = ""
+    @SceneStorage("scribe.besideNotebook") private var restoredBeside = ""
     @Namespace private var zoom
 
     /// With Reduce Motion the editor cross-fades in over the library instead of zooming out of the cover.
@@ -60,7 +62,8 @@ struct LibraryRootView: View {
             .disabled(editorCoversLibrary)
 
             if !usesZoom, let open {
-                EditorScreen(notebookID: open.id, initialPageID: open.pageID, sceneID: sceneID) { self.open = nil }
+                EditorPanes(primary: open, sceneID: sceneID) { self.open = nil }
+                    .environment(window)
                     .id(open.id)
                     .accessibilityAddTraits(.isModal)
                     .transition(.opacity)
@@ -69,8 +72,11 @@ struct LibraryRootView: View {
         }
         .animation(.easeInOut(duration: 0.18), value: open)
         .fullScreenCover(item: Binding(get: { usesZoom ? open : nil }, set: { open = $0 })) { item in
-            EditorScreen(notebookID: item.id, initialPageID: item.pageID, sceneID: sceneID) { open = nil }
+            EditorPanes(primary: item, sceneID: sceneID) { open = nil }
+                .environment(window)
                 .zoomTransition(id: item.zoomSource, in: zoom)
+                // A sideways finger drag on the page would otherwise pull the editor shut without its save-and-close.
+                .interactiveDismissDisabled()
         }
         .sheet(isPresented: $creating) {
             NewNotebookView(folder: folder) { id in
@@ -99,7 +105,16 @@ struct LibraryRootView: View {
                     .accessibilityHidden(true)
             }
         }
-        .onChange(of: open) { restoredNotebook = $1?.id.uuidString ?? "" }
+        .onChange(of: open) {
+            restoredNotebook = $1?.id.uuidString ?? ""
+            if $1 == nil {
+                window.beside = nil
+                window.active = nil
+                window.toolPicker = nil
+            }
+        }
+        .onChange(of: window.beside?.id) { restoredBeside = open == nil ? "" : $1?.uuidString ?? "" }
+        .onAppear { window.openNotebook = { id, page in Task { await perform(.open(id, page: page)) } } }
         .task(id: app.phase) {
             await restoreOpenNotebook()
             takePendingAction()
@@ -140,9 +155,10 @@ struct LibraryRootView: View {
             case .continueWriting:
                 guard let last = store.lastOpenedNotebook else { return }
                 id = last.id
-            case .open(let notebook):
+            case .open(let notebook, let linked):
                 guard let record = store.record(notebook), !record.isTrashed else { return }
                 id = notebook
+                page = linked
             }
             if let current = open, current.id != id {
                 NotificationCenter.default.post(name: .scribeCloseEditor, object: current.id)
@@ -189,8 +205,10 @@ struct LibraryRootView: View {
             return
         }
         guard let id = UUID(uuidString: restoredNotebook), let record = store.record(id), !record.isTrashed else { return }
+        let beside = UUID(uuidString: restoredBeside).flatMap(store.record)
         defaults.set(true, forKey: flag)
         openNotebook(id)
+        if let beside, beside.id != id, !beside.isTrashed, open?.id == id { window.beside = OpenNotebook(id: beside.id) }
         try? await Task.sleep(for: .seconds(3))
         defaults.removeObject(forKey: flag)
     }
@@ -219,6 +237,7 @@ struct LibraryRootView: View {
     /// Only one editor per window: while one is open, the library can't switch it to another notebook.
     private func openNotebook(_ id: UUID, pageID: UUID? = nil, zoomSource: String? = nil) {
         guard open == nil else { return }
+        if window.linkReturn?.destination != id { window.linkReturn = nil }
         if DocumentRegistry.shared.activateExistingEditor(for: id, from: sceneID) {
             if let pageID { NotificationCenter.default.post(name: .scribeShowPage, object: id, userInfo: ["page": pageID]) }
             return

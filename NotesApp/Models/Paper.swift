@@ -9,20 +9,20 @@ enum PaperTemplate: String, Codable, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .blank: "Blank"
-        case .narrowRuled: "Narrow Ruled"
-        case .wideRuled: "Wide Ruled"
-        case .grid: "Grid"
-        case .dotted: "Dotted"
-        case .cornell: "Cornell"
-        case .music: "Music Staff"
-        case .engineering: "Engineering"
-        case .isometric: "Isometric"
-        case .checklist: "Checklist"
-        case .penmanship: "Penmanship"
-        case .dayPlanner: "Day Planner"
-        case .weekPlanner: "Week Planner"
-        case .storyboard: "Storyboard"
+        case .blank: String(localized: "Blank")
+        case .narrowRuled: String(localized: "Narrow Ruled")
+        case .wideRuled: String(localized: "Wide Ruled")
+        case .grid: String(localized: "Grid")
+        case .dotted: String(localized: "Dotted")
+        case .cornell: String(localized: "Cornell")
+        case .music: String(localized: "Music Staff")
+        case .engineering: String(localized: "Engineering")
+        case .isometric: String(localized: "Isometric")
+        case .checklist: String(localized: "Checklist")
+        case .penmanship: String(localized: "Penmanship")
+        case .dayPlanner: String(localized: "Day Planner")
+        case .weekPlanner: String(localized: "Week Planner")
+        case .storyboard: String(localized: "Storyboard")
         }
     }
 
@@ -37,10 +37,10 @@ enum PaperFamily: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .writing: "Writing"
-        case .grids: "Grids"
-        case .planning: "Planning"
-        case .creative: "Creative"
+        case .writing: String(localized: "Writing")
+        case .grids: String(localized: "Grids")
+        case .planning: String(localized: "Planning")
+        case .creative: String(localized: "Creative")
         }
     }
 
@@ -61,15 +61,15 @@ enum PaperColor: String, Codable, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .white: "White"
-        case .ivory: "Ivory"
-        case .yellow: "Legal Pad"
-        case .gray: "Gray"
-        case .charcoal: "Charcoal"
-        case .kraft: "Kraft"
-        case .sage: "Sage"
-        case .blush: "Blush"
-        case .chalkboard: "Chalkboard"
+        case .white: String(localized: "White")
+        case .ivory: String(localized: "Ivory")
+        case .yellow: String(localized: "Legal Pad")
+        case .gray: String(localized: "Gray")
+        case .charcoal: String(localized: "Charcoal")
+        case .kraft: String(localized: "Kraft")
+        case .sage: String(localized: "Sage")
+        case .blush: String(localized: "Blush")
+        case .chalkboard: String(localized: "Chalkboard")
         }
     }
 
@@ -97,10 +97,10 @@ enum PageSize: String, Codable, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .letter: "US Letter"
-        case .a4: "A4"
-        case .a5: "A5"
-        case .widescreen: "Widescreen"
+        case .letter: String(localized: "US Letter")
+        case .a4: String(localized: "A4")
+        case .a5: String(localized: "A5")
+        case .widescreen: String(localized: "Widescreen")
         }
     }
 
