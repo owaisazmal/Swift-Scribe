@@ -106,8 +106,8 @@ final class EditorModesUITests: XCTestCase {
             app.buttons["Add"].firstMatch.tap()
             app.buttons["Sticker…"].firstMatch.tap()
             let tile = app.buttons["sticker.\(sticker)"]
-            // The stamps sit below the fold now that your own stickers come first.
-            if !tile.waitForExistence(timeout: 5) { app.scrollViews["sticker.drawer"].swipeUp() }
+            // Marks and tags sit below the fold, under your own stickers, the notes and the doodles.
+            for _ in 0..<4 where !tile.waitForExistence(timeout: 3) { app.scrollViews["sticker.drawer"].swipeUp() }
             XCTAssertTrue(tile.waitForExistence(timeout: 10))
             if sticker == "noteYellow" { attach(app, "sticker-drawer") }
             tile.tap()
@@ -127,7 +127,7 @@ final class EditorModesUITests: XCTestCase {
 
         drag(on: canvas, y: 0.22)
         XCTAssertEqual(strokeCount(canvas), 1, "ink goes over the sticker once it's put down")
-        add("star")
+        add("rainbow")
         add("stampImportant")
         app.buttons["Done"].firstMatch.tap()
         attach(app, "stickers-on-page")

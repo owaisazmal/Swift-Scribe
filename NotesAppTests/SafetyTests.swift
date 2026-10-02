@@ -417,7 +417,7 @@ final class LibraryStoreSafetyTests: XCTestCase {
 
     private func makeStore() throws -> (LibraryStore, StorageRoot, ModelContext) {
         let root = temporaryRoot(self)
-        let schema = Schema(versionedSchema: LibraryIndexSchemaV1.self)
+        let schema = LibraryIndex.schema
         let container = try ModelContainer(for: schema, configurations: ModelConfiguration(schema: schema, isStoredInMemoryOnly: true))
         self.container = container
         return (LibraryStore(root: root, context: container.mainContext), root, container.mainContext)
@@ -459,7 +459,7 @@ final class LibraryStoreSafetyTests: XCTestCase {
         let manifest = try await makeNotebook(store)
         store.updateSearchText("momentum and inertia", for: manifest.id)
         let copyID = try await store.duplicate(try XCTUnwrap(store.record(manifest.id)))
-        XCTAssertEqual(store.record(copyID)?.searchText, "momentum and inertia")
+        XCTAssertEqual(store.searchText(for: copyID), "momentum and inertia")
     }
 
     func testReadOnlyNotebooksIgnoreLibraryChanges() async throws {

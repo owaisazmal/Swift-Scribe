@@ -177,7 +177,8 @@ text/<pageID>.txt      recognised handwriting and PDF text, stamped with the ink
 
 ### Library index
 
-- SwiftData holds the library index (`LibraryIndexSchemaV1`): records, folders, search text and cover fields.
+- SwiftData holds the library index (`LibraryIndexSchemaV2`): notebook records with their cover fields, folders, and one `NotebookSearchText` row per notebook. Search text is not a relationship of the record, so the shelf's queries never read it; a search fetches only the IDs of matching titles and matching text rows (`LibraryIndex.notebookIDs`).
+- A store written by the first schema migrates in place (a lightweight stage that drops the record's search text and adds the table). The refresh that follows gives every notebook without a row its text from the package's `text/` files, the same way a rebuilt index gets it.
 - It is rebuilt from the manifests and `folders.json` whenever they are newer.
 - An index that can't be opened is set aside and rebuilt; there is no `fatalError` at launch.
 
@@ -251,7 +252,6 @@ All three targets build in the Swift 6 language mode with no warnings. Two thing
 ## Known limits
 
 - Undo keeps whole-page drawings. The number of steps shrinks as the pages being edited get heavier: 200 steps for light pages down to 20 for pages whose saved ink is over about 2.4 MB (`UndoBudget`, a 48 MB budget). The budget is an estimate and should be checked against a device memory trace.
-- Each library record carries its search text, so the shelf's query loads it. Moving search text into its own entity is a schema change worth making before release.
 - Lasso and ruler are page-scoped in the first release: each page is its own canvas, so neither can span two pages, and ink past a page edge is hidden. v1's single canvas allowed both. Cross-page lasso is a future feature, to be built as a selection layer over the per-page canvases, not by returning to one canvas.
 - ⌘F is claimed by a first-responder view in the library (the toolbar search swallows it otherwise). In the iPadOS 27 simulator under XCUITest, ⌘F never reaches the app at all while ⌘G on the same view does, so it needs a check on a device.
 - The second screen has been checked with a stand-in window (`-secondScreenInset`), not with a display: the simulator's external display can't be attached from a test. Lifting a subject out of a photo runs on a Mac with the same code but not in the simulator. Both need a check on a device.

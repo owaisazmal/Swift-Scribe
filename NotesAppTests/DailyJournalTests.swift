@@ -13,7 +13,7 @@ final class DailyJournalTests: XCTestCase {
     }()
 
     private func makeStore() throws -> LibraryStore {
-        let schema = Schema(versionedSchema: LibraryIndexSchemaV1.self)
+        let schema = LibraryIndex.schema
         let container = try ModelContainer(for: schema, configurations: ModelConfiguration(schema: schema, isStoredInMemoryOnly: true))
         self.container = container
         let saved = UserDefaults.standard.object(forKey: SettingsKey.dailyJournalID)

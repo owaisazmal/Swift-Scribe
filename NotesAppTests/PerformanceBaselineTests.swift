@@ -116,7 +116,7 @@ final class PerformanceBaselineTests: XCTestCase {
         try requirePerfRun()
         let root = v2Root()
         let id = try await V2StressFixture.write(pages: 100, strokes: { _ in 500 }, root: root)
-        let schema = Schema(versionedSchema: LibraryIndexSchemaV1.self)
+        let schema = LibraryIndex.schema
         let container = try ModelContainer(for: schema, configurations: ModelConfiguration(schema: schema, isStoredInMemoryOnly: true))
         let store = LibraryStore(root: root, context: container.mainContext)
         let (document, controller, _) = try await openV2(id, root: root, window: try hostWindow())

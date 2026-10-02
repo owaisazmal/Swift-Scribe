@@ -101,7 +101,7 @@ final class LibraryStore {
 
     @discardableResult
     func duplicate(_ record: NotebookRecord) async throws -> UUID {
-        let sourceID = record.id, searchText = record.searchText
+        let sourceID = record.id, searchText = searchText(for: record.id)
         if let open = DocumentRegistry.shared.document(for: sourceID) { await open.flush() }
         let newID = UUID()
         let source = root.package(sourceID), destination = root.package(newID)
@@ -186,6 +186,7 @@ final class LibraryStore {
                 try FileManager.default.moveItem(at: root.package(record.id), to: tombstone)
                 moved.append(tombstone)
                 deleted.append(record.id)
+                if let row = LibraryIndex.searchRow(for: record.id, in: context) { context.delete(row) }
                 context.delete(record)
             } catch {
                 lastError = "“\(record.title)” couldn't be deleted: \(error.localizedDescription)"
@@ -352,10 +353,13 @@ final class LibraryStore {
     }
 
     func updateSearchText(_ text: String, for id: UUID) {
-        guard let record = record(id), record.searchText != text else { return }
-        record.searchText = text
+        guard record(id) != nil, LibraryIndex.setSearchText(text, for: id, in: context) else { return }
         searchVersion &+= 1
         saveIndex()
+    }
+
+    func searchText(for id: UUID) -> String {
+        LibraryIndex.searchRow(for: id, in: context)?.text ?? ""
     }
 
     // MARK: Daily journal

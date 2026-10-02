@@ -93,11 +93,7 @@ struct ShelfView: View {
         guard !Task.isCancelled else { return }
         let container = context.container
         let found = await Task.detached(priority: .userInitiated) { () -> Set<UUID> in
-            let background = ModelContext(container)
-            let descriptor = FetchDescriptor<NotebookRecord>(predicate: #Predicate {
-                $0.title.localizedStandardContains(query) || $0.searchText.localizedStandardContains(query)
-            })
-            return Set(((try? background.fetch(descriptor)) ?? []).map(\.id))
+            LibraryIndex.notebookIDs(matching: query, in: ModelContext(container))
         }.value
         guard !Task.isCancelled else { return }
         matches = found
