@@ -395,6 +395,34 @@
         }
       }
     },
+    "%@, %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, %2$@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, %2$@"
+          }
+        }
+      }
+    },
     "%@, folder, %lld notebooks" : {
       "localizations" : {
         "de" : {
@@ -541,6 +569,62 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$@, page %2$lld : %3$@"
+          }
+        }
+      }
+    },
+    "%@, recording %lld" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, Aufnahme %2$lld"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, recording %2$lld"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, grabación %2$lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, enregistrement %2$lld"
+          }
+        }
+      }
+    },
+    "%@, recording %lld: %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, Aufnahme %2$lld: %3$@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, recording %2$lld: %3$@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, grabación %2$lld: %3$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, enregistrement %2$lld : %3$@"
           }
         }
       }
@@ -1995,6 +2079,28 @@
         }
       }
     },
+    "Add Study Tape" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lernklebeband hinzufügen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añadir cinta de estudio"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter un ruban de révision"
+          }
+        }
+      }
+    },
     "Add Text Box" : {
       "localizations" : {
         "de" : {
@@ -3365,6 +3471,72 @@
         }
       }
     },
+    "Copied" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kopiert"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copiado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copié"
+          }
+        }
+      }
+    },
+    "Copy" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kopieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copiar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copier"
+          }
+        }
+      }
+    },
+    "Copy Transcript" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transkript kopieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copiar transcripción"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copier la transcription"
+          }
+        }
+      }
+    },
     "Cornell" : {
       "localizations" : {
         "de" : {
@@ -3383,6 +3555,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cornell"
+          }
+        }
+      }
+    },
+    "Couldn't Read the Ink" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tinte konnte nicht gelesen werden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo leer la tinta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de lire l’encre"
           }
         }
       }
@@ -3455,6 +3649,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aperçu de la couverture : couverture %1$@ pour %2$@"
+          }
+        }
+      }
+    },
+    "Covering" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aufgeklebt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Colocada"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En place"
           }
         }
       }
@@ -4713,6 +4929,28 @@
         }
       }
     },
+    "Export Video" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Video exportieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exportar vídeo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exporter la vidéo"
+          }
+        }
+      }
+    },
     "Export as Images" : {
       "localizations" : {
         "de" : {
@@ -5281,6 +5519,72 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Grouper par"
+          }
+        }
+      }
+    },
+    "Handwriting as Text" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Handschrift als Text"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escritura a mano como texto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Écriture manuscrite en texte"
+          }
+        }
+      }
+    },
+    "Handwriting as text" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Handschrift als Text"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escritura a mano como texto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Écriture manuscrite en texte"
+          }
+        }
+      }
+    },
+    "Handwriting replaced with text" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Handschrift durch Text ersetzt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escritura a mano sustituida por texto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Écriture manuscrite remplacée par du texte"
           }
         }
       }
@@ -5923,6 +6227,28 @@
         }
       }
     },
+    "Language" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sprache"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Idioma"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Langue"
+          }
+        }
+      }
+    },
     "Large" : {
       "localizations" : {
         "de" : {
@@ -6187,6 +6513,50 @@
         }
       }
     },
+    "Lift Tape" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Klebeband anheben"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Levantar la cinta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Soulever le ruban"
+          }
+        }
+      }
+    },
+    "Lifted" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Angehoben"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Levantada"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Soulevé"
+          }
+        }
+      }
+    },
     "Lifts the subject out of a photo you pick" : {
       "localizations" : {
         "de" : {
@@ -6205,6 +6575,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Détache le sujet d’une photo que vous choisissez"
+          }
+        }
+      }
+    },
+    "Lifts the tape or puts it back. Touch and hold to move or resize." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hebt das Klebeband an oder klebt es wieder auf. Zum Bewegen oder Ändern der Größe gedrückt halten."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Levanta la cinta o la vuelve a colocar. Mantén pulsado para mover o cambiar el tamaño."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Soulève le ruban ou le remet en place. Maintenez le doigt pour déplacer ou redimensionner."
           }
         }
       }
@@ -7453,6 +7845,50 @@
         }
       }
     },
+    "No Transcript Yet" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noch kein Transkript"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aún no hay transcripción"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pas encore de transcription"
+          }
+        }
+      }
+    },
+    "No Words Found" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine Wörter gefunden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se encontraron palabras"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun mot trouvé"
+          }
+        }
+      }
+    },
     "No favourites yet" : {
       "localizations" : {
         "de" : {
@@ -7541,6 +7977,28 @@
         }
       }
     },
+    "No speech was found in this recording." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In dieser Aufnahme wurde keine Sprache gefunden."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se encontró voz en esta grabación."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune parole n’a été trouvée dans cet enregistrement."
+          }
+        }
+      }
+    },
     "None" : {
       "localizations" : {
         "de" : {
@@ -7581,6 +8039,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sur aucune étagère"
+          }
+        }
+      }
+    },
+    "Not transcribed" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nicht transkribiert"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sin transcribir"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non transcrit"
           }
         }
       }
@@ -7779,6 +8259,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "La corbeille est vide"
+          }
+        }
+      }
+    },
+    "Nothing in the selected ink could be read as writing. Try selecting whole words or lines." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In der ausgewählten Tinte konnte nichts als Schrift gelesen werden. Wähle ganze Wörter oder Zeilen aus."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nada de la tinta seleccionada se pudo leer como escritura. Prueba a seleccionar palabras o líneas completas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien dans l’encre sélectionnée n’a pu être lu comme de l’écriture. Essayez de sélectionner des mots ou des lignes entiers."
           }
         }
       }
@@ -9673,6 +10175,50 @@
         }
       }
     },
+    "Put All Tape Back" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle Klebebänder wieder aufkleben"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Volver a colocar toda la cinta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remettre tous les rubans en place"
+          }
+        }
+      }
+    },
+    "Put Tape Back" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Klebeband wieder aufkleben"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Volver a colocar la cinta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remettre le ruban en place"
+          }
+        }
+      }
+    },
     "Question Mark" : {
       "localizations" : {
         "de" : {
@@ -9735,6 +10281,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Arc-en-ciel"
+          }
+        }
+      }
+    },
+    "Reading your handwriting…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deine Handschrift wird gelesen …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Leyendo tu escritura…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lecture de votre écriture…"
           }
         }
       }
@@ -10025,6 +10593,28 @@
         }
       }
     },
+    "Remove Transcript" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transkript entfernen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminar transcripción"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer la transcription"
+          }
+        }
+      }
+    },
     "Removed %lld notebooks from Favourites" : {
       "localizations" : {
         "de" : {
@@ -10175,6 +10765,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Renommer…"
+          }
+        }
+      }
+    },
+    "Replace Handwriting" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Handschrift ersetzen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sustituir la escritura"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remplacer l’écriture"
           }
         }
       }
@@ -11257,6 +11869,28 @@
         }
       }
     },
+    "Sky" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Himmel"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cielo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ciel"
+          }
+        }
+      }
+    },
     "Slate" : {
       "localizations" : {
         "de" : {
@@ -11451,6 +12085,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bulle de dialogue"
+          }
+        }
+      }
+    },
+    "Speech recognition is off for Swift Scribe. Turn it on in Settings › Privacy & Security › Speech Recognition." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Spracherkennung ist für Swift Scribe deaktiviert. Aktiviere sie unter Einstellungen › Datenschutz & Sicherheit › Spracherkennung."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El reconocimiento de voz está desactivado para Swift Scribe. Actívalo en Ajustes › Privacidad y seguridad › Reconocimiento de voz."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La reconnaissance vocale est désactivée pour Swift Scribe. Activez-la dans Réglages › Confidentialité et sécurité › Reconnaissance vocale."
           }
         }
       }
@@ -11939,6 +12595,50 @@
         }
       }
     },
+    "Study Tape" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lernklebeband"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cinta de estudio"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ruban de révision"
+          }
+        }
+      }
+    },
+    "Study tape" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lernklebeband"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cinta de estudio"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ruban de révision"
+          }
+        }
+      }
+    },
     "Sun" : {
       "localizations" : {
         "de" : {
@@ -11979,6 +12679,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Swift Scribe"
+          }
+        }
+      }
+    },
+    "Swift Scribe can write down what was said, so you can read it, search for it and jump to any moment. It is done on this iPad: the recording is never sent anywhere." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Swift Scribe kann aufschreiben, was gesagt wurde, damit du es lesen, durchsuchen und zu jedem Moment springen kannst. Das geschieht auf diesem iPad: Die Aufnahme wird nie irgendwohin gesendet."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Swift Scribe puede poner por escrito lo que se dijo, para que puedas leerlo, buscarlo y saltar a cualquier momento. Se hace en este iPad: la grabación nunca se envía a ningún sitio."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Swift Scribe peut mettre par écrit ce qui a été dit, pour que vous puissiez le lire, le rechercher et aller à n’importe quel moment. Tout se fait sur cet iPad : l’enregistrement n’est jamais envoyé nulle part."
           }
         }
       }
@@ -12181,6 +12903,28 @@
         }
       }
     },
+    "Tap a line to hear it, with the ink you wrote as it was said." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tippe auf eine Zeile, um sie zu hören, zusammen mit der Tinte, die du dabei geschrieben hast."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toca una línea para oírla, con la tinta que escribiste mientras se decía."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Touchez une ligne pour l’écouter, avec l’encre que vous avez écrite à ce moment-là."
+          }
+        }
+      }
+    },
     "Tap the microphone to record a lecture or meeting alongside your notes." : {
       "localizations" : {
         "de" : {
@@ -12221,6 +12965,72 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Touchez le petit ruban à côté du numéro de page pour ajouter un signet à une page. Les signets et la table des matières d’un PDF sont répertoriés ici."
+          }
+        }
+      }
+    },
+    "Tape Colour" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Klebebandfarbe"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Color de la cinta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couleur du ruban"
+          }
+        }
+      }
+    },
+    "Tape lifted" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Klebeband angehoben"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cinta levantada"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ruban soulevé"
+          }
+        }
+      }
+    },
+    "Tape put back" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Klebeband wieder aufgeklebt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cinta colocada de nuevo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ruban remis en place"
           }
         }
       }
@@ -12533,6 +13343,28 @@
         }
       }
     },
+    "The handwriting recogniser didn't answer. Try again in a moment." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Handschrifterkennung hat nicht geantwortet. Versuche es gleich noch einmal."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El reconocedor de escritura no respondió. Inténtalo de nuevo en un momento."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La reconnaissance d’écriture n’a pas répondu. Réessayez dans un instant."
+          }
+        }
+      }
+    },
     "The ink on a page couldn't be read. The original file was kept as %@, and the page starts empty." : {
       "localizations" : {
         "de" : {
@@ -12759,6 +13591,28 @@
         }
       }
     },
+    "The page being written, playing over and over" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Seite, während sie geschrieben wird, in Dauerschleife"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La página mientras se escribe, en reproducción continua"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La page en train d’être écrite, en boucle"
+          }
+        }
+      }
+    },
     "The page this link opened was deleted" : {
       "localizations" : {
         "de" : {
@@ -12781,24 +13635,68 @@
         }
       }
     },
-    "The pencil replays a recording with your ink: what you wrote appears as it was written, and tapping ink jumps to that moment." : {
+    "The pencil replays a recording with your ink: what you wrote appears as it was written, and tapping ink jumps to that moment. The speech bubble opens what was said." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Der Stift gibt eine Aufnahme zusammen mit deiner Tinte wieder: Was du geschrieben hast, erscheint so, wie es geschrieben wurde, und durch Tippen auf Tinte springst du zu diesem Moment."
+            "value" : "Der Stift gibt eine Aufnahme zusammen mit deiner Tinte wieder: Was du geschrieben hast, erscheint so, wie es geschrieben wurde, und durch Tippen auf Tinte springst du zu diesem Moment. Die Sprechblase öffnet, was gesagt wurde."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "El lápiz reproduce una grabación con tu tinta: lo que escribiste aparece tal como se escribió, y al tocar la tinta se salta a ese momento."
+            "value" : "El lápiz reproduce una grabación con tu tinta: lo que escribiste aparece tal como se escribió, y al tocar la tinta se salta a ese momento. El bocadillo abre lo que se dijo."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le crayon relit un enregistrement avec votre encre : ce que vous avez écrit apparaît au fil de l’écriture, et toucher de l’encre vous amène à ce moment."
+            "value" : "Le crayon relit un enregistrement avec votre encre : ce que vous avez écrit apparaît au fil de l’écriture, et toucher de l’encre vous amène à ce moment. La bulle ouvre ce qui a été dit."
+          }
+        }
+      }
+    },
+    "The recording couldn't be transcribed: %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Aufnahme konnte nicht transkribiert werden: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo transcribir la grabación: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’enregistrement n’a pas pu être transcrit : %@"
+          }
+        }
+      }
+    },
+    "The video couldn't be made: %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Video konnte nicht erstellt werden: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo crear el vídeo: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La vidéo n’a pas pu être créée : %@"
           }
         }
       }
@@ -12821,6 +13719,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "La bande de la semaine et le calendrier repartent de zéro. Vos carnets et vos pages ne sont pas modifiés."
+          }
+        }
+      }
+    },
+    "There is no ink on this page to film." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auf dieser Seite gibt es keine Tinte zum Filmen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No hay tinta en esta página que filmar."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il n’y a pas d’encre à filmer sur cette page."
           }
         }
       }
@@ -12865,6 +13785,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ce PDF est protégé par un mot de passe. Déverrouillez-le dans Fichiers ou Aperçu, puis importez-le à nouveau."
+          }
+        }
+      }
+    },
+    "This Page as a Time-lapse Video…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Seite als Zeitraffervideo …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta página como vídeo time-lapse…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette page en vidéo accélérée…"
           }
         }
       }
@@ -12979,6 +13921,28 @@
         }
       }
     },
+    "This iPad can't transcribe %@ on the device. Swift Scribe never sends a recording away to be transcribed, so it was left as it is." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieses iPad kann %@ nicht auf dem Gerät transkribieren. Swift Scribe sendet eine Aufnahme nie zum Transkribieren weg, daher wurde sie unverändert gelassen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este iPad no puede transcribir %@ en el dispositivo. Swift Scribe nunca envía una grabación fuera para transcribirla, así que se dejó como está."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet iPad ne peut pas transcrire %@ sur l’appareil. Swift Scribe n’envoie jamais un enregistrement ailleurs pour le transcrire ; il a donc été laissé tel quel."
+          }
+        }
+      }
+    },
     "This is the last page." : {
       "localizations" : {
         "de" : {
@@ -13019,6 +13983,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ce carnet n’a pas pu être ouvert"
+          }
+        }
+      }
+    },
+    "This notebook is read-only." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieses Notizbuch ist schreibgeschützt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este cuaderno es de solo lectura."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce carnet est en lecture seule."
           }
         }
       }
@@ -13525,6 +14511,160 @@
         }
       }
     },
+    "Transcribe" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transkribieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcribir"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcrire"
+          }
+        }
+      }
+    },
+    "Transcribe Again" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erneut transkribieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcribir de nuevo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcrire à nouveau"
+          }
+        }
+      }
+    },
+    "Transcribed" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transkribiert"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcrita"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcrit"
+          }
+        }
+      }
+    },
+    "Transcribing" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wird transkribiert"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcribiendo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcription en cours"
+          }
+        }
+      }
+    },
+    "Transcribing…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wird transkribiert …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcribiendo…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcription…"
+          }
+        }
+      }
+    },
+    "Transcript" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transkript"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcripción"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcription"
+          }
+        }
+      }
+    },
+    "Transcript Options" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transkriptoptionen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opciones de transcripción"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Options de transcription"
+          }
+        }
+      }
+    },
     "Try Again" : {
       "localizations" : {
         "de" : {
@@ -13547,6 +14687,28 @@
         }
       }
     },
+    "Turn Ink into Text" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tinte in Text umwandeln"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Convertir tinta en texto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Convertir l’encre en texte"
+          }
+        }
+      }
+    },
     "Turn Off On This Day" : {
       "localizations" : {
         "de" : {
@@ -13565,6 +14727,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Désactiver « Ce jour-là »"
+          }
+        }
+      }
+    },
+    "Turn into Text" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In Text umwandeln"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Convertir en texto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Convertir en texte"
           }
         }
       }
@@ -14229,6 +15413,28 @@
         }
       }
     },
+    "Your video is ready." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dein Video ist fertig."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu vídeo está listo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre vidéo est prête."
+          }
+        }
+      }
+    },
     "canvas.empty" : {
       "localizations" : {
         "de" : {
@@ -14743,6 +15949,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "l’enregistrement n’a pas abouti"
+          }
+        }
+      }
+    },
+    "this iPad can't encode it" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "dieses iPad kann es nicht codieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "este iPad no puede codificarlo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "cet iPad ne peut pas l’encoder"
           }
         }
       }

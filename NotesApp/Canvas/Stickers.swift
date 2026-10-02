@@ -703,10 +703,12 @@ private extension CGMutablePath {
 /// Draws everything placed on a page, back to front, in a y-down context scaled to `size`. Thread-safe.
 enum PageItemRenderer {
     /// Without `links`, a link shows its own label or a plain "Page": enough for a thumbnail.
-    static func draw(_ items: [PageItem], pageSize: CGSize, assets: URL, in ctx: CGContext, size: CGSize, onDark: Bool = false, links: LinkTitles? = nil) {
+    /// Draws what lies under the ink, or with `overInk` the study tape that lies over it, leaving out any that is lifted.
+    static func draw(_ items: [PageItem], pageSize: CGSize, assets: URL, in ctx: CGContext, size: CGSize, onDark: Bool = false, links: LinkTitles? = nil,
+                     overInk: Bool = false, lifted: Set<UUID> = []) {
         guard !items.isEmpty, pageSize.width > 0 else { return }
         let scale = size.width / pageSize.width
-        for item in items {
+        for item in items where item.isOverInk == overInk && !lifted.contains(item.id) {
             ctx.saveGState()
             ctx.translateBy(x: item.center.x * scale, y: item.center.y * scale)
             ctx.rotate(by: item.rotation)
@@ -727,6 +729,8 @@ enum PageItemRenderer {
             case .link(let link):
                 let title = links?.title(for: link) ?? (link.target == nil ? LinkTitles().title(for: link) : link.label.isEmpty ? String(localized: "Page") : link.label)
                 PageLinkArt.draw(title: title, kind: link.kind, resolved: links?.resolves(link) ?? true, in: ctx, rect: rect)
+            case .tape(let color):
+                TapeArt.draw(color, in: ctx, rect: rect)
             case .unknown:
                 break
             }

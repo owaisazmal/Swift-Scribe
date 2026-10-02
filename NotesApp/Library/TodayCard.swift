@@ -86,7 +86,7 @@ struct DeskCards: View {
     private func memory(journal: NotebookRecord?) -> DeskMemory? {
         guard showsOnThisDay, hiddenDay != DailyJournal.dayKey(for: .now) else { return nil }
         let found = journal == nil ? Resurfaced.candidate(today: .now, calendar: .current, journal: nil, notebooks: notebooks) : resurfaced
-        guard let found, let record = records.first(where: { $0.id == found.notebookID && !$0.isTrashed }) else { return nil }
+        guard let found, let record = records.first(where: { $0.id == found.notebookID && !$0.isTrashed && !$0.isLocked }) else { return nil }
         guard let pageID = found.pageID else { return DeskMemory(resurfaced: found, record: record, page: nil, number: nil) }
         guard let manifest, manifest.id == record.id, let index = manifest.pages.firstIndex(where: { $0.id == pageID }) else { return nil }
         return DeskMemory(resurfaced: found, record: record, page: manifest.pages[index], number: index + 1)
@@ -202,12 +202,12 @@ struct TodayCard: View {
         .accessibilityHint(Text("Opens the notebook at today's page"))
         .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier("desk.today")
-        .task(id: "\(preview?.id.uuidString ?? "")|\(preview?.thumbnailKey ?? "")") { await loadImage(preview) }
+        .task(id: "\(preview?.id.uuidString ?? "")|\(preview?.thumbnailKey ?? "")|\(record.isLocked)") { await loadImage(preview) }
     }
 
     private func loadImage(_ page: NotebookPage?) async {
         guard let page else { return }
-        let loaded = todayIndex == nil
+        let loaded = todayIndex == nil || record.isLocked
             ? await BlankPages.image(page)
             : await PageThumbnailer.thumbnail(package: NotebookPackage(root: store.root, id: record.id), page: page)
         guard !Task.isCancelled, let loaded else { return }

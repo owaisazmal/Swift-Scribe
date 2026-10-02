@@ -50,6 +50,7 @@ final class AppModel {
             if let count = LaunchOptions.value("-seedLibrary").flatMap(Int.init) { await LibrarySeed.write(count: count, root: root) }
             if LaunchOptions.arguments.contains("-seedLongPDF") { await LibrarySeed.writeLongPDF(root: root) }
             if LaunchOptions.arguments.contains("-seedReplay") { await ReplaySeed.write(root: root) }
+            if LaunchOptions.arguments.contains("-seedHandwriting") { await HandwritingSeed.write(root: root) }
             await DailyJournal.seedForTests(root: root)
         }
         if LaunchOptions.arguments.contains("-seedActivity") { await WritingActivity.seedForTests(root: root) }
@@ -59,7 +60,10 @@ final class AppModel {
         #endif
         let root = root
         Task.detached(priority: .utility) { LibraryStore.sweepDeleted(root: root) }
-        await LibraryIndex.refresh(root: root, context: container.mainContext, full: indexWasRecovered)
+        // An index made by an older build reads every manifest once, for what that build didn't keep.
+        let indexSchema = UserDefaults.standard.integer(forKey: SettingsKey.indexSchema)
+        await LibraryIndex.refresh(root: root, context: container.mainContext, full: indexWasRecovered || indexSchema < LibraryIndex.schemaNumber)
+        if indexSchema != LibraryIndex.schemaNumber { UserDefaults.standard.set(LibraryIndex.schemaNumber, forKey: SettingsKey.indexSchema) }
         await activity.load()
         library.purgeExpiredTrash()
         phase = .ready

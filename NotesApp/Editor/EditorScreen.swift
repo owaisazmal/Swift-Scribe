@@ -167,17 +167,38 @@ struct EditorScreen: View {
 
     @Environment(LibraryStore.self) private var store
     @Environment(WritingActivity.self) private var activity
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.editorPane) private var pane
     @State private var document: NotebookDocument?
     @State private var failure: String?
     @State private var isClosing = false
     @State private var unsavedReason: String?
+    @State private var lock = NotebookLock.shared
+    @State private var askedToUnlock = false
+
+    /// A locked notebook is covered until it is unlocked, and whenever the app isn't in front, so it never shows in the app switcher.
+    private func isCovered(_ document: NotebookDocument) -> Bool {
+        document.manifest.library.isLocked && (!lock.isUnlocked(notebookID) || scenePhase != .active)
+    }
 
     var body: some View {
         ZStack {
             Color.desk.ignoresSafeArea()
             if let document {
-                EditorView(document: document, initialPageID: initialPageID, close: close)
+                let covered = isCovered(document)
+                EditorView(document: document, initialPageID: initialPageID, isCovered: covered, close: close)
                     .id(document.id)
+                    .disabled(covered)
+                    .accessibilityHidden(covered)
+                if covered {
+                    LockedNotebookView(title: document.title, closeTitle: pane == .secondary ? "Close" : "Back to Library",
+                                       unlock: { unlock(document) }, close: close)
+                        .task(id: scenePhase) {
+                            guard scenePhase == .active, !askedToUnlock, !lock.isUnlocked(notebookID) else { return }
+                            askedToUnlock = true
+                            unlock(document)
+                        }
+                }
             } else if let failure {
                 EmptyShelf(title: String(localized: "This notebook couldn't be opened"), message: failure) {
                     Button("Back to Library", action: onClose).prominentButton()
@@ -187,6 +208,12 @@ struct EditorScreen: View {
             }
         }
         .task(id: notebookID) { await open() }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .background else { return }
+            lock.lock(notebookID)
+            askedToUnlock = false
+        }
+        .onDisappear { lock.lock(notebookID) }
         .onReceive(NotificationCenter.default.publisher(for: UIScene.didDisconnectNotification)) { note in
             guard (note.object as? UIScene)?.session.persistentIdentifier == sceneID else { return }
             closeWithWindow()
@@ -205,6 +232,10 @@ struct EditorScreen: View {
         } message: {
             Text("Swift Scribe couldn't write to this device: \(unsavedReason ?? ""). If you close now, it keeps trying in the background, but changes that haven't been saved are lost if the app quits first.")
         }
+    }
+
+    private func unlock(_ document: NotebookDocument) {
+        Task { await lock.unlock(notebookID, title: document.title) }
     }
 
     private func open() async {

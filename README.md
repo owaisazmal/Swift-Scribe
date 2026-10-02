@@ -11,6 +11,7 @@ Swift Scribe is built entirely on Apple frameworks (SwiftUI, PencilKit, PDFKit, 
 - Full tool palette: pen, monoline, fountain pen, pencil, marker/highlighter, crayon, watercolor, eraser, lasso (move/copy/delete), ruler, and custom colors
 - Draw and hold: draw a line, circle, ellipse, rectangle, triangle or any figure with straight sides and rest the pen a moment before lifting, and it straightens. Undo gives your own stroke back; Settings › Input turns it off
 - Select ink across pages (⋯ › Select Ink Across Pages): draw round ink on any page, or drag across it, then drag what you caught to move it, onto another page if you like, or duplicate or delete it. Each is one undo step
+- Handwriting to text: with ink selected, Turn into Text reads it on the device and shows the words to correct, copy, or type onto the page in the handwriting's place. One undo brings the handwriting back
 - Pinch to zoom up to 5× with crisp ink and backgrounds at every zoom level
 - Pages keep their true relative size; Fit Width (⌘0) and Fit Page (⌘9) enlarge a smaller page
 - Undo / redo (toolbar, tool palette, ⌘Z / ⇧⌘Z), including page operations
@@ -42,13 +43,16 @@ Swift Scribe is built entirely on Apple frameworks (SwiftUI, PencilKit, PDFKit, 
 - Pictures on a page: add from Photos, drop from another app, or paste (⌘V), then move, resize, rotate, layer or delete them
 - Forty built-in stickers in a soft paper-craft style (sticky notes in six colours, an index card, a taped grid note, torn paper, a kraft tag, washi tapes, doodles, marks and pastel tags), drawn as vectors so they stay sharp at any zoom; ink goes over them, so you can write on a note
 - Stickers of your own: pick a photo and its subject is lifted out with a white die-cut edge (on-device, with Vision), kept in the sticker drawer for every notebook
+- Study tape (+ › Study Tape): a strip of washi tape in four colours that covers what is under it, ink included. Tap it to lift it and tap again to put it back, with a finger or the Pencil; touch and hold to move, stretch or turn it. Lifting is for looking and is never saved, so every strip is back in place the next time you open the notebook. While presenting, lifting a strip reveals the answer on the second screen too
 - Typed text boxes: type on the page, then move, resize, turn and restyle the box (size, bold, colour, alignment); typed text is searchable
 - Export any notebook as a PDF from the editor or the library (vector backgrounds, stickers and typed text, PDF text stays selectable, bookmarks become the PDF's outline, links between pages and to the web keep working), then share or print
 - Export pages as images: every page of a notebook, or just the one you're on, as PNGs at twice the page's size
+- Export a page as a time-lapse video: the page being written, every stroke in the order and at the pace you made it with the waits taken out, sped up to fit twenty seconds at most. It plays in the export sheet and shares like any video
 
 **Audio**
 - Record lectures or meetings alongside a notebook, and play them back later
 - Replay a recording with your ink: what you wrote during it is faint until the sound reaches the moment you wrote it, the page turns to follow the writing, and tapping ink jumps the sound to when it was written
+- Transcripts: have a recording written down (Recordings › the speech bubble › Transcribe). It is done on the iPad, never on a server; if the iPad can't transcribe a language on the device, the app says so and sends nothing. Read it line by line, copy it, and tap a line to hear it with the ink you wrote as it was said. During a replay the transcript sits beside the page with the line being said marked. **Needs a check on a device:** the simulator has no on-device recogniser, so the recogniser itself has only run through a stand-in
 
 **Writing history**
 - A This-week strip in the library: seven small sheets, inked on the days you wrote
@@ -64,7 +68,7 @@ Swift Scribe is built entirely on Apple frameworks (SwiftUI, PencilKit, PDFKit, 
 - Recently Deleted with 30-day auto-purge
 - iCloud sync between your iPads (Settings › iCloud, off by default): each notebook is copied whole, a notebook changed on two devices keeps both versions, and a delete never beats newer writing. **Experimental:** the sync logic is tested with a folder standing in for iCloud, but it has not yet run against real iCloud, and it needs a build with the iCloud capability (see Getting started)
 - Back up the whole library into one file (Settings › Backup) and restore it on this or another iPad. Restoring adds what is missing and never replaces a notebook: one that differs from the backup comes back beside yours as a copy
-- Search by title, **handwriting** (on-device OCR with Vision), typed text, and imported PDF text, with page-level results that open at the matching page
+- Search by title, **handwriting** (on-device OCR with Vision), typed text, imported PDF text, and what was said in transcribed recordings, with page-level results that open at the matching page
 
 **Languages**
 - English, Spanish, French and German, including the widgets, the Siri phrases and the permission prompts. The translations were machine-made for this release and have not been reviewed by native speakers; corrections are very welcome
@@ -81,7 +85,7 @@ Swift Scribe is built entirely on Apple frameworks (SwiftUI, PencilKit, PDFKit, 
 
 ## Privacy
 
-Swift Scribe has no accounts and no analytics. iCloud sync is off unless you turn it on; with it on, your notebooks, folders and stickers are copied to the app's private container in your own iCloud storage, which Apple syncs between your devices. The writing history is never synced. The writing history behind the week strip and calendar is a small file on your device (`Library/activity.json`) listing the days you wrote and which pages. It is never shared, and Settings › Writing History turns it off or clears it.
+Swift Scribe has no accounts and no analytics. Handwriting and speech are recognised on the device: a recording is only transcribed when you ask, and only if the iPad can do it without sending it anywhere. iCloud sync is off unless you turn it on; with it on, your notebooks, folders and stickers are copied to the app's private container in your own iCloud storage, which Apple syncs between your devices. The writing history is never synced. The writing history behind the week strip and calendar is a small file on your device (`Library/activity.json`) listing the days you wrote and which pages. It is never shared, and Settings › Writing History turns it off or clears it.
 
 The widgets read a small snapshot the app writes to its own shared container on the device (the last notebook's title, page and cover, and page counts for recent days). With writing history off, no days are written there.
 
@@ -114,7 +118,7 @@ NotesApp/
 ├── Editor/       NotebookDocument (model, undo, autosave), editor chrome, navigator, recorder, second screen
 ├── Library/      Library views, covers, new-notebook sheet, library store, one-editor registry
 ├── Design/       Colour tokens, typography (Fraunces, Bricolage Grotesque), cover renderer
-├── Services/     PDF and image export, library backup, iCloud sync, handwriting recognition
+├── Services/     PDF, image and video export, library backup, iCloud sync, handwriting and speech recognition
 ├── Settings/     Settings and acknowledgements
 └── Resources/    Bundled fonts with their licences, privacy manifest, string catalogs
 ScribeWidgets/    The widget extension: Continue Writing, This Week, Today's Page
@@ -139,6 +143,7 @@ Key design decisions (details and measurements in [docs/ARCHITECTURE.md](docs/AR
 Contributions toward any of these are very welcome:
 
 - [ ] Try iCloud sync on two real devices (it has only run against a stand-in folder), then sync a notebook while it is open
+- [ ] Try transcription on a real iPad, with real speech and a long recording (the simulator can't recognise speech on the device)
 - [ ] A ruler that spans pages (PencilKit's ruler belongs to one canvas, and each page has its own)
 - [ ] Native-speaker review of the Spanish, French and German translations, and more languages
 - [ ] Plural rules for languages with more than two forms (counts are written as "1 page" / "%lld pages" pairs today)

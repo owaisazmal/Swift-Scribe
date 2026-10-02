@@ -71,13 +71,22 @@ enum WebAddress {
     }
 }
 
-/// A picture, sticker, text box or link placed on a page, under the ink. Geometry is in page points.
+/// The colours study tape comes in. Raw values are stored in notebooks.
+enum TapeColor: String, Sendable, CaseIterable, Identifiable {
+    case mustard, rose, sage, sky
+    var id: String { rawValue }
+}
+
+/// A picture, sticker, text box or link placed on a page, under the ink, or a strip of study tape over it.
+/// Geometry is in page points.
 struct PageItem: Sendable, Hashable, Identifiable {
     enum Content: Sendable, Hashable {
         case image(file: String)
         case sticker(String)
         case text(TextBox)
         case link(PageLink)
+        /// Covers what is under it, ink included, until it is tapped.
+        case tape(TapeColor)
         /// Made by a newer version; kept as read and not drawn.
         case unknown
     }
@@ -118,6 +127,14 @@ struct PageItem: Sendable, Hashable, Identifiable {
         if case .link(let link) = content { return link }
         return nil
     }
+
+    var tape: TapeColor? {
+        if case .tape(let color) = content { return color }
+        return nil
+    }
+
+    /// Study tape lies over the ink; everything else lies under it.
+    var isOverInk: Bool { tape != nil }
 
     /// The sticker of your own this picture was placed from, so placing it again reuses the same file.
     var source: String? {
@@ -195,6 +212,8 @@ struct PageItem: Sendable, Hashable, Identifiable {
             } else {
                 content = .unknown
             }
+        case ("tape", _, _):
+            content = object["tint"]?.stringValue.flatMap(TapeColor.init(rawValue:)).map(Content.tape) ?? .unknown
         default: content = .unknown
         }
         raw = object
@@ -236,6 +255,9 @@ struct PageItem: Sendable, Hashable, Identifiable {
             case .web(let url):
                 object["url"] = .string(url.absoluteString)
             }
+        case .tape(let color):
+            object["kind"] = .string("tape")
+            object["tint"] = .string(color.rawValue)
         case .unknown:
             break
         }

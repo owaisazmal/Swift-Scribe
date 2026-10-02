@@ -40,8 +40,12 @@ extension Notification.Name {
 
 extension LibraryStore {
     /// The notebook last opened that is still on the shelves.
-    var lastOpenedNotebook: NotebookRecord? {
-        notebooks().filter { $0.lastOpenedAt != nil }.max { ($0.lastOpenedAt ?? .distantPast) < ($1.lastOpenedAt ?? .distantPast) }
+    var lastOpenedNotebook: NotebookRecord? { lastOpenedNotebook(includingLocked: true) }
+
+    /// A locked notebook is never what a widget shows.
+    func lastOpenedNotebook(includingLocked: Bool) -> NotebookRecord? {
+        notebooks().filter { $0.lastOpenedAt != nil && (includingLocked || !$0.isLocked) }
+            .max { ($0.lastOpenedAt ?? .distantPast) < ($1.lastOpenedAt ?? .distantPast) }
     }
 
     /// Every notebook that isn't in Recently Deleted.

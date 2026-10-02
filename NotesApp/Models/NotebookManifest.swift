@@ -139,6 +139,14 @@ struct LibraryState: Sendable, Hashable {
     var undecoded: [String: UndecodedField] = [:]
 }
 
+extension LibraryState {
+    /// A locked notebook asks who is holding the iPad before it opens. Older builds keep it as an unknown key.
+    var isLocked: Bool {
+        get { extra["locked"]?.boolValue ?? false }
+        set { extra["locked"] = newValue ? .bool(true) : nil }
+    }
+}
+
 struct UndecodedField: Sendable, Hashable {
     var raw: JSONValue
     var fallback: JSONValue

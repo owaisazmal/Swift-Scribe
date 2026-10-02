@@ -34,4 +34,7 @@ enum SettingsKey {
     static let keepsWritingHistory = "keepsWritingHistory"
     static let snapsShapes = "snapsShapes"
     static let syncsWithICloud = "syncsWithICloud"
+    static let tapeColor = "tapeColor"
+    static let transcriptLanguage = "transcriptLanguage"
+    static let indexSchema = "libraryIndexSchema"
 }

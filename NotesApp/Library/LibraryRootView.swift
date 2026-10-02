@@ -242,7 +242,16 @@ struct LibraryRootView: View {
             if let pageID { NotificationCenter.default.post(name: .scribeShowPage, object: id, userInfo: ["page": pageID]) }
             return
         }
-        open = OpenNotebook(id: id, pageID: pageID, zoomSource: zoomSource)
+        // A locked notebook asks before it opens; the editor asks again if it is reached some other way.
+        guard let record = store.record(id), record.isLocked, !NotebookLock.shared.isUnlocked(id), NotebookLock.shared.isAvailable else {
+            open = OpenNotebook(id: id, pageID: pageID, zoomSource: zoomSource)
+            return
+        }
+        let title = record.title.isEmpty ? String(localized: "Untitled") : record.title
+        Task {
+            guard await NotebookLock.shared.unlock(id, title: title), open == nil else { return }
+            open = OpenNotebook(id: id, pageID: pageID, zoomSource: zoomSource)
+        }
     }
 }
 
