@@ -164,10 +164,10 @@ final class NotebookDocument {
             notices.append(DocumentNotice(kind: .quarantined, message: String(localized: "A damaged file (\(file)) was set aside and kept. The notebook opened from its last good copy.")))
         }
         if !load.recoveredPageIDs.isEmpty {
-            notices.append(DocumentNotice(kind: .recovered, message: String(localized: "Recovered \(load.recoveredPageIDs.count) page(s) written just before the app last quit. They're at the end.")))
+            notices.append(DocumentNotice(kind: .recovered, message: String(localized: "Recovered \(load.recoveredPageIDs.count) pages written just before the app last quit. They're at the end.")))
         }
         if !manifest.opaquePages.isEmpty {
-            notices.append(DocumentNotice(kind: .unreadablePages, message: String(localized: "\(manifest.opaquePages.count) page(s) were made by a newer version of Swift Scribe and are hidden here. They're kept unchanged.")))
+            notices.append(DocumentNotice(kind: .unreadablePages, message: String(localized: "\(manifest.opaquePages.count) pages were made by a newer version of Swift Scribe and are hidden here. They're kept unchanged.")))
         }
         if isReadOnly {
             notices.append(DocumentNotice(kind: .readOnly, message: String(localized: "This notebook was saved by a newer version of Swift Scribe, so it opens read-only.")))

@@ -307,8 +307,8 @@ struct ShelfView: View {
         if isSelecting { return String(localized: "Select notebooks to move, favourite or delete") }
         if scope == .trash { return String(localized: "Deleted notebooks stay here for 30 days") }
         let count = visible.count, pageCount = visible.reduce(0) { $0 + $1.pageCount }
-        let notebooks = count == 1 ? String(localized: "1 notebook") : String(localized: "\(count) notebooks")
-        let pages = pageCount == 1 ? String(localized: "1 page") : String(localized: "\(pageCount) pages")
+        let notebooks = String(localized: "\(count) notebooks")
+        let pages = String(localized: "\(pageCount) pages")
         return "\(notebooks) · \(pages) · \(sort.summary)"
     }
 
@@ -447,7 +447,7 @@ struct ShelfView: View {
         }
         if isSelecting {
             ToolbarItem(placement: .status) {
-                Text(selection.count == 1 ? String(localized: "1 selected") : String(localized: "\(selection.count) selected"))
+                Text("\(selection.count) selected")
                     .font(.subheadline.weight(.semibold).monospacedDigit())
             }
         }
@@ -592,8 +592,7 @@ struct ShelfView: View {
         Task {
             do {
                 try await store.importScan(images, folder: folder)
-                AccessibilityNotification.Announcement(images.count == 1 ? String(localized: "1 page scanned into a new notebook")
-                                                                         : String(localized: "\(images.count) pages scanned into a new notebook")).post()
+                AccessibilityNotification.Announcement(String(localized: "\(images.count) pages scanned into a new notebook")).post()
             } catch {
                 errorMessage = error.localizedDescription
             }

@@ -85,7 +85,7 @@ final class SpotlightIndexer: NSObject, CSSearchableIndexDelegate {
     static func attributes(for entry: SpotlightEntry, text: String, thumbnail: Data?) -> CSSearchableItemAttributeSet {
         let attributes = CSSearchableItemAttributeSet(contentType: .content)
         attributes.title = entry.title
-        attributes.contentDescription = entry.pageCount == 1 ? String(localized: "Notebook, 1 page") : String(localized: "Notebook, \(entry.pageCount) pages")
+        attributes.contentDescription = String(localized: "Notebook, \(entry.pageCount) pages")
         attributes.textContent = String(text.prefix(textLimit))
         attributes.contentModificationDate = entry.modifiedAt
         attributes.thumbnailData = thumbnail

@@ -259,18 +259,17 @@ struct WritingCalendarView: View {
     // MARK: Words
 
     private func pagesText(_ pages: Int) -> String {
-        pages == 1 ? String(localized: "1 page") : String(localized: "\(pages) pages")
+        String(localized: "\(pages) pages")
     }
 
     private func daysText(_ days: Int) -> String {
-        days == 1 ? String(localized: "1 day") : String(localized: "\(days) days")
+        String(localized: "\(days) days")
     }
 
     private func summary(pages: Int, notebooks: Int) -> String {
         switch (pages, notebooks) {
         case (0, _): String(localized: "Nothing written")
         case (_, 0): pagesText(pages)
-        case (_, 1): String(localized: "\(pagesText(pages)) in 1 notebook")
         default: String(localized: "\(pagesText(pages)) in \(notebooks) notebooks")
         }
     }
@@ -288,7 +287,7 @@ struct WritingCalendarView: View {
                 ? String(localized: "Pages from this long ago are kept as a count only.")
                 : String(localized: "Written in notebooks since deleted.")
         }
-        return missing == 1 ? String(localized: "1 more page has since been deleted.") : String(localized: "\(missing) more pages have since been deleted.")
+        return String(localized: "\(missing) more pages have since been deleted.")
     }
 
     // MARK: Navigation

@@ -207,8 +207,7 @@ final class NotebookFinder {
         }
         isSearching = false
         let count = matches.count
-        AccessibilityNotification.Announcement(count == 0 ? String(localized: "No matches") : count == 1 ? String(localized: "1 match")
-                                                                                                         : String(localized: "\(count) matches")).post()
+        AccessibilityNotification.Announcement(count == 0 ? String(localized: "No matches") : String(localized: "\(count) matches")).post()
     }
 
     private func rects(for needle: String, on page: NotebookPage) async -> [CGRect] {

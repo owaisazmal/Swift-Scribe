@@ -109,7 +109,7 @@ private struct LinkNotebookPicker: View {
                             RecordCover(record: record, width: CoverWidth.row, showsShadow: false).frame(width: 40)
                             VStack(alignment: .leading, spacing: Space.x1) {
                                 Text(record.title).font(.headline).foregroundStyle(Color.ink)
-                                Text(record.pageCount == 1 ? String(localized: "1 page") : String(localized: "\(record.pageCount) pages"))
+                                Text("\(record.pageCount) pages")
                                     .font(.subheadline)
                                     .foregroundStyle(Color.textSecondary)
                             }

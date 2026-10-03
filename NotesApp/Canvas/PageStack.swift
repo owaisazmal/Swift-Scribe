@@ -74,7 +74,7 @@ final class PageCanvasView: PKCanvasView {
         get {
             let count = strokeCount ?? drawing.strokes.count
             strokeCount = count
-            return count == 0 ? String(localized: "canvas.empty", defaultValue: "Empty") : count == 1 ? String(localized: "1 stroke") : String(localized: "\(count) strokes")
+            return count == 0 ? String(localized: "canvas.empty", defaultValue: "Empty") : String(localized: "\(count) strokes")
         }
         set {}
     }
@@ -1483,8 +1483,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         }
         setInkSelection(caught)
         let count = session.inkSelectionCount
-        AccessibilityNotification.Announcement(count == 0 ? String(localized: "No ink selected")
-                                               : count == 1 ? String(localized: "1 stroke selected") : String(localized: "\(count) strokes selected")).post()
+        AccessibilityNotification.Announcement(count == 0 ? String(localized: "No ink selected") : String(localized: "\(count) strokes selected")).post()
     }
 
     /// While it is dragged the selected ink is drawn by the overlay, and the canvases draw their pages without it.

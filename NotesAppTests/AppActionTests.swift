@@ -91,4 +91,22 @@ final class AppActionTests: XCTestCase {
         XCTAssertEqual(WidgetSnapshot.read(from: directory), snapshot)
         XCTAssertNil(WidgetSnapshot.read(from: directory.appending(path: "missing")))
     }
+
+    func testAWindowRemembersWhatItHasOpenUntilItIsGone() {
+        let scene = "test-\(UUID().uuidString)", other = "test-\(UUID().uuidString)"
+        let notebook = UUID(), beside = UUID()
+        XCTAssertNil(WindowMemory.remembered(in: scene), "a window never seen falls back to what iPadOS saved for it")
+        WindowMemory.remember(notebook, beside: beside, in: scene)
+        WindowMemory.remember(nil, beside: beside, in: other)
+        XCTAssertEqual(WindowMemory.remembered(in: scene)?.notebook, notebook)
+        XCTAssertEqual(WindowMemory.remembered(in: scene)?.beside, beside)
+        let closed = WindowMemory.remembered(in: other)
+        XCTAssertNotNil(closed, "a window whose notebook was closed says so, so an older saved state can't reopen one")
+        XCTAssertNil(closed?.notebook)
+        XCTAssertNil(closed?.beside)
+        WindowMemory.keep(only: [other])
+        XCTAssertNil(WindowMemory.remembered(in: scene))
+        WindowMemory.keep(only: Set(UIApplication.shared.openSessions.map(\.persistentIdentifier)))
+        XCTAssertNil(WindowMemory.remembered(in: other))
+    }
 }

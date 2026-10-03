@@ -194,20 +194,12 @@ extension LibraryBackup.Summary {
     /// "Restored 12 notebooks. 3 came back as copies because the library has newer versions."
     var message: String {
         var parts: [String] = []
-        if added > 0 { parts.append(added == 1 ? String(localized: "Restored 1 notebook.") : String(localized: "Restored \(added) notebooks.")) }
-        if copies > 0 {
-            parts.append(copies == 1 ? String(localized: "1 notebook differs from the one in your library, so it came back beside it as a copy.")
-                                     : String(localized: "\(copies) notebooks differ from the ones in your library, so they came back beside them as copies."))
-        }
-        if unchanged > 0 {
-            parts.append(unchanged == 1 ? String(localized: "1 notebook was already here.") : String(localized: "\(unchanged) notebooks were already here."))
-        }
-        if folders > 0 { parts.append(folders == 1 ? String(localized: "1 folder was added.") : String(localized: "\(folders) folders were added.")) }
-        if stickers > 0 { parts.append(stickers == 1 ? String(localized: "1 sticker was added.") : String(localized: "\(stickers) stickers were added.")) }
-        if unreadable > 0 {
-            parts.append(unreadable == 1 ? String(localized: "1 notebook in the backup couldn't be read and was left out.")
-                                         : String(localized: "\(unreadable) notebooks in the backup couldn't be read and were left out."))
-        }
+        if added > 0 { parts.append(String(localized: "Restored \(added) notebooks.")) }
+        if copies > 0 { parts.append(String(localized: "\(copies) notebooks differ from the ones in your library, so they came back beside them as copies.")) }
+        if unchanged > 0 { parts.append(String(localized: "\(unchanged) notebooks were already here.")) }
+        if folders > 0 { parts.append(String(localized: "\(folders) folders were added.")) }
+        if stickers > 0 { parts.append(String(localized: "\(stickers) stickers were added.")) }
+        if unreadable > 0 { parts.append(String(localized: "\(unreadable) notebooks in the backup couldn't be read and were left out.")) }
         return parts.isEmpty ? String(localized: "The backup had nothing in it.") : parts.joined(separator: " ")
     }
 }

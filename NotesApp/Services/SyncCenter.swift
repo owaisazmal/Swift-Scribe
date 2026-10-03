@@ -134,12 +134,12 @@ extension SyncReport {
     /// "3 notebooks sent, 1 received." for the Settings row.
     var summary: String {
         var parts: [String] = []
-        func count(_ number: Int, _ one: String, _ many: String) { if number > 0 { parts.append(number == 1 ? one : many) } }
-        count(pushed.count, String(localized: "1 notebook sent"), String(localized: "\(pushed.count) notebooks sent"))
-        count(pulled.count, String(localized: "1 notebook received"), String(localized: "\(pulled.count) notebooks received"))
-        count(removedHere.count + removedThere.count, String(localized: "1 deletion carried over"), String(localized: "\(removedHere.count + removedThere.count) deletions carried over"))
-        count(conflictCopies.count, String(localized: "1 conflicted copy kept"), String(localized: "\(conflictCopies.count) conflicted copies kept"))
-        count(waiting.count, String(localized: "1 notebook waiting until it's closed"), String(localized: "\(waiting.count) notebooks waiting until they're closed"))
+        let deletions = removedHere.count + removedThere.count
+        if pushed.count > 0 { parts.append(String(localized: "\(pushed.count) notebooks sent")) }
+        if pulled.count > 0 { parts.append(String(localized: "\(pulled.count) notebooks received")) }
+        if deletions > 0 { parts.append(String(localized: "\(deletions) deletions carried over")) }
+        if conflictCopies.count > 0 { parts.append(String(localized: "\(conflictCopies.count) conflicted copies kept")) }
+        if waiting.count > 0 { parts.append(String(localized: "\(waiting.count) notebooks waiting until they're closed")) }
         return parts.isEmpty ? String(localized: "Everything is up to date") : parts.joined(separator: ", ")
     }
 }

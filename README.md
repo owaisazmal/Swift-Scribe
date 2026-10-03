@@ -158,7 +158,6 @@ Contributions toward any of these are very welcome:
 - [ ] Try on a real iPad what the simulator can only stand in for: scanning with the camera, Face ID on a locked notebook, translation, the calendar's permission prompt, the Control Center buttons, and the zoom window with a Pencil
 - [ ] A ruler that spans pages (PencilKit's ruler belongs to one canvas, and each page has its own)
 - [ ] Native-speaker review of the Spanish, French and German translations, and more languages
-- [ ] Plural rules for languages with more than two forms (counts are written as "1 page" / "%lld pages" pairs today)
 
 ## Contributing
 

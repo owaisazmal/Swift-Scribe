@@ -66,7 +66,7 @@ final class DailyJournalUITests: XCTestCase {
         notebook.tap()
         XCTAssertTrue(app.buttons["editor.ribbon"].waitForExistence(timeout: 20))
         XCUIDevice.shared.press(.home)
-        sleep(2)
+        // Stopped straight away, before iPadOS has saved the window's own state.
         app.terminate()
 
         app = launch([])
