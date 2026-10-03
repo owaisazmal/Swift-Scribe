@@ -110,10 +110,20 @@ struct TranscriptView: View {
     }
 
     private var languagePicker: some View {
-        Picker("Language", selection: Binding(get: { locale.identifier(.bcp47) }, set: { language = $0 })) {
-            ForEach(languages, id: \.identifier) { Text(Transcription.name(of: $0)).tag($0.identifier(.bcp47)) }
+        Menu {
+            Picker("Language", selection: Binding(get: { locale.identifier(.bcp47) }, set: { language = $0 })) {
+                ForEach(languages, id: \.identifier) { Text(Transcription.name(of: $0)).tag($0.identifier(.bcp47)) }
+            }
+        } label: {
+            HStack(spacing: Space.x2) {
+                Label(Transcription.name(of: locale), systemImage: "globe")
+                Image(systemName: "chevron.up.chevron.down").imageScale(.small).foregroundStyle(Color.textSecondary)
+            }
         }
-        .pickerStyle(.menu)
+        .menuStyle(.button)
+        .buttonStyle(.scribe(.secondary, compact: true))
+        .accessibilityLabel(Text("Language"))
+        .accessibilityValue(Text(Transcription.name(of: locale)))
         .accessibilityIdentifier("transcript.language")
     }
 
@@ -127,7 +137,7 @@ struct TranscriptView: View {
                 ProgressView { Text("Transcribing…").foregroundStyle(Color.ink) }
             }
             Button("Cancel", role: .cancel) { recorder.cancelTranscription(recordingID) }
-                .buttonStyle(.bordered)
+                .buttonStyle(.scribe)
         }
         .padding(Space.x8)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -172,10 +182,13 @@ struct TranscriptView: View {
                         Button(role: .destructive) { recorder.removeTranscript(recording) } label: { Label("Remove Transcript", systemImage: "trash") }
                     }
                 } label: {
-                    Label("Transcript Options", systemImage: "ellipsis.circle")
+                    Label("Transcript Options", systemImage: "ellipsis")
                 }
+                .menuStyle(.button)
+                .buttonStyle(.boardIcon)
                 .accessibilityIdentifier("transcript.options")
             }
+            .boardBackground()
         }
     }
 }

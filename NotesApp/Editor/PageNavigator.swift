@@ -24,11 +24,17 @@ struct PageNavigator: View {
     @State private var dropTarget: UUID?
     @FocusState private var goToFocused: Bool
     @State private var tab = Tab.pages
+    @State private var barRoom = CGFloat.infinity
+    @State private var tabsWidth: CGFloat = 0
+    @State private var doneWidth: CGFloat = 0
 
     enum Tab { case pages, outline }
 
     private var document: NotebookDocument { session.document }
     private var currentPage: Int { session.currentPage }
+    /// Larger text, longer words and narrow windows leave no room for the field beside the tabs, so there it sits under the bar.
+    private var goToFitsBar: Bool { dynamicTypeSize <= .large && barRoom >= goToWidth + tabsWidth + doneWidth + 92 }
+    private let goToWidth: CGFloat = 176
 
     var body: some View {
         NavigationStack {
@@ -43,35 +49,62 @@ struct PageNavigator: View {
                 }
             }
             .background(Color.desk)
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { barRoom = $0 }
             .sensoryFeedback(.alignment, trigger: dropTarget) { _, target in target != nil }
             .navigationTitle(Text(document.pageCountText))
             .navigationBarTitleDisplayMode(.inline)
+            .barGround(Color.desk)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
-                ToolbarItem(placement: .principal) {
-                    Picker("Show", selection: $tab) {
-                        Text("Pages").tag(Tab.pages)
-                        Text("Outline").tag(Tab.outline)
+                ToolbarItem(placement: .confirmationAction) {
+                    HStack(spacing: Space.x2) {
+                        if tab == .pages {
+                            Button { session.addPage(after: document.pages.count - 1) } label: {
+                                Label("Add Page", systemImage: "plus")
+                            }
+                            .buttonStyle(.boardIcon)
+                            .disabled(document.isReadOnly)
+                        }
+                        Button("Done") { dismiss() }
+                            .buttonStyle(.scribe(.primary, inBar: true))
+                            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { doneWidth = $0 }
                     }
-                    .pickerStyle(.segmented)
+                }
+                .boardBackground()
+                ToolbarItem(placement: .principal) {
+                    ScribeSegmentedPicker("Show", selection: $tab, options: [Tab.pages, .outline], inBar: true) { tab in
+                        switch tab {
+                        case .pages: Text("Pages")
+                        case .outline: Text("Outline")
+                        }
+                    }
                     .fixedSize()
+                    .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { tabsWidth = $0 }
                     .accessibilityIdentifier("navigator.tabs")
                 }
-                if tab == .pages {
+                .boardBackground()
+                if tab == .pages, goToFitsBar {
                     ToolbarItem(placement: .topBarLeading) {
-                        TextField("Go to page", text: $goToPage)
-                            .keyboardType(.numberPad)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 120)
-                            .focused($goToFocused)
-                            .onSubmit(go)
-                    }
-                    ToolbarItem(placement: .primaryAction) {
-                        Button { session.addPage(after: document.pages.count - 1) } label: {
-                            Label("Add Page", systemImage: "plus")
+                        ScribeSearchField(prompt: "Go to page", text: $goToPage, systemImage: "number", isSearch: false, clears: false, identifier: "navigator.goto",
+                                          focus: $goToFocused) {
+                            if pageNumber != nil {
+                                Button(action: go) {
+                                    Image(systemName: "arrow.right")
+                                        .font(.footnote.weight(.bold))
+                                        .foregroundStyle(Color.onPrimaryCloth)
+                                        .frame(width: 28, height: 28)
+                                        .background(Color.primaryCloth, in: Circle())
+                                        .frame(width: 44, height: 44)
+                                        .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel(Text("Go"))
+                            }
                         }
-                        .disabled(document.isReadOnly)
+                        .keyboardType(.numberPad)
+                        .onSubmit(go)
+                        .frame(width: goToWidth)
                     }
+                    .boardBackground()
                 }
             }
             .confirmationDialog("Delete this page?", isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
@@ -95,11 +128,31 @@ struct PageNavigator: View {
                         .padding(Space.x5)
                 }
             }
+            .safeAreaInset(edge: .top, spacing: 0) { if !goToFitsBar { goToRow } }
             .onAppear {
                 guard document.pages.indices.contains(currentPage) else { return }
                 proxy.scrollTo(document.pages[currentPage].id, anchor: .center)
             }
         }
+    }
+
+    private var goToRow: some View {
+        HStack(spacing: Space.x3) {
+            TextField("Go to page", text: $goToPage, prompt: Text("Go to page").foregroundStyle(Color.textSecondary))
+                .keyboardType(.numberPad)
+                .submitLabel(.go)
+                .focused($goToFocused)
+                .onSubmit(go)
+                .accessibilityIdentifier("navigator.goto")
+                .padding(.vertical, Space.x2)
+                .scribeField(focused: goToFocused)
+            Button("Go", action: go)
+                .buttonStyle(.scribe(.primary))
+                .disabled(pageNumber == nil)
+        }
+        .padding(.horizontal, dynamicTypeSize.isAccessibilitySize ? Space.x4 : Space.x5)
+        .padding(.vertical, Space.x2)
+        .background(Color.desk)
     }
 
     private var cells: some View {
@@ -174,8 +227,13 @@ struct PageNavigator: View {
         return true
     }
 
+    private var pageNumber: Int? {
+        guard let number = Int(goToPage.trimmingCharacters(in: .whitespaces)), (1...max(document.pages.count, 1)).contains(number) else { return nil }
+        return number
+    }
+
     private func go() {
-        guard let number = Int(goToPage), (1...document.pages.count).contains(number) else { return }
+        guard let number = pageNumber else { return }
         dismiss()
         session.go(to: number - 1)
     }

@@ -43,9 +43,7 @@ final class ScanUITests: XCTestCase {
         XCTAssertTrue(scanned.waitForExistence(timeout: 20), "a scan from the library is a notebook of its own")
         XCTAssertTrue(scanned.label.contains("2 pages"))
 
-        app.buttons["Search"].firstMatch.tap()
-        let field = app.searchFields.firstMatch
-        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        let field = app.openLibrarySearch()
         field.typeText("quarterly")
         let hit = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'page 1: ' AND label CONTAINS[c] 'quarterly'")).firstMatch
         XCTAssertTrue(hit.waitForExistence(timeout: 40), "the words printed on a scan are found")

@@ -134,9 +134,8 @@ struct ReplayBar: View {
         let total = session.replay?.marks.count ?? 0, written = session.replay?.written(by: time) ?? 0
         HStack(spacing: Space.x2) {
             Button { recorder.isPaused ? recorder.resume() : recorder.pause() } label: {
-                Image(systemName: recorder.isPaused ? "play.fill" : "pause.fill").frame(width: 44, height: 44)
+                Label(recorder.isPaused ? "Play" : "Pause", systemImage: recorder.isPaused ? "play.fill" : "pause.fill")
             }
-            .accessibilityLabel(Text(recorder.isPaused ? "Play" : "Pause"))
             .accessibilityIdentifier("editor.replay.play")
             if !dynamicTypeSize.isAccessibilitySize {
                 Text(clock(time)).font(.subheadline.weight(.semibold).monospacedDigit()).foregroundStyle(Color.ink)
@@ -156,18 +155,14 @@ struct ReplayBar: View {
             }
             if let transcript {
                 Button(action: toggleTranscript) {
-                    Image(systemName: "quote.bubble").symbolVariant(transcript ? .fill : .none).frame(width: 44, height: 44)
+                    Label("Transcript", systemImage: "quote.bubble").symbolVariant(transcript ? .fill : .none)
                 }
-                .accessibilityLabel(Text("Transcript"))
                 .accessibilityValue(Text(transcript ? "Showing" : "Hidden"))
                 .accessibilityIdentifier("editor.replay.transcript")
             }
-            Divider().frame(height: 24)
+            Rectangle().fill(Color.hairline).frame(width: 1, height: 24)
             Button("Done", action: done)
-                .font(.subheadline.weight(.semibold))
-                .lineLimit(1)
-                .fixedSize()
-                .prominentButton()
+                .buttonStyle(.scribe(.primary, compact: true, inBar: true))
                 .accessibilityIdentifier("editor.replay.done")
         }
         .accessibilityElement(children: .contain)

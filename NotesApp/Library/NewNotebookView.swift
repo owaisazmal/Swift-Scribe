@@ -85,12 +85,17 @@ struct NewNotebookView: View {
             .navigationTitle("New Notebook")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }.buttonStyle(.scribe(.secondary, inBar: true))
+                }
+                .boardBackground()
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Create") { Task { await create() } }
+                        .buttonStyle(.scribe(.primary, inBar: true))
                         .disabled(creating)
                         .keyboardShortcut(.defaultAction)
                 }
+                .boardBackground()
             }
             .alert("Something went wrong", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
                 Button("OK", role: .cancel) {}
@@ -133,12 +138,10 @@ struct NewNotebookView: View {
 
     private func form(withPageOptions: Bool) -> some View {
         VStack(alignment: .leading, spacing: Space.x4) {
-            TextField(placeholder, text: $title)
+            TextField("Title", text: $title, prompt: Text(placeholder).foregroundStyle(Color.textSecondary))
                 .displayFont(24, relativeTo: .title2)
-                .padding(.horizontal, Space.x3)
                 .padding(.vertical, Space.x2)
-                .background(Color.paper, in: RoundedRectangle(cornerRadius: Radius.control))
-                .overlay { RoundedRectangle(cornerRadius: Radius.control).strokeBorder(Color.hairline) }
+                .scribeField(focused: titleFocused)
                 .focused($titleFocused)
                 .submitLabel(.done)
                 .onSubmit { Task { await create() } }
@@ -148,10 +151,7 @@ struct NewNotebookView: View {
             StarterRow(notebookID: id, selection: starter, pick: apply)
 
             label("Cover")
-            Picker("Cover", selection: $style) {
-                ForEach(CoverStyle.allCases) { Text($0.displayName).tag($0) }
-            }
-            .pickerStyle(.segmented)
+            ScribeSegmentedPicker("Cover", selection: $style, options: CoverStyle.allCases) { Text($0.displayName) }
 
             switch style {
             case .cloth, .firstPage:
@@ -259,10 +259,9 @@ struct ShuffleButton: View {
             action()
         } label: {
             Label("Shuffle", systemImage: "dice")
-                .frame(minHeight: 44)
         }
+        .buttonStyle(.scribe(.secondary, compact: true))
         .symbolEffect(.bounce, value: reduceMotion ? 0 : count)
-        .font(.subheadline.weight(.semibold))
         .accessibilityHint(style == .print ? Text("Prints a new pattern in another pair of inks") : Text("Picks another cloth"))
     }
 }

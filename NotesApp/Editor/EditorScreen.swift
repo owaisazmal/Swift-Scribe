@@ -151,7 +151,12 @@ struct BesidePicker: View {
             }
             .navigationTitle("Open Beside")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }.buttonStyle(.scribe(.secondary, inBar: true))
+                }
+                .boardBackground()
+            }
         }
     }
 }
@@ -201,7 +206,7 @@ struct EditorScreen: View {
                 }
             } else if let failure {
                 EmptyShelf(title: String(localized: "This notebook couldn't be opened"), message: failure) {
-                    Button("Back to Library", action: onClose).prominentButton()
+                    Button("Back to Library", action: onClose).buttonStyle(.scribe(.primary))
                 }
             } else {
                 ProgressView().controlSize(.large)

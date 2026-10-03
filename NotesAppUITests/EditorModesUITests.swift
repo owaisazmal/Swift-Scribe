@@ -285,7 +285,7 @@ final class EditorModesUITests: XCTestCase {
 
         app.buttons["Add"].firstMatch.tap()
         app.buttons["Link…"].firstMatch.tap()
-        let tabs = app.segmentedControls["link.tabs"]
+        let tabs = app.element("link.tabs")
         XCTAssertTrue(tabs.waitForExistence(timeout: 10))
         tabs.buttons["Web"].tap()
         let address = app.textFields["link.web.address"]

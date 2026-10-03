@@ -182,7 +182,7 @@ struct LibrarySlipView: View {
             .accessibilityElement(children: .combine)
             HStack(spacing: Space.x1) {
                 Button("Undo", action: undo)
-                    .prominentButton()
+                    .buttonStyle(.scribe(.primary, compact: true))
                 Button(action: dismiss) {
                     Image(systemName: "xmark")
                         .font(.caption.weight(.bold))
@@ -198,9 +198,7 @@ struct LibrarySlipView: View {
         .padding(.trailing, Space.x1)
         .padding(.vertical, stacked ? Space.x3 : Space.x1)
         .frame(maxWidth: 520)
-        .background(Color.surface, in: RoundedRectangle(cornerRadius: Radius.control))
-        .overlay { RoundedRectangle(cornerRadius: Radius.control).strokeBorder(Color.hairline) }
-        .shadow(color: .black.opacity(0.08), radius: 6, y: 2)
+        .board(in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
         .padding(.horizontal, Space.x4)
         .accessibilityElement(children: .contain)
     }

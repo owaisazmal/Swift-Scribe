@@ -123,7 +123,7 @@ struct LockedNotebookView: View {
                 .prominentButton()
                 .accessibilityIdentifier("lock.unlock")
             Button(closeTitle, action: close)
-                .buttonStyle(.bordered)
+                .buttonStyle(.scribe)
                 .accessibilityIdentifier("lock.close")
         } illustration: {
             Image(systemName: "lock.fill")

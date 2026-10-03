@@ -35,6 +35,10 @@ struct LibraryRootView: View {
     @SceneStorage("scribe.openNotebook") private var restoredNotebook = ""
     @SceneStorage("scribe.besideNotebook") private var restoredBeside = ""
     @Namespace private var zoom
+    @State private var sidebar = SidebarControl()
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @State private var rootWidth: CGFloat = 0
+    @State private var detailWidth: CGFloat = 0
 
     /// With Reduce Motion the editor cross-fades in over the library instead of zooming out of the cover.
     private var usesZoom: Bool { !reduceMotion }
@@ -48,14 +52,20 @@ struct LibraryRootView: View {
         ZStack {
             NavigationSplitView {
                 LibrarySidebar(scope: $scope, showingSettings: $showingSettings)
+                    .modifier(BoardSidebarToggle(shows: sizeClass == .regular, title: "Hide Sidebar", placement: .topBarTrailing) { sidebar.toggle() })
             } detail: {
                 NavigationStack {
                     ShelfView(scope: scope ?? .all, zoomNamespace: zoom, onOpen: { openNotebook($0.id) },
                               onOpenPage: { openNotebook($0.id, pageID: $1) },
                               onOpenZoomed: { openNotebook($0.id, pageID: $1, zoomSource: $2) }, onCreate: { creating = true },
                               onQuickNote: quickNote, isSearching: $isSearching, isCovered: open != nil || creating || showingSettings)
+                        .modifier(BoardSidebarToggle(shows: sizeClass == .regular && !sidebarBeside, title: "Show Sidebar",
+                                                     placement: .topBarLeading) { sidebar.toggle() })
                 }
+                .background(SidebarAnchor(control: sidebar))
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { detailWidth = $0 }
             }
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { rootWidth = $0 }
             .tint(Color.accentColor)
             .environment(changes)
             .accessibilityHidden(editorCoversLibrary)
@@ -103,6 +113,12 @@ struct LibraryRootView: View {
                     .keyboardShortcut("t", modifiers: .command)
                     .hidden()
                     .accessibilityHidden(true)
+                if #available(iOS 26, *), sizeClass == .regular {
+                    Button(sidebarBeside ? "Hide Sidebar" : "Show Sidebar") { sidebar.toggle() }
+                        .keyboardShortcut("s", modifiers: [.command, .control])
+                        .hidden()
+                        .accessibilityHidden(true)
+                }
             }
         }
         .onChange(of: open) {
@@ -129,6 +145,9 @@ struct LibraryRootView: View {
             if let action = AppAction(url: url) { Task { await perform(action) } }
         }
     }
+
+    /// The sidebar stands beside the shelves only when they are narrower than the window.
+    private var sidebarBeside: Bool { rootWidth - detailWidth > 1 }
 
     private func takePendingAction() {
         guard app.phase == .ready, let action = app.pendingAction else { return }
@@ -336,4 +355,57 @@ struct SceneReader: UIViewRepresentable {
 extension Notification.Name {
     /// Asks the editor showing a notebook (object: its ID) to go to a page (userInfo "page": the page ID).
     static let scribeShowPage = Notification.Name("ScribeShowPage")
+}
+
+/// Shows and hides the sidebar the way the system's button does: over the shelves in portrait, beside them in landscape.
+@MainActor
+final class SidebarControl {
+    weak var anchor: UIView?
+
+    func toggle() {
+        var responder: UIResponder? = anchor
+        while let current = responder, !(current is UISplitViewController) { responder = current.next }
+        guard let split = responder as? UISplitViewController, !split.isCollapsed else { return }
+        if split.displayMode == .secondaryOnly { split.show(.primary) } else { split.hide(.primary) }
+    }
+}
+
+private struct SidebarAnchor: UIViewRepresentable {
+    let control: SidebarControl
+
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        view.isUserInteractionEnabled = false
+        control.anchor = view
+        return view
+    }
+
+    func updateUIView(_ view: UIView, context: Context) { control.anchor = view }
+}
+
+/// On iPadOS 26 and later the system's sidebar button is a glass bubble; this puts a board one in its place.
+private struct BoardSidebarToggle: ViewModifier {
+    let shows: Bool
+    let title: LocalizedStringKey
+    let placement: ToolbarItemPlacement
+    let action: () -> Void
+
+    func body(content: Content) -> some View {
+        if #available(iOS 26, *) {
+            content
+                .toolbar(removing: .sidebarToggle)
+                .toolbar {
+                    if shows {
+                        ToolbarItem(placement: placement) {
+                            Button(action: action) { Label(title, systemImage: "sidebar.leading") }
+                                .buttonStyle(.boardIcon)
+                                .accessibilityIdentifier("ToggleSidebar")
+                        }
+                        .boardBackground()
+                    }
+                }
+        } else {
+            content
+        }
+    }
 }

@@ -41,11 +41,14 @@ struct DeskCards: View {
             let sideBySide = sizeClass == .regular && !dynamicTypeSize.isAccessibilitySize && width >= 680
             let layout = sideBySide ? AnyLayout(HStackLayout(alignment: .top, spacing: Space.x4))
                                     : AnyLayout(VStackLayout(alignment: .leading, spacing: Space.x3))
+            let isPair = (journal != nil || offersJournal) && memory != nil
             layout {
                 todaySlot(journal, offersJournal: offersJournal)
                 if let memory { memoryCard(memory) }
             }
             .fixedSize(horizontal: false, vertical: true)
+            // Two cards share the row; one on its own stays card-sized.
+            .frame(maxWidth: isPair ? .infinity : 520, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .leading)
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         }
@@ -289,7 +292,7 @@ struct DeskCardLayout<Thumbnail: View, Content: View, Accessory: View>: View {
         .padding(.vertical, asRow ? Space.x1 : Space.x2 + 2)
         .padding(.leading, asRow ? 0 : Space.x3)
         .padding(.trailing, asRow ? 0 : Space.x4)
-        .frame(maxWidth: asRow ? nil : 520, maxHeight: asRow ? nil : .infinity, alignment: .leading)
+        .frame(maxWidth: asRow ? nil : .infinity, maxHeight: asRow ? nil : .infinity, alignment: .leading)
         .background {
             if !asRow {
                 let shape = RoundedRectangle(cornerRadius: Radius.control)

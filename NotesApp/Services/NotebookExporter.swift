@@ -216,6 +216,7 @@ struct ExportSheet: View {
                         Text(job.progress, format: .percent.precision(.fractionLength(0)))
                     }
                     Button("Cancel", role: .cancel) { job.cancel(); dismiss() }
+                        .buttonStyle(.scribe)
                 case .finished(let urls):
                     if job.format == .timelapse, let url = urls.first {
                         LoopingVideo(url: url)
@@ -234,7 +235,7 @@ struct ExportSheet: View {
                             .prominentButton()
                         if job.format != .timelapse {
                             Button { print(urls) } label: { Label(String(localized: "export.print", defaultValue: "Print"), systemImage: "printer") }
-                                .buttonStyle(.bordered)
+                                .buttonStyle(.scribe)
                         }
                     }
                     .sheet(isPresented: $sharing) { ShareSheet(items: urls) }
@@ -249,9 +250,15 @@ struct ExportSheet: View {
             .background(Color.surface)
             .navigationTitle(job.format == .pdf ? Text("Export PDF") : job.format == .images ? Text("Export Images") : Text("Export Video"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }.buttonStyle(.scribe(.secondary, inBar: true))
+                }
+                .boardBackground()
+            }
         }
         .presentationDetents(job.format == .timelapse ? [.large] : [.medium])
+        .presentationBackground(Color.surface)
         .onDisappear { if job.state == .running { job.cancel() } }
     }
 

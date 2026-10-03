@@ -76,7 +76,10 @@ struct PaperDrawer: View {
             .navigationTitle("Paper")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }.buttonStyle(.scribe(.primary, inBar: true))
+                }
+                .boardBackground()
             }
             .onChange(of: changing == nil) { _, gone in if gone, !mode.isAdding { dismiss() } }
         }
@@ -88,20 +91,31 @@ struct PaperDrawer: View {
             PaperColorChips(selection: Binding(get: { selectedColor }, set: pickColor))
             if mode.isAdding {
                 LabeledContent {
-                    Picker("Page Size", selection: $pageSize) {
-                        if PageSize.allCases.allSatisfy({ $0.points != newPageSize }) {
-                            Text("Current Size").tag(PageSize?.none)
+                    Menu {
+                        Picker("Page Size", selection: $pageSize) {
+                            if PageSize.allCases.allSatisfy({ $0.points != newPageSize }) {
+                                Text("Current Size").tag(PageSize?.none)
+                            }
+                            ForEach(PageSize.allCases) { Text($0.displayName).tag(PageSize?.some($0)) }
                         }
-                        ForEach(PageSize.allCases) { Text($0.displayName).tag(PageSize?.some($0)) }
+                    } label: {
+                        HStack(spacing: Space.x2) {
+                            Text(sizeName)
+                            Image(systemName: "chevron.up.chevron.down").imageScale(.small).foregroundStyle(Color.textSecondary)
+                        }
                     }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
+                    .menuStyle(.button)
+                    .buttonStyle(.scribe(.secondary, compact: true))
+                    .accessibilityLabel(Text("Page Size"))
+                    .accessibilityValue(Text(sizeName))
                 } label: {
                     Text("Page Size").foregroundStyle(Color.ink)
                 }
             }
         }
     }
+
+    private var sizeName: String { pageSize?.displayName ?? String(localized: "Current Size") }
 
     private func pick(_ option: PaperTemplate) {
         switch mode {

@@ -47,15 +47,21 @@ struct WritingCalendarView: View {
             .navigationTitle("Writing Calendar")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItemGroup(placement: .topBarLeading) {
-                    Button { step(-1) } label: { Label("Previous Month", systemImage: "chevron.backward") }
-                        .keyboardShortcut("[", modifiers: .command)
-                        .disabled(!canGoBack)
-                    Button { step(1) } label: { Label("Next Month", systemImage: "chevron.forward") }
-                        .keyboardShortcut("]", modifiers: .command)
-                        .disabled(!canGoForward)
+                ToolbarItem(placement: .topBarLeading) {
+                    BarGroup {
+                        Button { step(-1) } label: { Label("Previous Month", systemImage: "chevron.backward") }
+                            .keyboardShortcut("[", modifiers: .command)
+                            .disabled(!canGoBack)
+                        Button { step(1) } label: { Label("Next Month", systemImage: "chevron.forward") }
+                            .keyboardShortcut("]", modifiers: .command)
+                            .disabled(!canGoForward)
+                    }
                 }
-                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+                .boardBackground()
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }.buttonStyle(.scribe(.primary, inBar: true))
+                }
+                .boardBackground()
             }
             .onAppear { if selected == nil { selected = defaultSelection(in: month) } }
             .task(id: selected) { await loadDetail() }

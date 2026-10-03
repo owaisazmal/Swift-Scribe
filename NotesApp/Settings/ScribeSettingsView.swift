@@ -44,6 +44,7 @@ struct ScribeSettingsView: View {
                 } footer: {
                     SettingsNote("“System Setting” follows Settings › Apple Pencil › Only Draw with Apple Pencil. With Straighten Shapes on, draw a line, circle, rectangle or triangle and hold still for a moment before lifting; Undo brings your own stroke back.")
                 }
+                .listRowBackground(Color.surface)
 
                 Section {
                     Picker("Template", selection: $template) {
@@ -62,6 +63,7 @@ struct ScribeSettingsView: View {
                 } header: {
                     SettingsNote("New Notebooks")
                 }
+                .listRowBackground(Color.surface)
 
                 if UIApplication.shared.supportsAlternateIcons {
                     Section {
@@ -69,6 +71,7 @@ struct ScribeSettingsView: View {
                     } header: {
                         SettingsNote("App Icon")
                     }
+                    .listRowBackground(Color.surface)
                 }
 
                 Section {
@@ -85,6 +88,7 @@ struct ScribeSettingsView: View {
                 } footer: {
                     SettingsNote("Touch and hold a notebook, then choose Use as Daily Journal. Press ⌘T in the library to open today's page. With Print Today's Events on, each new day's page starts with that day's events from your calendar, as text you can move or delete. They are read on this iPad.")
                 }
+                .listRowBackground(Color.surface)
                 .alert("Calendar", isPresented: Binding(get: { agendaMessage != nil }, set: { if !$0 { agendaMessage = nil } })) {
                     Button("OK", role: .cancel) {}
                 } message: {
@@ -105,6 +109,7 @@ struct ScribeSettingsView: View {
                 } footer: {
                     SettingsNote("Swift Scribe keeps a list of the days you wrote and which pages, on this device only. It's never shared.")
                 }
+                .listRowBackground(Color.surface)
 
                 Section {
                     Toggle("Find Notebooks in Spotlight", isOn: $showsInSpotlight)
@@ -117,6 +122,7 @@ struct ScribeSettingsView: View {
                 } footer: {
                     SettingsNote("Notebooks can be found from the Home Screen by their title or by the words in them. That index is kept by iPadOS on this iPad. Locked notebooks are never in it.")
                 }
+                .listRowBackground(Color.surface)
 
                 if let sync = app?.sync {
                     Section {
@@ -149,6 +155,7 @@ struct ScribeSettingsView: View {
                     } footer: {
                         SettingsNote("Each notebook is copied whole to your private iCloud storage and from there to your other iPads. A notebook open here syncs when you close it. If one was changed on two devices before they could sync, the newer version is kept and the older is saved beside it as a conflicted copy. Writing history stays on this device.")
                     }
+                    .listRowBackground(Color.surface)
                 }
 
                 Section {
@@ -177,6 +184,7 @@ struct ScribeSettingsView: View {
                 } footer: {
                     SettingsNote("A backup is one file holding every notebook, folder and sticker. Restoring adds what is missing and never replaces a notebook: one that differs from the backup comes back beside yours as a copy.")
                 }
+                .listRowBackground(Color.surface)
                 .disabled(backupWork != nil)
 
                 Section {
@@ -193,15 +201,20 @@ struct ScribeSettingsView: View {
                 } footer: {
                     SettingsNote("Swift Scribe is free and open source. No ads, no subscriptions, no tracking. Your notes stay on your device.")
                 }
+                .listRowBackground(Color.surface)
             }
             .scrollContentBackground(.hidden)
-            .background(Color.surface)
+            .background(Color.paper)
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }.buttonStyle(.scribe(.primary, inBar: true))
+                }
+                .boardBackground()
             }
         }
+        .tint(Color.accentColor)
         .presentationSizing(.page)
         .sheet(item: $sharedBackup) { file in ShareSheet(items: [file.url]) }
         .fileImporter(isPresented: $choosingBackup, allowedContentTypes: [.scribeBackup, .appleArchive]) { result in
@@ -293,10 +306,11 @@ struct AcknowledgementsView: View {
                 } header: {
                     Text(entry.name).displayFont(20, relativeTo: .title3).textCase(nil).foregroundStyle(Color.ink)
                 }
+                .listRowBackground(Color.surface)
             }
         }
         .scrollContentBackground(.hidden)
-        .background(Color.surface)
+        .background(Color.paper)
         .navigationTitle("Acknowledgements")
     }
 }
