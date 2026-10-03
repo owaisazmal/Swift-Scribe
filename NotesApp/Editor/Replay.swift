@@ -162,7 +162,8 @@ struct ReplayBar: View {
             }
             Rectangle().fill(Color.hairline).frame(width: 1, height: 24)
             Button("Done", action: done)
-                .buttonStyle(.scribe(.primary, compact: true, inBar: true))
+                .buttonStyle(.scribe(.primary, compact: true))
+                .fixedSize()
                 .accessibilityIdentifier("editor.replay.done")
         }
         .accessibilityElement(children: .contain)

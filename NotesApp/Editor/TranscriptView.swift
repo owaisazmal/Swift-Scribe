@@ -72,6 +72,7 @@ struct TranscriptView: View {
         }
         .background(Color.surface)
         .navigationTitle("Recording \(number)")
+        .barGround(.surface)
         .navigationBarTitleDisplayMode(.inline)
     }
 

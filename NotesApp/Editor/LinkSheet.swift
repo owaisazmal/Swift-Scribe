@@ -180,6 +180,7 @@ private struct LinkNotebookPages: View {
         }
         .background(Color.desk)
         .navigationTitle(record.title)
+        .barGround(.desk)
         .navigationBarTitleDisplayMode(.inline)
         .task(id: record.id) {
             guard !record.isLocked else { return }
@@ -257,9 +258,10 @@ private struct LinkAddressForm: View {
                         .focused($field, equals: .address)
                         .submitLabel(.done)
                         .onSubmit(add)
+                        .accessibilityLabel(Text("Address"))
                         .accessibilityIdentifier("link.web.address")
                         .padding(.vertical, Space.x2)
-                        .scribeField(focused: field == .address)
+                        .scribeField(focused: field == .address) { field = .address }
                 }
                 VStack(alignment: .leading, spacing: Space.x2) {
                     Text("Name").metaStyle(.footnote).accessibilityHidden(true)
@@ -267,9 +269,10 @@ private struct LinkAddressForm: View {
                         .focused($field, equals: .name)
                         .submitLabel(.done)
                         .onSubmit(add)
+                        .accessibilityLabel(Text("Name"))
                         .accessibilityIdentifier("link.web.name")
                         .padding(.vertical, Space.x2)
-                        .scribeField(focused: field == .name)
+                        .scribeField(focused: field == .name) { field = .name }
                     Text("Tapping the link opens the address in your browser. Without a name, the link shows the address.")
                         .font(.footnote)
                         .foregroundStyle(Color.textSecondary)

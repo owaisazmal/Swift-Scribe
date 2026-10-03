@@ -74,16 +74,27 @@ struct PaperDrawer: View {
             }
             .background(Color.surface)
             .navigationTitle("Paper")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }.buttonStyle(.scribe(.primary, inBar: true))
-                }
-                .boardBackground()
-            }
+            .toolbar(.hidden, for: .navigationBar)
+            .safeAreaInset(edge: .top, spacing: 0) { header }
             .onChange(of: changing == nil) { _, gone in if gone, !mode.isAdding { dismiss() } }
         }
         .frame(minWidth: 340, idealWidth: 560, minHeight: 440, idealHeight: 720)
+    }
+
+    /// A popover's bar tints whatever sits in it, so the title and Done are a row of their own.
+    private var header: some View {
+        ZStack(alignment: .trailing) {
+            Text("Paper")
+                .font(.headline)
+                .foregroundStyle(Color.ink)
+                .frame(maxWidth: .infinity)
+                .accessibilityAddTraits(.isHeader)
+            Button("Done") { dismiss() }.buttonStyle(.scribe(.primary, inBar: true))
+        }
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+        .padding(.horizontal, Space.x4)
+        .padding(.vertical, Space.x2)
+        .background(Color.surface)
     }
 
     private var controls: some View {

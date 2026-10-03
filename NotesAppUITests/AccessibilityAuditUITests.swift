@@ -154,7 +154,7 @@ final class AccessibilityAuditUITests: XCTestCase {
         let choosePaper = app.buttons["Choose Paper…"].firstMatch
         XCTAssertTrue(choosePaper.waitForExistence(timeout: 5))
         choosePaper.tap()
-        XCTAssertTrue(app.navigationBars["Paper"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.scrollViews["paper.drawer"].waitForExistence(timeout: 10))
         sleep(1)
         // At AX-L the drawer is a long list, and the audit misreads rows it scrolls back into view, so only its top is audited.
         if mode == "AX-L" {

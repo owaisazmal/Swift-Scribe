@@ -206,6 +206,7 @@ struct ScribeSettingsView: View {
             .scrollContentBackground(.hidden)
             .background(Color.paper)
             .navigationTitle("Settings")
+            .barGround(.paper)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -312,5 +313,6 @@ struct AcknowledgementsView: View {
         .scrollContentBackground(.hidden)
         .background(Color.paper)
         .navigationTitle("Acknowledgements")
+        .barGround(.paper)
     }
 }

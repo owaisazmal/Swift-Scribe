@@ -87,45 +87,6 @@ final class ToolPickerAnchor: UIView {
     override var undoManager: UndoManager? { undoProxy ?? super.undoManager }
 }
 
-private final class ChunkTiledLayer: CATiledLayer {
-    override class func fadeDuration() -> CFTimeInterval { 0 }
-}
-
-/// A 256-point piece of a page background. Pieces exist only near the viewport, so tile caches stay bounded at 5×.
-final class PageBackgroundChunk: UIView {
-    override class var layerClass: AnyClass { ChunkTiledLayer.self }
-
-    static let size: CGFloat = 256
-    let region: CGRect
-    private let page: NotebookPage
-    private let assets: URL
-    private let unit: CGFloat
-
-    init(page: NotebookPage, assets: URL, region: CGRect, unit: CGFloat) {
-        self.page = page
-        self.assets = assets
-        self.region = region
-        self.unit = unit
-        super.init(frame: CGRect(x: 0, y: 0, width: region.width * unit, height: region.height * unit))
-        isOpaque = true
-        isUserInteractionEnabled = false
-        layer.anchorPoint = .zero
-        let tiled = layer as! CATiledLayer
-        tiled.levelsOfDetail = 7
-        tiled.levelsOfDetailBias = 4
-        tiled.tileSize = CGSize(width: 512, height: 512)
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-
-    /// CATiledLayer draws on background threads.
-    nonisolated override func draw(_ rect: CGRect) {
-        guard let ctx = UIGraphicsGetCurrentContext() else { return }
-        ctx.translateBy(x: -region.minX * unit, y: -region.minY * unit)
-        PageRenderer.drawBackground(page, assets: assets, in: ctx, size: CGSize(width: page.size.width * unit, height: page.size.height * unit), items: false)
-    }
-}
-
 /// Marks where the words being looked for are on a page. The match being shown is outlined as well as filled,
 /// so it never stands out by colour alone. Each mark is its own small layer: a page zoomed to 5× is too large to draw whole.
 final class FindHighlightView: UIView {
@@ -163,7 +124,7 @@ final class FindHighlightView: UIView {
 
 final class PageSlotView: UIView {
     var page: NotebookPage
-    var chunks: [Int: PageBackgroundChunk] = [:]
+    var paper: PagePaperView?
     weak var canvas: PageCanvasView?
     var findView: FindHighlightView?
     private(set) var itemViews: [UUID: PageItemView] = [:]
@@ -250,6 +211,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     private var canvasWindow: ClosedRange<Int>?
     private var isApplyingDrawing = false
     private var isBaking = false
+    private var paperLevel = 0
     private var lastBounds: CGRect = .zero
     private var toolPickerSuppressed = false
     private let laser = LaserTrailView()
@@ -318,6 +280,8 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     required init?(coder: NSCoder) { fatalError() }
 
     var liveCanvasCount: Int { canvases.count }
+    var paperPixelCount: Int { slots.values.reduce(0) { $0 + ($1.paper?.pixelCount ?? 0) } }
+    var isPaperDrawn: Bool { slots.values.allSatisfy { $0.paper?.isDrawn ?? false } }
 
     func canvas(forPage index: Int) -> PageCanvasView? {
         pages.indices.contains(index) ? canvases[pages[index].id] : nil
@@ -428,7 +392,6 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         fitScale = bounds.width / layout.size.width
         let tallest = layout.frames.map(\.height).max() ?? 1
         minimumZoom = min(1, bounds.height / (tallest + PageStackLayout.margin * 2) / fitScale)
-        for slot in slots.values { removeChunks(slot) }
         if isFirst {
             firstInkPage = pages.indices.contains(page) ? pages[page].id : nil
             lastSafeTop = view.safeAreaInsets.top
@@ -507,6 +470,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     private func bake(zoom newZoom: CGFloat) {
         zoom = min(max(newZoom, minimumZoom), maximumZoom)
         bakedScale = zoom * fitScale
+        paperLevel = 0
         isBaking = true
         scrollView.minimumZoomScale = min(scrollView.minimumZoomScale, 1)
         scrollView.maximumZoomScale = max(scrollView.maximumZoomScale, 1)
@@ -520,7 +484,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         for (id, slot) in slots {
             guard let index = index(of: id) else { continue }
             position(slot, at: index)
-            for chunk in slot.chunks.values { position(chunk) }
+            slot.paper?.fit(unit: fitScale, zoom: zoom)
             if let canvas = slot.canvas { place(canvas, in: slot) }
             slot.layoutItems(scale: bakedScale)
             showFind(in: slot)
@@ -535,11 +499,6 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     private func position(_ slot: PageSlotView, at index: Int) {
         let frame = layout.frames[index]
         slot.frame = CGRect(x: frame.minX * bakedScale, y: frame.minY * bakedScale, width: frame.width * bakedScale, height: frame.height * bakedScale)
-    }
-
-    private func position(_ chunk: PageBackgroundChunk) {
-        chunk.transform = CGAffineTransform(scaleX: zoom, y: zoom)
-        chunk.layer.position = CGPoint(x: chunk.region.minX * bakedScale, y: chunk.region.minY * bakedScale)
     }
 
     private func updateInsets() {
@@ -669,10 +628,11 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
             let prefetch = max(0, visible.lowerBound - 3)...min(count - 1, visible.upperBound + 3)
             document.prefetchInk(pages[prefetch].map(\.id))
         }
+        let density = paperDensity()
         for index in canvasWindow ?? window {
             guard let slot = slots[pages[index].id] else { continue }
             if let canvas = slot.canvas { place(canvas, in: slot) }
-            updateChunks(in: slot)
+            updatePaper(in: slot, density: density)
         }
         let page = currentPage
         if pendingPage == nil, page != session.currentPage { session.pageDidChange(page) }
@@ -717,45 +677,32 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         if session.selection?.pageID == id { select(nil) }
         recycleCanvas(id)
         guard let slot = slots.removeValue(forKey: id) else { return }
-        removeChunks(slot)
+        slot.paper?.clear()
         slot.removeFromSuperview()
-    }
-
-    private func removeChunks(_ slot: PageSlotView) {
-        slot.chunks.values.forEach { $0.removeFromSuperview() }
-        slot.chunks.removeAll()
     }
 
     private func updatePageEdges() {
         for slot in slots.values { slot.layer.borderColor = UIColor.hairline.resolvedColor(with: traitCollection).cgColor }
     }
 
-    private func updateChunks(in slot: PageSlotView) {
-        let page = slot.page
+    /// Pixels per point of paper: exact for the zoom at rest, a power of two off it once a pinch has gone far enough.
+    private func paperDensity() -> CGFloat {
+        let pinch = log2(max(scrollView.zoomScale, 0.01))
+        if abs(pinch - CGFloat(paperLevel)) > 0.6 { paperLevel = Int(pinch.rounded()) }
+        return zoom * max(traitCollection.displayScale, 1) * pow(2, CGFloat(paperLevel))
+    }
+
+    /// Paper is kept a quarter of the viewport beyond what shows, so a 5× page costs no more than a 1× one.
+    private func updatePaper(in slot: PageSlotView, density: CGFloat) {
+        let paper = slot.paper ?? PagePaperView(page: slot.page, assets: document.package.assetsDirectory)
+        if slot.paper == nil {
+            slot.insertSubview(paper, at: 0)
+            slot.paper = paper
+        }
+        paper.fit(unit: fitScale, zoom: zoom)
         let viewport = slot.convert(scrollView.bounds, from: scrollView)
-        let keep = viewport.insetBy(dx: -viewport.width / 2, dy: -viewport.height / 2).intersection(slot.bounds)
-        var needed = Set<Int>()
-        let size = PageBackgroundChunk.size
-        if !keep.isNull, !keep.isEmpty, bakedScale > 0 {
-            let columns = Int((page.size.width / size).rounded(.up)), rows = Int((page.size.height / size).rounded(.up))
-            let c0 = max(0, Int(keep.minX / bakedScale / size)), c1 = min(columns - 1, Int(keep.maxX / bakedScale / size))
-            let r0 = max(0, Int(keep.minY / bakedScale / size)), r1 = min(rows - 1, Int(keep.maxY / bakedScale / size))
-            if c0 <= c1, r0 <= r1 {
-                for row in r0...r1 { for column in c0...c1 { needed.insert(row * 1000 + column) } }
-            }
-        }
-        for (key, chunk) in slot.chunks where !needed.contains(key) {
-            chunk.removeFromSuperview()
-            slot.chunks.removeValue(forKey: key)
-        }
-        for key in needed where slot.chunks[key] == nil {
-            let x = CGFloat(key % 1000) * size, y = CGFloat(key / 1000) * size
-            let region = CGRect(x: x, y: y, width: min(size, page.size.width - x), height: min(size, page.size.height - y))
-            let chunk = PageBackgroundChunk(page: page, assets: document.package.assetsDirectory, region: region, unit: fitScale)
-            position(chunk)
-            slot.insertSubview(chunk, at: 0)
-            slot.chunks[key] = chunk
-        }
+        let keep = viewport.insetBy(dx: -viewport.width / 4, dy: -viewport.height / 4).intersection(slot.bounds)
+        paper.show(near: keep.isNull ? .null : paper.convert(keep, from: slot), density: density)
     }
 
     // MARK: Canvases

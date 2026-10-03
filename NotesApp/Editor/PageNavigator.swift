@@ -98,9 +98,10 @@ struct PageNavigator: View {
                                 }
                                 .buttonStyle(.plain)
                                 .accessibilityLabel(Text("Go"))
+                                .accessibilityIdentifier("navigator.go")
                             }
                         }
-                        .keyboardType(.numberPad)
+                        .keyboardType(.numbersAndPunctuation)
                         .onSubmit(go)
                         .frame(width: goToWidth)
                     }
@@ -139,14 +140,16 @@ struct PageNavigator: View {
     private var goToRow: some View {
         HStack(spacing: Space.x3) {
             TextField("Go to page", text: $goToPage, prompt: Text("Go to page").foregroundStyle(Color.textSecondary))
-                .keyboardType(.numberPad)
+                .keyboardType(.numbersAndPunctuation)
                 .submitLabel(.go)
                 .focused($goToFocused)
                 .onSubmit(go)
+                .accessibilityLabel(Text("Go to page"))
                 .accessibilityIdentifier("navigator.goto")
                 .padding(.vertical, Space.x2)
-                .scribeField(focused: goToFocused)
+                .scribeField(focused: goToFocused) { goToFocused = true }
             Button("Go", action: go)
+                .accessibilityIdentifier("navigator.go")
                 .buttonStyle(.scribe(.primary))
                 .disabled(pageNumber == nil)
         }

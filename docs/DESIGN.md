@@ -6,7 +6,7 @@ The visual system is **Clothbound**: a library that looks like a shelf of cloth-
 
 - The canvas stays quiet. Paper and ink only, and nothing moves while you write.
 - Controls are bound like the notebooks. Buttons and bars are boards standing on the desk, fields and tab tracks are wells pressed into it, and the action that finishes a task is cloth. No Liquid Glass and no blur of our own. Menus, alerts, the share sheet and the tool picker stay system.
-- Each control appears in one place. Undo and redo live in the tool picker and return to the top bar only while it's hidden.
+- Each control appears in one place. Undo and redo are the exception: they stay in the top bar, where ⌘Z and ⇧⌘Z are attached, as well as in the tool picker.
 - Colour never carries meaning alone. Favourites get a ribbon plus a spoken label; selection gets stitching plus a check mark.
 
 ## Colour tokens
@@ -65,16 +65,16 @@ Every text pair is checked by `DesignTokenTests.testEveryTextPairReachesAA` in a
 
 ## Controls
 
-Every button, field and tab in the app is drawn by `Design/Controls.swift`, in three materials:
+Every button, bar, field and tab we draw comes from `Design/Controls.swift`, in three materials. Rows in Settings and other lists, switches, menus and the system's back chevron on pushed pages stay system:
 
-- **Board** (`.board(in:)`): Board fill, a Hairline edge, a lit top edge (white at 85%, 9% at night) and a two-layer umber shadow (`#2A2116`, 10% at 0.5 pt and 7% at 6 pt; black at night). Pressed, it sinks into the well and loses its shadow; disabled, it lies flat. Increase Contrast drops the lit edge.
+- **Board** (`.board(in:)`): Board fill, a Hairline edge, a lit top edge (white at 85%, 9% at night) and a two-layer umber shadow (`#2A2116`, 10% at 0.5 pt and 7% at 6 pt; black at night). Pressed, it sinks into the well and loses its shadow; disabled, it is an edgeless slab at half strength with secondary text, so the state shows by shape in dark mode and with Increase Contrast too. Increase Contrast drops the lit edge.
 - **Well** (`.well(in:)`): the Well colour with an umber inner shadow and a lit lower lip. Its edge is the Hairline, ink at 50% with Increase Contrast, and a 1.5 pt accent ring while it has focus.
-- **Cloth** (`.scribe(.primary)`): PrimaryCloth with the covers' own two-way weave (a 4 pt tile, white 6% and black 7%), the cover board's bevel (white 18% over black 20%) and an umber shadow. Disabled cloth is a well with secondary text. Increase Contrast drops the weave and bevel.
+- **Cloth** (`.scribe(.primary)`): PrimaryCloth with the covers' own two-way weave (a 4 pt tile, white 6% and black 7%), the cover board's bevel (white 18% over black 20%) and an umber shadow. Disabled cloth is a plain Well fill with secondary text and no edge. Increase Contrast drops the weave and bevel.
 
 The pieces:
 
 - **Buttons.** `.scribe` is a board with Ink in the medium weight; `.scribe(.primary)` is cloth in semibold, for the one action that finishes a task (Done, Create, Save, Share); `.scribe(.destructive)` is tomato cloth, used only for the stop-recording button. Anything else that deletes is a tomato icon on a board, or an Ink word, and asks before it acts or can be undone. Shapes are 22 pt continuous rounded rectangles, so a one-line button is a capsule and a wrapped one stays a slab. `compact` draws 34 pt inside a 44 pt target. At accessibility sizes, buttons in content wrap to three lines.
-- **Bars.** `BarGroup` puts a row of 44 pt icons (`.barIcon`, Ink, a small well while pressed, Tomato for a destructive role) on one board capsule; `.boardIcon` is a single icon on a round board. Toolbar items wear `.boardBackground()`, which removes the system glass on iPadOS 26 and later. Everything in a bar stops growing at the largest standard text size and shows the Large Content Viewer instead.
+- **Bars.** `BarGroup` puts a row of 44 pt icons (`.barIcon`, Ink, a small well while pressed, Tomato for a destructive role) on one board capsule; `.boardIcon` is a single icon on a round board. Toolbar items wear `.boardBackground()`, which removes the system glass on iPadOS 26 and later. Everything in a navigation bar stops growing at the largest standard text size and shows the Large Content Viewer, with its name, instead; the floating bars over the page grow with the text size, words and field alike. A bar keeps the colour of its ground when content scrolls under it (`barGround`), never the system's blurred band. The sidebar's bar tints whatever sits in it, so on iPadOS 26 and later the sidebar draws its title and buttons in a row of its own.
 - **Under the bar.** When a bar has no room for a field or a set of tabs (a narrow window, a long translation, text above the Large size), they take a row of their own under it: the navigator's go-to field, the link sheet's tabs, the library's search.
 - **Fields.** `ScribeSearchField` is a capsule well with a glyph, a 44 pt clear button and room for one more control (the navigator's Go arrow). Escape clears it, then leaves it. Sheet fields use `.scribeField(focused:)`, a rounded well.
 - **The library bar.** A board with Sort, New and Select, then the search well (260 pt). When the bar has no room for the field (a narrow window, or a long translation beside the sidebar), it moves to a row of its own under the bar instead of into the system's overflow menu. The sidebar button is a round board like Settings beside it; it shows and hides the sidebar the way the system's did, over the shelves in portrait and beside them in landscape.

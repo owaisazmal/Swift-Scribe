@@ -26,7 +26,6 @@ struct LibraryRootView: View {
     @State private var creatingQuickNote = false
     @Environment(AppModel.self) private var app
     @State private var sceneID: String?
-    @State private var isSearching = false
     @State private var changes = LibraryChangeCenter()
     @State private var openingToday = false
     @State private var triedRestore = false
@@ -51,14 +50,13 @@ struct LibraryRootView: View {
     var body: some View {
         ZStack {
             NavigationSplitView {
-                LibrarySidebar(scope: $scope, showingSettings: $showingSettings)
-                    .modifier(BoardSidebarToggle(shows: sizeClass == .regular, title: "Hide Sidebar", placement: .topBarTrailing) { sidebar.toggle() })
+                LibrarySidebar(scope: $scope, showingSettings: $showingSettings, hideSidebar: hidesSidebar ? { sidebar.toggle() } : nil)
             } detail: {
                 NavigationStack {
                     ShelfView(scope: scope ?? .all, zoomNamespace: zoom, onOpen: { openNotebook($0.id) },
                               onOpenPage: { openNotebook($0.id, pageID: $1) },
                               onOpenZoomed: { openNotebook($0.id, pageID: $1, zoomSource: $2) }, onCreate: { creating = true },
-                              onQuickNote: quickNote, isSearching: $isSearching, isCovered: open != nil || creating || showingSettings)
+                              onQuickNote: quickNote, isCovered: open != nil || creating || showingSettings)
                         .modifier(BoardSidebarToggle(shows: sizeClass == .regular && !sidebarBeside, title: "Show Sidebar",
                                                      placement: .topBarLeading) { sidebar.toggle() })
                 }
@@ -144,6 +142,11 @@ struct LibraryRootView: View {
         .onOpenURL { url in
             if let action = AppAction(url: url) { Task { await perform(action) } }
         }
+    }
+
+    /// Before iPadOS 26 the system's own button does this.
+    private var hidesSidebar: Bool {
+        if #available(iOS 26, *) { sizeClass == .regular } else { false }
     }
 
     /// The sidebar stands beside the shelves only when they are narrower than the window.

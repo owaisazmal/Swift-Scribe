@@ -48,6 +48,7 @@ struct StickerDrawer: View {
             .accessibilityIdentifier("sticker.drawer")
             .background(Color.surface)
             .navigationTitle("Stickers")
+            .barGround(.surface)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

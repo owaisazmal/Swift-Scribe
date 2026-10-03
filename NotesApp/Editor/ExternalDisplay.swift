@@ -110,8 +110,7 @@ final class ExternalDisplay {
         }
         window.rootViewController = stage
         window.isHidden = false
-        // A new window is laid out by whichever thread commits a transaction first, and the page's tiles are drawn on
-        // background threads that commit their own. Committing here keeps the stage's first layout on the main thread.
+        // Committing here keeps the stage's first layout on the main thread.
         window.layoutIfNeeded()
         CATransaction.flush()
         self.window = window
@@ -163,7 +162,7 @@ final class PresentationStageController: UIViewController {
         view.addSubview(trail)
     }
 
-    /// Core Animation can lay a window out from a tile-drawing thread; then this waits for the main thread.
+    /// Should Core Animation ever lay the window out off the main thread, this waits for the main thread.
     nonisolated override func viewDidLayoutSubviews() {
         guard Thread.isMainThread else {
             return DispatchQueue.main.async { [weak self] in self?.view.setNeedsLayout() }
