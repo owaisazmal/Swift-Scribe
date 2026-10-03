@@ -3,7 +3,15 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
   pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
   workflow_dispatch:
 
 concurrency:
@@ -22,7 +30,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Pick an iPad simulator
+      - name: Pick and boot an iPad simulator
         run: |
           xcodebuild -version
           udid=$(xcrun simctl list devices available --json | jq -r '
@@ -35,18 +43,32 @@ jobs:
             exit 1
           fi
           echo "SIMULATOR_UDID=$udid" >> "$GITHUB_ENV"
+          xcrun simctl boot "$udid"
 
-      - name: Build and test
+      - name: Build
         run: |
           set -o pipefail
-          xcodebuild test \
+          xcodebuild build-for-testing \
+            -project NotesApp.xcodeproj \
+            -scheme NotesApp \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
+            2>&1 | tee "$RUNNER_TEMP/build.log" \
+            | xcbeautify --renderer github-actions
+
+      - name: Wait for the simulator
+        run: xcrun simctl bootstatus "$SIMULATOR_UDID"
+
+      - name: Unit tests
+        run: |
+          set -o pipefail
+          xcodebuild test-without-building \
             -project NotesApp.xcodeproj \
             -scheme NotesApp \
             -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
             -only-testing:NotesAppTests \
             -parallel-testing-enabled NO \
             -resultBundlePath "$RUNNER_TEMP/NotesApp.xcresult" \
-            2>&1 | tee "$RUNNER_TEMP/xcodebuild.log" \
+            2>&1 | tee "$RUNNER_TEMP/test.log" \
             | xcbeautify --renderer github-actions
 
       - uses: actions/upload-artifact@v7
@@ -54,5 +76,6 @@ jobs:
         with:
           name: test-results
           path: |
-            ${{ runner.temp }}/xcodebuild.log
+            ${{ runner.temp }}/build.log
+            ${{ runner.temp }}/test.log
             ${{ runner.temp }}/NotesApp.xcresult
