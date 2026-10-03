@@ -56,6 +56,7 @@ struct CoverEditorView: View {
             }
             .background(Color.surface)
             .navigationTitle("Change Cover")
+            .barGround(.surface)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

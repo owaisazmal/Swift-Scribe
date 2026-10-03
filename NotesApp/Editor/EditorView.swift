@@ -1151,7 +1151,7 @@ fileprivate struct EditorContent: View {
                                : asked && !finder.isSearching ? String(localized: "No matches") : ""
         return HStack(spacing: 0) {
             ScribeSearchField("Find in Notebook", text: $findText, handlesEscape: false, capsTextSize: false, identifier: "editor.find.field",
-                              value: Text(status), focus: $findFocused)
+                              focus: $findFocused)
                 .fontWeight(.regular)
                 .onSubmit {
                     finder.step(1)
@@ -1227,7 +1227,8 @@ fileprivate struct EditorContent: View {
     /// Cloth, like the library slip's Undo.
     private func barDone(_ action: @escaping () -> Void) -> some View {
         Button("Done", action: action)
-            .buttonStyle(.scribe(.primary, compact: true, inBar: true))
+            .buttonStyle(.scribe(.primary, compact: true))
+            .fixedSize()
             .padding(.leading, Space.x1)
     }
 
@@ -1667,7 +1668,7 @@ struct RecordingList: View {
                         .disabled(recorder.isRecording)
                         HStack(spacing: Space.x3) {
                             VStack(alignment: .leading, spacing: Space.x1) {
-                                Text("Recording \(index + 1)").font(.body.weight(.medium))
+                                Text("Recording \(index + 1)").font(.body.weight(.medium)).foregroundStyle(Color.ink)
                                 Text(recording.createdAt.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(Color.textSecondary)
                                 if recorder.playingID == recording.id { ProgressView(value: recorder.playbackProgress) }
                             }
@@ -1697,6 +1698,8 @@ struct RecordingList: View {
                             Button(role: .destructive) { recorder.delete(recording) } label: { Label("Delete", systemImage: "trash") }
                         }
                     }
+                    .listRowBackground(Color.surface)
+                    .listRowSeparatorTint(Color.hairline)
                 }
               } footer: {
                 if replay != nil, !recorder.recordings.isEmpty {
@@ -1705,6 +1708,8 @@ struct RecordingList: View {
                 }
               }
             }
+            .scrollContentBackground(.hidden)
+            .background(Color.surface)
             .overlay {
                 if recorder.recordings.isEmpty {
                     ScrollView {
@@ -1719,6 +1724,7 @@ struct RecordingList: View {
                 }
             }
             .navigationTitle("Recordings")
+            .barGround(.surface)
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: UUID.self) { id in
                 TranscriptView(recorder: recorder, recordingID: id, replay: replay)

@@ -66,4 +66,37 @@ final class FindUITests: XCTestCase {
         XCTAssertTrue(ribbon.waitForExistence(timeout: 5), "back to writing")
         XCTAssertFalse(app.element("editor.find.field").exists)
     }
+
+    /// The keyboard coming up over the editor at a large text size: its window was once laid out off the main thread, which ended the app.
+    func testFindAndGoToPageOpenAtAnAccessibilityTextSize() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-storageRoot", "find", "-resetStorage", "-seedLibrary", "2", "-seedHandwriting", "-drawingInput", "anyInput",
+                               "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityM"]
+        app.launch()
+        let notebook = app.buttons["notebook.Study Notes"]
+        XCTAssertTrue(notebook.waitForExistence(timeout: 30))
+        notebook.tap()
+        let ribbon = app.buttons["editor.ribbon"]
+        XCTAssertTrue(ribbon.waitForExistence(timeout: 20))
+
+        app.buttons["More"].firstMatch.tap()
+        app.buttons["Find in Notebook…"].firstMatch.tap()
+        let field = app.element("editor.find.field")
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.typeText("hello")
+        let status = app.staticTexts["editor.find.status"]
+        wait(for: [expectation(for: NSPredicate(format: "label == '1 of 1'"), evaluatedWith: status)], timeout: 40)
+        attach(app, "find-accessibility-size")
+        app.buttons["editor.find.done"].tap()
+        XCTAssertTrue(ribbon.waitForExistence(timeout: 5), "back to writing")
+
+        ribbon.tap()
+        let goTo = app.element("navigator.goto")
+        XCTAssertTrue(goTo.waitForExistence(timeout: 10))
+        goTo.tap()
+        goTo.typeText("2")
+        attach(app, "go-to-page-accessibility-size")
+        app.buttons["navigator.go"].firstMatch.tap()
+        wait(for: [expectation(for: NSPredicate(format: "label == 'Page 2 of 2'"), evaluatedWith: ribbon)], timeout: 10)
+    }
 }

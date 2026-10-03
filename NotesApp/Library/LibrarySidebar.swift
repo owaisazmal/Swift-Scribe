@@ -51,6 +51,8 @@ struct SpineChip: View {
 struct LibrarySidebar: View {
     @Binding var scope: LibraryScope?
     @Binding var showingSettings: Bool
+    /// Hides the sidebar; nil where it can't be hidden.
+    var hideSidebar: (() -> Void)?
     @Environment(LibraryStore.self) private var store
     @Environment(LibraryChangeCenter.self) private var changes
     @Environment(\.undoManager) private var undoManager
@@ -122,14 +124,14 @@ struct LibrarySidebar: View {
         .background(Color.surface)
         .tint(Color.sidebarTint)
         .navigationTitle("Swift Scribe")
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button { showingSettings = true } label: { Label("Settings", systemImage: "gearshape") }
-                    .buttonStyle(.boardIcon)
-                    .keyboardShortcut(",", modifiers: .command)
+        .modifier(SidebarHeader {
+            if let hideSidebar {
+                Button(action: hideSidebar) { Label("Hide Sidebar", systemImage: "sidebar.leading") }
+                    .accessibilityIdentifier("ToggleSidebar")
             }
-            .boardBackground()
-        }
+            Button { showingSettings = true } label: { Label("Settings", systemImage: "gearshape") }
+                .keyboardShortcut(",", modifiers: .command)
+        })
         .alert("New Folder", isPresented: $creatingFolder) {
             TextField("Name", text: $folderName)
             Button("Cancel", role: .cancel) {}
@@ -236,5 +238,39 @@ struct LibrarySidebar: View {
             if scope == .folder(folder.id) { scope = .all }
             store.deleteFolder(folder)
         } label: { Label("Delete Folder", systemImage: "trash") }
+    }
+}
+
+/// The sidebar's bar tints whatever sits in it on iPadOS 26 and later, so there the title and its buttons are a row of their own.
+private struct SidebarHeader<Buttons: View>: ViewModifier {
+    @ViewBuilder var buttons: Buttons
+
+    func body(content: Content) -> some View {
+        if #available(iOS 26, *) {
+            content
+                .toolbar(.hidden, for: .navigationBar)
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    HStack(spacing: Space.x2) {
+                        Text("Swift Scribe")
+                            .font(.headline)
+                            .foregroundStyle(Color.ink)
+                            .lineLimit(1)
+                            .accessibilityAddTraits(.isHeader)
+                        Spacer(minLength: Space.x2)
+                        buttons.buttonStyle(.boardIcon)
+                    }
+                    .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+                    .padding(.leading, Space.x5)
+                    .padding(.trailing, Space.x3)
+                    .padding(.bottom, Space.x2)
+                    .background(Color.surface)
+                }
+        } else {
+            content
+                .barGround(.surface)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) { buttons.buttonStyle(.boardIcon) }
+                }
+        }
     }
 }

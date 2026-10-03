@@ -83,6 +83,7 @@ struct NewNotebookView: View {
             }
             .background(Color.surface)
             .navigationTitle("New Notebook")
+            .barGround(.surface)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -141,7 +142,7 @@ struct NewNotebookView: View {
             TextField("Title", text: $title, prompt: Text(placeholder).foregroundStyle(Color.textSecondary))
                 .displayFont(24, relativeTo: .title2)
                 .padding(.vertical, Space.x2)
-                .scribeField(focused: titleFocused)
+                .scribeField(focused: titleFocused) { titleFocused = true }
                 .focused($titleFocused)
                 .submitLabel(.done)
                 .onSubmit { Task { await create() } }
@@ -182,11 +183,20 @@ struct NewNotebookView: View {
         VStack(alignment: .leading, spacing: Space.x4) {
             Divider().overlay(Color.hairline)
             LabeledContent {
-                Picker("Size", selection: $pageSize) {
-                    ForEach(PageSize.allCases) { Text($0.displayName).tag($0) }
+                Menu {
+                    Picker("Size", selection: $pageSize) {
+                        ForEach(PageSize.allCases) { Text($0.displayName).tag($0) }
+                    }
+                } label: {
+                    HStack(spacing: Space.x2) {
+                        Text(pageSize.displayName)
+                        Image(systemName: "chevron.up.chevron.down").imageScale(.small).foregroundStyle(Color.textSecondary)
+                    }
                 }
-                .labelsHidden()
-                .pickerStyle(.menu)
+                .menuStyle(.button)
+                .buttonStyle(.scribe(.secondary, compact: true))
+                .accessibilityLabel(Text("Page Size"))
+                .accessibilityValue(Text(pageSize.displayName))
             } label: {
                 Text("Page Size").foregroundStyle(Color.ink)
             }

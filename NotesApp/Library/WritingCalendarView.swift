@@ -45,6 +45,7 @@ struct WritingCalendarView: View {
             }
             .background(Color.surface)
             .navigationTitle("Writing Calendar")
+            .barGround(.surface)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {

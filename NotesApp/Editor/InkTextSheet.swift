@@ -84,6 +84,7 @@ struct InkTextSheet: View {
             }
             .background(Color.surface)
             .navigationTitle("Handwriting as Text")
+            .barGround(.surface)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

@@ -249,6 +249,7 @@ struct ExportSheet: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.surface)
             .navigationTitle(job.format == .pdf ? Text("Export PDF") : job.format == .images ? Text("Export Images") : Text("Export Video"))
+            .barGround(.surface)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {

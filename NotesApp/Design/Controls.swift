@@ -40,7 +40,7 @@ private struct BoardSurface<S: InsettableShape>: ViewModifier {
         let dark = scheme == .dark, raised = !pressed && !flat
         content
             .background {
-                shape.fill(Color.board)
+                shape.fill(Color.board.opacity(flat ? 0.5 : 1))
                     .overlay { if pressed { shape.fill(Color.well) } }
                     .shadow(color: Elevation.shade(dark).opacity(raised ? (dark ? 0.40 : 0.10) : 0), radius: 0.5, y: 0.5)
                     .shadow(color: Elevation.shade(dark).opacity(raised ? (dark ? 0.22 : 0.07) : 0), radius: 6, y: 3)
@@ -53,7 +53,7 @@ private struct BoardSurface<S: InsettableShape>: ViewModifier {
                         .allowsHitTesting(false)
                 }
             }
-            .overlay { shape.strokeBorder(Color.hairline, lineWidth: 1).allowsHitTesting(false) }
+            .overlay { if !flat { shape.strokeBorder(Color.hairline, lineWidth: 1).allowsHitTesting(false) } }
     }
 }
 
@@ -183,7 +183,7 @@ struct ScribeButtonStyle: ButtonStyle {
         @ViewBuilder
         private func filled(pressed: Bool) -> some View {
             if !isEnabled {
-                Color.clear.well(in: shape)
+                shape.fill(Color.well)
             } else {
                 let dark = scheme == .dark
                 shape
@@ -250,7 +250,8 @@ struct BarIconButtonStyle: ButtonStyle {
                 .contentShape(Rectangle())
                 .contentShape(.hoverEffect, Capsule().inset(by: 2))
                 .hoverEffect(.highlight)
-                .modifier(BarLimit(active: true))
+                .dynamicTypeSize(...barTextLimit)
+                .accessibilityShowsLargeContentViewer { configuration.label.labelStyle(.titleAndIcon) }
         }
     }
 }
@@ -296,7 +297,8 @@ struct BoardIconButtonStyle: ButtonStyle {
                 .contentShape([.interaction, .accessibility], Circle())
                 .contentShape(.hoverEffect, Circle())
                 .hoverEffect(.highlight)
-                .modifier(BarLimit(active: true))
+                .dynamicTypeSize(...barTextLimit)
+                .accessibilityShowsLargeContentViewer { configuration.label.labelStyle(.titleAndIcon) }
         }
     }
 }
@@ -314,10 +316,17 @@ extension ToolbarContent {
 }
 
 extension View {
-    /// Before iPadOS 26 a scrolled bar turns to the system's grey material; this keeps it the colour of its ground.
+    /// Keeps a bar the colour of its ground when content scrolls under it, in place of the system's material band.
     @ViewBuilder
     func barGround(_ ground: Color) -> some View {
-        if #available(iOS 26, *) { self } else { toolbarBackground(ground, for: .navigationBar) }
+        if #available(iOS 26, *) {
+            toolbarBackground(ground, for: .navigationBar, .bottomBar)
+                .toolbarBackgroundVisibility(.visible, for: .navigationBar, .bottomBar)
+                .scrollEdgeEffectHidden(true, for: .top)
+                .scrollEdgeEffectStyle(.hard, for: .bottom)
+        } else {
+            toolbarBackground(ground, for: .navigationBar, .bottomBar)
+        }
     }
 }
 
@@ -353,6 +362,7 @@ struct ScribeSearchField<Accessory: View>: View {
                 .frame(maxWidth: .infinity, minHeight: 44)
                 .focused(focus)
                 .accessibilityFocused($voiceOverOnField)
+                .accessibilityLabel(Text(prompt))
                 .accessibilityAddTraits(isSearch ? .isSearchField : [])
                 .modifier(FieldAccessibility(identifier: identifier, value: value))
             if clears, !text.isEmpty {
@@ -417,13 +427,14 @@ extension ScribeSearchField where Accessory == EmptyView {
 }
 
 extension View {
-    /// A text field in a sheet: a rounded well, 44 points tall, outlined in the accent while it has focus.
-    func scribeField(focused: Bool = false) -> some View {
+    /// A text field in a sheet: a rounded well, 44 points tall, outlined in the accent while it has focus. A tap anywhere on it calls `focus`.
+    func scribeField(focused: Bool = false, focus: @escaping () -> Void = {}) -> some View {
         textFieldStyle(.plain)
             .foregroundStyle(Color.ink)
             .tint(Color.accentColor)
             .padding(.horizontal, Space.x3)
             .frame(minHeight: 44)
+            .background { Color.clear.contentShape(Rectangle()).onTapGesture(perform: focus) }
             .well(in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous), focused: focused)
     }
 }
@@ -473,6 +484,7 @@ struct ScribeSegmentedPicker<Value: Hashable, Label: View>: View {
                 .buttonStyle(.plain)
                 .hoverEffect(.highlight)
                 .matchedGeometryEffect(id: option, in: thumb)
+                .modifier(BarLimit(active: inBar))
                 .accessibilityAddTraits(selected ? .isSelected : [])
             }
         }
@@ -480,7 +492,6 @@ struct ScribeSegmentedPicker<Value: Hashable, Label: View>: View {
         .animation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.86), value: selection)
         .well(in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         .fixedSize(horizontal: inBar, vertical: true)
-        .modifier(BarLimit(active: inBar))
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(.isTabBar)
         .accessibilityLabel(Text(title))

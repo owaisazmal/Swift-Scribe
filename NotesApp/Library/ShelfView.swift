@@ -17,7 +17,6 @@ struct ShelfView: View {
     let onOpenZoomed: (NotebookRecord, UUID?, String) -> Void
     let onCreate: () -> Void
     let onQuickNote: () -> Void
-    @Binding var isSearching: Bool
     let isCovered: Bool
 
     @Environment(LibraryStore.self) private var store
@@ -145,8 +144,6 @@ struct ShelfView: View {
         .toolbarTitleDisplayMode(.inline)
         .barGround(.paper)
         .background(SearchActivator(isSearching: searchFocused, isCovered: isCovered) { searchFocused = true })
-        .onChange(of: isSearching) { _, requested in if requested, !searchFocused { searchFocused = true } }
-        .onChange(of: searchFocused) { _, focused in isSearching = focused }
         .toolbar { toolbar(visible) }
         .toolbar { if isSelecting { selectionBar(visible) } }
         .fileImporter(isPresented: $importingPDF, allowedContentTypes: [.pdf], allowsMultipleSelection: true) { result in
@@ -444,7 +441,7 @@ struct ShelfView: View {
                 .font(.headline)
                 .foregroundStyle(Color.ink)
                 .lineLimit(1)
-                .fixedSize()
+                .fixedSize(horizontal: dynamicTypeSize.isAccessibilitySize, vertical: false)
                 .opacity(shows ? 1 : 0)
                 .accessibilityHidden(!shows)
                 .animation(Motion.adaptive(Motion.standard, reduceMotion: reduceMotion), value: shows)
@@ -458,6 +455,7 @@ struct ShelfView: View {
                 BarGroup {
                     if scope == .trash {
                         Button("Empty") { confirmingEmptyTrash = true }.disabled(visible.isEmpty)
+                        Rectangle().fill(Color.hairline).frame(width: 1, height: 24)
                     } else {
                         Menu {
                             Picker("Sort By", selection: $sort) {

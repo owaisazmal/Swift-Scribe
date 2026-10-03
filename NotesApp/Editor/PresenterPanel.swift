@@ -156,23 +156,26 @@ struct PresenterNotesSheet: View {
                 .font(.body)
                 .foregroundStyle(Color.ink)
                 .scrollContentBackground(.hidden)
-                .padding(Space.x3)
-                .background(Color.surface)
+                .padding(Space.x2)
                 .focused($focused)
                 .overlay(alignment: .topLeading) {
                     if text.isEmpty {
                         Text("What you want to say on this page. Only you see it, beside the page, while you present.")
                             .foregroundStyle(Color.textSecondary)
-                            .padding(Space.x3)
+                            .padding(Space.x2)
                             .padding(.top, 8)
                             .padding(.leading, 5)
                             .allowsHitTesting(false)
                             .accessibilityHidden(true)
                     }
                 }
+                .well(in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous), focused: focused)
+                .padding(Space.x4)
+                .background(Color.surface)
                 .accessibilityLabel(Text("Notes for page \(number)"))
                 .accessibilityIdentifier("presenter.notes.editor")
                 .navigationTitle("Notes for Page \(number)")
+                .barGround(.surface)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
@@ -191,6 +194,7 @@ struct PresenterNotesSheet: View {
                 }
         }
         .presentationDetents([.medium, .large])
+        .presentationBackground(Color.surface)
         .onAppear {
             text = document.index(of: pageID).map { document.pages[$0].notes } ?? ""
             focused = true

@@ -150,6 +150,7 @@ struct BesidePicker: View {
                 }
             }
             .navigationTitle("Open Beside")
+            .barGround(.desk)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
