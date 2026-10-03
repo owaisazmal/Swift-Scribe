@@ -18,8 +18,8 @@ final class StudyUITests: XCTestCase {
         Int(((canvas.value as? String) ?? "").split(separator: " ").first ?? "") ?? 0
     }
 
-    private func openStudyNotes(_ app: XCUIApplication) -> XCUIElement {
-        app.launchArguments = ["-storageRoot", "study", "-resetStorage", "-seedLibrary", "2", "-seedHandwriting", "-drawingInput", "anyInput"]
+    private func openStudyNotes(_ app: XCUIApplication, extra: [String] = []) -> XCUIElement {
+        app.launchArguments = ["-storageRoot", "study", "-resetStorage", "-seedLibrary", "2", "-seedHandwriting", "-drawingInput", "anyInput"] + extra
         app.launch()
         let notebook = app.buttons["notebook.Study Notes"]
         XCTAssertTrue(notebook.waitForExistence(timeout: 30))
@@ -81,6 +81,41 @@ final class StudyUITests: XCTestCase {
         attach(app, "timelapse-ready")
         app.buttons["Done"].firstMatch.tap()
         XCTAssertTrue(app.buttons["editor.ribbon"].waitForExistence(timeout: 5))
+    }
+
+    func testSelectedHandwritingIsTranslated() throws {
+        let app = XCUIApplication()
+        let canvas = openStudyNotes(app, extra: ["-fakeTranslate"])
+        app.buttons["More"].firstMatch.tap()
+        app.buttons["Select Ink Across Pages"].firstMatch.tap()
+        let status = app.staticTexts["editor.ink.status"]
+        XCTAssertTrue(status.waitForExistence(timeout: 5))
+        canvas.coordinate(withNormalizedOffset: CGVector(dx: 0.12, dy: 0.14))
+            .press(forDuration: 0.1, thenDragTo: canvas.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.33)), withVelocity: 400, thenHoldForDuration: 0.2)
+        app.buttons["editor.ink.text"].tap()
+        let editor = app.textViews["inktext.editor"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 20))
+
+        let translate = app.buttons["inktext.translate"]
+        XCTAssertTrue(translate.waitForExistence(timeout: 10), "the languages the iPad can translate into are offered")
+        translate.tap()
+        app.buttons["French"].firstMatch.tap()
+        wait(for: [expectation(for: NSPredicate(format: "value == 'BONJOUR'"), evaluatedWith: editor)], timeout: 10)
+        XCTAssertTrue(app.staticTexts["Translated into French on this iPad."].exists)
+        attach(app, "ink-translated")
+
+        app.buttons["inktext.original"].tap()
+        wait(for: [expectation(for: NSPredicate(format: "value CONTAINS[c] 'hello'"), evaluatedWith: editor)], timeout: 5)
+        XCTAssertFalse(app.buttons["inktext.original"].exists)
+
+        translate.tap()
+        app.buttons["Spanish"].firstMatch.tap()
+        wait(for: [expectation(for: NSPredicate(format: "value == 'HOLA'"), evaluatedWith: editor)], timeout: 10)
+        app.buttons["inktext.replace"].tap()
+        XCTAssertTrue(app.buttons["editor.ribbon"].waitForExistence(timeout: 5))
+        XCTAssertEqual(strokeCount(canvas), 0)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'HOLA'")).firstMatch.waitForExistence(timeout: 5),
+                      "the translation is typed where the handwriting was")
     }
 
     func testSelectedHandwritingBecomesTypedText() throws {

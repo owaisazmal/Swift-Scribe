@@ -12,6 +12,9 @@ struct ScribeSettingsView: View {
     @AppStorage(SettingsKey.dailyJournalID) private var journalID = ""
     @AppStorage(SettingsKey.showsOnThisDay) private var showsOnThisDay = true
     @AppStorage(SettingsKey.snapsShapes) private var snapsShapes = true
+    @AppStorage(SettingsKey.journalAgenda) private var printsAgenda = false
+    @AppStorage(SettingsKey.spotlight) private var showsInSpotlight = true
+    @State private var agendaMessage: String?
     @State private var confirmingHistoryClear = false
     @State private var backupWork: BackupWork?
     @State private var lastBackup: URL?
@@ -72,13 +75,20 @@ struct ScribeSettingsView: View {
                     let journal = journalID.isEmpty ? nil : store.dailyJournal
                     LabeledContent("Journal", value: journal?.title ?? String(localized: "None"))
                     Toggle("Show On This Day", isOn: $showsOnThisDay)
+                    Toggle("Print Today's Events", isOn: Binding(get: { printsAgenda }, set: setPrintsAgenda))
+                        .accessibilityIdentifier("settings.journal.agenda")
                     if journal != nil {
                         Button("Stop Using Daily Journal") { journalID = "" }
                     }
                 } header: {
                     SettingsNote("Daily Journal")
                 } footer: {
-                    SettingsNote("Touch and hold a notebook, then choose Use as Daily Journal. Press ⌘T in the library to open today's page.")
+                    SettingsNote("Touch and hold a notebook, then choose Use as Daily Journal. Press ⌘T in the library to open today's page. With Print Today's Events on, each new day's page starts with that day's events from your calendar, as text you can move or delete. They are read on this iPad.")
+                }
+                .alert("Calendar", isPresented: Binding(get: { agendaMessage != nil }, set: { if !$0 { agendaMessage = nil } })) {
+                    Button("OK", role: .cancel) {}
+                } message: {
+                    Text(agendaMessage ?? "")
                 }
 
                 Section {
@@ -94,6 +104,18 @@ struct ScribeSettingsView: View {
                     SettingsNote("Writing History")
                 } footer: {
                     SettingsNote("Swift Scribe keeps a list of the days you wrote and which pages, on this device only. It's never shared.")
+                }
+
+                Section {
+                    Toggle("Find Notebooks in Spotlight", isOn: $showsInSpotlight)
+                        .accessibilityIdentifier("settings.spotlight")
+                        .onChange(of: showsInSpotlight) { _, _ in
+                            if let app { app.spotlight.schedule(app.library, after: .zero) }
+                        }
+                } header: {
+                    SettingsNote("Search")
+                } footer: {
+                    SettingsNote("Notebooks can be found from the Home Screen by their title or by the words in them. That index is kept by iPadOS on this iPad. Locked notebooks are never in it.")
                 }
 
                 if let sync = app?.sync {
@@ -189,6 +211,20 @@ struct ScribeSettingsView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(backupMessage ?? "")
+        }
+    }
+
+    /// Turning it on asks for the calendar there and then, so a new day's page never has to.
+    private func setPrintsAgenda(_ on: Bool) {
+        printsAgenda = on
+        guard on else { return }
+        Task {
+            do {
+                _ = try await Agenda.calendar.events(on: .now, calendar: .current)
+            } catch {
+                printsAgenda = false
+                agendaMessage = error.localizedDescription
+            }
         }
     }
 

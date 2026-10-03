@@ -126,10 +126,46 @@ final class PageBackgroundChunk: UIView {
     }
 }
 
+/// Marks where the words being looked for are on a page. The match being shown is outlined as well as filled,
+/// so it never stands out by colour alone. Each mark is its own small layer: a page zoomed to 5× is too large to draw whole.
+final class FindHighlightView: UIView {
+    private var marks: [CAShapeLayer] = []
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        backgroundColor = .clear
+        isUserInteractionEnabled = false
+        isAccessibilityElement = false
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    func show(_ rects: [CGRect], current: CGRect?, scale: CGFloat, onDark: Bool) {
+        while marks.count > rects.count { marks.removeLast().removeFromSuperlayer() }
+        while marks.count < rects.count {
+            let mark = CAShapeLayer()
+            layer.addSublayer(mark)
+            marks.append(mark)
+        }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        for (mark, rect) in zip(marks, rects) {
+            let box = CGRect(x: rect.minX * scale, y: rect.minY * scale, width: rect.width * scale, height: rect.height * scale).insetBy(dx: -3, dy: -2)
+            let shown = rect == current
+            mark.path = CGPath(roundedRect: box, cornerWidth: 3, cornerHeight: 3, transform: nil)
+            mark.fillColor = UIColor(hex: 0xE8B023, alpha: shown ? 0.5 : 0.3).cgColor
+            mark.strokeColor = shown ? UIColor(hex: onDark ? 0xF7F1E3 : 0x1B2230).cgColor : UIColor(hex: 0xB07F0E).cgColor
+            mark.lineWidth = shown ? 2 : 1
+        }
+        CATransaction.commit()
+    }
+}
+
 final class PageSlotView: UIView {
     var page: NotebookPage
     var chunks: [Int: PageBackgroundChunk] = [:]
     weak var canvas: PageCanvasView?
+    var findView: FindHighlightView?
     private(set) var itemViews: [UUID: PageItemView] = [:]
 
     /// Pictures, stickers, text and links sit above the paper and below the canvas, back to front. Study tape sits
@@ -229,8 +265,22 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     private var lassoMoveOrigin: CGPoint?
     private var isMovingInk = false
     private lazy var lassoPan = UIPanGestureRecognizer(target: self, action: #selector(lassoPanned))
-    /// Nothing on the page can be changed by hand while it is presented or replayed, or while ink is being selected.
-    private var isLocked: Bool { isPresenting || replay != nil || inkLasso != nil }
+    /// Find in the notebook: the marks on each page, and the match being shown.
+    private var isFinding = false
+    private var findRects: [UUID: [CGRect]] = [:]
+    private var findCurrent: FindMatch?
+    /// Nothing on the page can be changed by hand while it is presented or replayed, while ink is being selected,
+    /// or while it is being searched.
+    private var isLocked: Bool { isPresenting || replay != nil || inkLasso != nil || isFinding }
+    /// The zoom window: what it covers, the strip it is written in, and the outline on the page of what it shows.
+    private var zoomWindow: ZoomWindow?
+    private var zoomPanel: ZoomWindowPanel?
+    private var zoomCanvas: PageCanvasView?
+    private var zoomTarget: ZoomTargetView?
+    private var zoomLevel = 1
+    private var zoomDragOrigin: CGPoint?
+    private var zoomAdvance: DispatchWorkItem?
+    private var zoomReachedBand = false
     private var selectionView: ItemSelectionView?
     private var linkTitles = LinkTitles()
     private var textView: UITextView?
@@ -320,6 +370,10 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         registerForTraitChanges([UITraitUserInterfaceStyle.self, UITraitAccessibilityContrast.self]) { (self: Self, _) in
             self.updatePageEdges()
         }
+        registerForTraitChanges([UITraitPreferredContentSizeCategory.self]) { (self: Self, _) in
+            self.layoutZoomPanel()
+            self.updateInsets()
+        }
         NotificationCenter.default.addObserver(self, selector: #selector(sceneDidActivate), name: UIScene.didActivateNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(keyboardChanged), name: UIResponder.keyboardWillChangeFrameNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(secondScreenChanged), name: .scribeExternalDisplayChanged, object: nil)
@@ -344,7 +398,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         endTextEditing()
         ExternalDisplay.shared.end(for: self)
         toolPicker.setVisible(false, forFirstResponder: anchor)
-        for canvas in canvases.values { toolPicker.setVisible(false, forFirstResponder: canvas) }
+        for canvas in allCanvases { toolPicker.setVisible(false, forFirstResponder: canvas) }
         anchor.resignFirstResponder()
         UIApplication.shared.isIdleTimerDisabled = false
     }
@@ -379,10 +433,12 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
             firstInkPage = pages.indices.contains(page) ? pages[page].id : nil
             lastSafeTop = view.safeAreaInsets.top
         }
+        layoutZoomPanel()
         bake(zoom: zoom)
         scrollToPage(page, animated: false)
         updateWindow(force: true)
         if isPresenting { present(page: page) }
+        resizeZoomWindow()
     }
 
     override var keyCommands: [UIKeyCommand]? {
@@ -467,9 +523,11 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
             for chunk in slot.chunks.values { position(chunk) }
             if let canvas = slot.canvas { place(canvas, in: slot) }
             slot.layoutItems(scale: bakedScale)
+            showFind(in: slot)
         }
         showSelection()
         inkLasso?.scale = bakedScale
+        layoutZoomTarget()
         updateInsets()
         isBaking = false
     }
@@ -491,8 +549,9 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         let bottom = obscured.isNull ? vertical : max(vertical, view.bounds.maxY - obscured.minY)
         // Room to centre the first and last page while presenting.
         let slack = isPresenting ? scrollView.bounds.height / 2 : 0
+        let panel = zoomPanel.map { view.bounds.maxY - $0.frame.minY } ?? 0
         scrollView.contentInset = UIEdgeInsets(top: max(vertical + view.safeAreaInsets.top, slack), left: horizontal,
-                                               bottom: max(bottom, slack, textView == nil ? 0 : keyboardOverlap), right: horizontal)
+                                               bottom: max(bottom, slack, panel, textView == nil && !isFinding ? 0 : keyboardOverlap), right: horizontal)
     }
 
     private func clamped(_ offset: CGPoint) -> CGPoint {
@@ -530,6 +589,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         var area = view.bounds.inset(by: UIEdgeInsets(top: view.safeAreaInsets.top, left: 0, bottom: 0, right: 0))
         let obscured = toolPicker.isVisible ? toolPicker.frameObscured(in: view) : .null
         if !obscured.isNull, obscured.minY > area.minY { area.size.height = obscured.minY - area.minY }
+        if let zoomPanel { area.size.height = max(min(area.height, zoomPanel.frame.minY - area.minY), 80) }
         return area
     }
 
@@ -605,7 +665,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
                 let slot = slots[page.id] ?? makeSlot(page, at: index)
                 if slot.canvas == nil { attachCanvas(page, to: slot) }
             }
-            document.pinInk(keep)
+            document.pinInk(keep.union(zoomWindow.map { [$0.pageID] } ?? []))
             let prefetch = max(0, visible.lowerBound - 3)...min(count - 1, visible.upperBound + 3)
             document.prefetchInk(pages[prefetch].map(\.id))
         }
@@ -646,8 +706,10 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         position(slot, at: index)
         contentView.addSubview(slot)
         if let inkLasso { contentView.bringSubviewToFront(inkLasso) }
+        if let zoomTarget { contentView.bringSubviewToFront(zoomTarget) }
         slots[page.id] = slot
         if page.hasItems { syncItems(in: slot) }
+        showFind(in: slot)
         return slot
     }
 
@@ -747,6 +809,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         slot.raiseTape()
         if let selectionView, selectionView.superview === slot { slot.bringSubviewToFront(selectionView) }
         if let textView, textView.superview === slot { slot.bringSubviewToFront(textView) }
+        if let findView = slot.findView { slot.bringSubviewToFront(findView) }
         if toolPicker.isVisible { toolPicker.setVisible(true, forFirstResponder: canvas) }
         if let ink = document.loadedInk(page.id) {
             show(ink, in: canvas)
@@ -826,7 +889,19 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         canvas.strokeCount = nil
         let before = document.loadedInk(id)
         document.canvasDidChangeInk(id, to: canvas.drawing)
+        mirrorInk(from: canvas, pageID: id)
+        if canvas === zoomCanvas { return zoomStrokeEnded(canvas, before: before) }
         straightenLastStroke(on: canvas, pageID: id, before: before)
+    }
+
+    /// A page being written in the zoom window has two canvases: whichever was written in, the other shows the same ink.
+    private func mirrorInk(from canvas: PageCanvasView, pageID: UUID) {
+        let other = canvas === zoomCanvas ? canvases[pageID] : zoomWindow?.pageID == pageID ? zoomCanvas : nil
+        guard let other, other.isLoaded else { return }
+        isApplyingDrawing = true
+        other.drawing = canvas.drawing
+        other.strokeCount = nil
+        isApplyingDrawing = false
     }
 
     /// Draw and hold: a stroke that ended with the pen at rest is redrawn as the line, circle or figure it looks like.
@@ -849,6 +924,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
             canvas.drawing = drawing
             isApplyingDrawing = false
             document.canvasDidChangeInk(pageID, to: drawing)
+            mirrorInk(from: canvas, pageID: pageID)
             document.undoManager.setActionName(String(localized: "Straighten Shape"))
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             AccessibilityNotification.Announcement(String(localized: "Straightened into a \(snapped.shape.displayName)")).post()
@@ -859,6 +935,9 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     /// Writing anywhere puts a selected picture down.
     func canvasViewDidBeginUsingTool(_ canvasView: PKCanvasView) {
         if session.selection != nil { select(nil) }
+        guard canvasView === zoomCanvas else { return }
+        zoomAdvance?.cancel()
+        session.onTouchDown?()
     }
 
     func canvasViewDidFinishRendering(_ canvasView: PKCanvasView) {
@@ -879,7 +958,9 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     func document(_ document: NotebookDocument, didReplaceInkOf pageID: UUID) {
         // An undo or redo under the selection moves strokes about, so what was caught is let go.
         if inkLasso != nil, !isMovingInk, !inkSelection.isEmpty { setInkSelection([:]) }
-        guard let canvas = canvases[pageID], let ink = document.loadedInk(pageID) else { return }
+        guard let ink = document.loadedInk(pageID) else { return }
+        if zoomWindow?.pageID == pageID, let zoomCanvas { showZoomInk(ink, in: zoomCanvas) }
+        guard let canvas = canvases[pageID] else { return }
         show(ink, in: canvas)
     }
 
@@ -894,10 +975,12 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         guard updatedKeys.elementsEqual(currentKeys, by: Self.sameSlot) else {
             relayout(updated, changed: Self.changedIDs(updatedKeys, currentKeys))
             refreshItems(all: renamed)
+            refreshZoomWindow()
             return
         }
         pages = updated
         refreshItems(all: renamed)
+        refreshZoomWindow()
     }
 
     // MARK: Pictures, stickers, text and links
@@ -1039,7 +1122,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     /// A finger tap opens a link or picks up a picture when fingers don't draw; any tap elsewhere puts the selected one down.
     /// While presenting nothing is drawn, so a tap on a link always opens it.
     @objc private func tappedPage(_ gesture: UITapGestureRecognizer) {
-        guard !isOnSelection(gesture) else { return }
+        guard !isOnSelection(gesture), !isFinding else { return }
         if replay != nil { return seekReplay(to: gesture.location(in: scrollView)) }
         if inkLasso != nil { return setInkSelection([:]) }
         let hit = isPresenting || !fingersDraw ? item(at: gesture.location(in: scrollView)) : nil
@@ -1159,6 +1242,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         guard let frame = (note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue, let window = view.window else { return }
         let covered = view.convert(frame, from: window.screen.coordinateSpace).intersection(view.bounds)
         keyboardOverlap = covered.isNull ? 0 : max(0, view.bounds.maxY - covered.minY)
+        if isFinding { updateInsets() }
         guard textView != nil else { return }
         updateInsets()
         revealTextEditor()
@@ -1263,7 +1347,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     func setToolPickerVisible(_ visible: Bool) {
         let shown = visible && !toolPickerSuppressed && !document.isReadOnly && !isLocked
         toolPicker.setVisible(shown, forFirstResponder: anchor)
-        for canvas in canvases.values { toolPicker.setVisible(shown, forFirstResponder: canvas) }
+        for canvas in allCanvases { toolPicker.setVisible(shown, forFirstResponder: canvas) }
         if !toolPickerSuppressed, textView == nil { anchor.becomeFirstResponder() }
     }
 
@@ -1279,7 +1363,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
 
     private func applyDrawingPolicy(_ policy: PKCanvasViewDrawingPolicy) {
         drawingPolicy = policy
-        for canvas in canvases.values + pool { canvas.drawingPolicy = policy }
+        for canvas in allCanvases + pool { canvas.drawingPolicy = policy }
         updateScrollTouches()
     }
 
@@ -1291,7 +1375,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         let fingersDraw = switch drawingPolicy {
         case _ where isPresenting: fingersPoint
         case _ where inkLasso != nil: true
-        case _ where document.isReadOnly || replay != nil: false
+        case _ where document.isReadOnly || replay != nil || isFinding: false
         case .anyInput: true
         case .pencilOnly: false
         default: toolPicker.isVisible && !UIPencilInteraction.prefersPencilOnlyDrawing
@@ -1485,6 +1569,318 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         return ItemSelection(pageID: page.id, itemID: item.id)
     }
 
+    // MARK: Find in the notebook
+
+    func setFinding(_ finding: Bool) {
+        guard finding != isFinding, isViewLoaded else { return }
+        isFinding = finding
+        if finding {
+            select(nil)
+        } else {
+            findRects = [:]
+            findCurrent = nil
+            for slot in slots.values { showFind(in: slot) }
+        }
+        for canvas in canvases.values where canvas.isLoaded { setDrawingEnabled(!document.isReadOnly && !isLocked, canvas) }
+        setToolPickerVisible(session.isToolPickerVisible)
+        updateScrollTouches()
+        updateInsets()
+    }
+
+    /// Marks every match on the pages that are showing, and brings the one being shown into view when it changes.
+    func showFind(_ matches: [FindMatch], current: FindMatch?) {
+        guard isFinding else { return }
+        findRects = Dictionary(grouping: matches, by: \.pageID).mapValues { $0.map(\.rect) }
+        let moved = current != findCurrent
+        findCurrent = current
+        for slot in slots.values { showFind(in: slot) }
+        if moved, let current { reveal(current) }
+    }
+
+    private func showFind(in slot: PageSlotView) {
+        let rects = findRects[slot.page.id] ?? []
+        guard isFinding, !rects.isEmpty else {
+            slot.findView?.removeFromSuperview()
+            slot.findView = nil
+            return
+        }
+        let view = slot.findView ?? FindHighlightView()
+        if view.superview !== slot { slot.addSubview(view) }
+        slot.bringSubviewToFront(view)
+        view.frame = slot.bounds
+        view.show(rects, current: findCurrent?.pageID == slot.page.id ? findCurrent?.rect : nil, scale: bakedScale,
+                  onDark: slot.page.effectivePaperColor.isDark)
+        slot.findView = view
+    }
+
+    private func reveal(_ match: FindMatch) {
+        guard let index = index(of: match.pageID) else { return }
+        session.pageDidChange(index)
+        reveal(match.rect, onPage: index, margin: 56)
+    }
+
+    /// Scrolls just far enough to bring part of a page into what can be seen, clear of the keyboard and the zoom window.
+    private func reveal(_ rect: CGRect, onPage index: Int, margin: CGFloat) {
+        guard layout.frames.indices.contains(index), effectiveScale > 0 else { return }
+        let frame = layout.frames[index], scale = effectiveScale
+        let target = CGRect(x: (frame.minX + rect.minX) * scale, y: (frame.minY + rect.minY) * scale, width: rect.width * scale, height: rect.height * scale)
+        var area = readableArea
+        area.size.height = max(min(area.height, view.bounds.maxY - keyboardOverlap - area.minY), 80)
+        let visible = area.offsetBy(dx: scrollView.contentOffset.x, dy: scrollView.contentOffset.y)
+        guard !visible.insetBy(dx: 8, dy: min(margin, max((visible.height - target.height) / 2, 0))).contains(target) else { return }
+        let x = visible.minX <= target.minX && target.maxX <= visible.maxX ? scrollView.contentOffset.x : target.midX - area.midX
+        let offset = clamped(CGPoint(x: x, y: target.midY - area.midY))
+        let moves = abs(offset.y - scrollView.contentOffset.y) + abs(offset.x - scrollView.contentOffset.x) > 0.5
+        pendingPage = moves ? index : nil
+        scrollView.setContentOffset(offset, animated: moves)
+    }
+
+    // MARK: Zoom window
+
+    private var allCanvases: [PageCanvasView] { Array(canvases.values) + (zoomCanvas.map { [$0] } ?? []) }
+
+    func setZoomWindow(_ open: Bool) {
+        guard open != (zoomPanel != nil), isViewLoaded else { return }
+        if open { openZoomWindow() } else { closeZoomWindow() }
+    }
+
+    private func openZoomWindow() {
+        guard !isLocked, !document.isReadOnly, !pages.isEmpty else { return session.zoomWindowDidClose() }
+        select(nil)
+        let index = pendingPage ?? currentPage
+        let panel = ZoomWindowPanel()
+        panel.onAction = { [weak self] in self?.zoomAction($0) }
+        view.insertSubview(panel, belowSubview: laser)
+        zoomPanel = panel
+        let canvas = makeCanvas()
+        syncTool(canvas)
+        canvas.accessibilityIdentifier = "zoom.canvas"
+        panel.host(canvas)
+        zoomCanvas = canvas
+        let target = ZoomTargetView()
+        target.pan.addTarget(self, action: #selector(zoomTargetPanned))
+        target.onStep = { [weak self] in self?.zoomAction($0 > 0 ? .forward : .back) }
+        scrollView.panGestureRecognizer.require(toFail: target.pan)
+        contentView.addSubview(target)
+        zoomTarget = target
+        layoutZoomPanel()
+        placeZoomWindow(onPage: index, center: visibleCenter(ofPage: index))
+        updateInsets()
+        if toolPicker.isVisible { toolPicker.setVisible(true, forFirstResponder: canvas) }
+        revealZoomTarget()
+        UIAccessibility.post(notification: .layoutChanged, argument: canvas)
+    }
+
+    private func closeZoomWindow() {
+        guard zoomPanel != nil else { return }
+        zoomAdvance?.cancel()
+        if let canvas = zoomCanvas {
+            toolPicker.setVisible(false, forFirstResponder: canvas)
+            toolPicker.removeObserver(canvas)
+            if canvas.isFirstResponder { anchor.becomeFirstResponder() }
+            canvas.delegate = nil
+        }
+        zoomPanel?.removeFromSuperview()
+        zoomTarget?.removeFromSuperview()
+        zoomPanel = nil
+        zoomCanvas = nil
+        zoomTarget = nil
+        zoomWindow = nil
+        updateInsets()
+        scrollView.contentOffset = clamped(scrollView.contentOffset)
+        updateWindow(force: true)
+    }
+
+    /// At the foot of the view, above a tool picker docked there. The strip of paper keeps its height; the row of
+    /// buttons over it grows with the text size.
+    private func layoutZoomPanel() {
+        guard let panel = zoomPanel else { return }
+        let obscured = toolPicker.isVisible ? toolPicker.frameObscured(in: view) : .null
+        let bottom = obscured.isNull || obscured.minY < view.bounds.midY ? view.bounds.maxY : obscured.minY
+        let paper = min(max(view.bounds.height * 0.26, 170), 280) - ZoomWindowPanel.minimumBarHeight
+        let height = paper + panel.barHeight(forWidth: view.bounds.width)
+        let frame = CGRect(x: 0, y: bottom - height, width: view.bounds.width, height: height)
+        guard panel.frame != frame else { return }
+        let resized = panel.frame.size != frame.size
+        panel.frame = frame
+        panel.layoutIfNeeded()
+        if resized { resizeZoomWindow() }
+    }
+
+    /// What the window covers at the current zoom level: the shape of the strip, as wide as that level's share of the page.
+    private func zoomSize(onPage index: Int) -> CGSize? {
+        guard let area = zoomPanel?.canvasArea.bounds.size, area.width > 0, area.height > 0, pages.indices.contains(index) else { return nil }
+        let width = pages[index].size.width * ZoomWindow.widths[zoomLevel]
+        return CGSize(width: width, height: area.height * width / area.width)
+    }
+
+    private func placeZoomWindow(onPage index: Int, center: CGPoint?) {
+        guard let size = zoomSize(onPage: index) else { return }
+        let page = pages[index]
+        zoomWindow = ZoomWindow(pageID: page.id, pageSize: page.size, center: center ?? CGPoint(x: page.size.width / 2, y: page.size.height / 2),
+                                size: size, lineHeight: ZoomWindow.lineHeight(for: page, windowHeight: size.height))
+        zoomReachedBand = false
+        document.pinInk(Set(canvases.keys).union([page.id]))
+        showZoomWindow()
+    }
+
+    /// The strip changed shape, or the zoom level changed: the window keeps its corner and takes the new size.
+    private func resizeZoomWindow() {
+        guard var window = zoomWindow, let index = index(of: window.pageID), let size = zoomSize(onPage: index) else { return }
+        window.resize(to: size)
+        zoomWindow = window
+        showZoomWindow()
+    }
+
+    /// The pages changed under the window: it closes if its page is gone, and otherwise shows the page as it now is.
+    private func refreshZoomWindow() {
+        guard var window = zoomWindow else { return }
+        guard let index = index(of: window.pageID) else {
+            closeZoomWindow()
+            return session.zoomWindowDidClose()
+        }
+        window.fit(pageSize: pages[index].size)
+        zoomWindow = window
+        showZoomWindow()
+    }
+
+    /// Puts the strip's canvas, the paper behind it and the outline on the page where the window now is.
+    private func showZoomWindow() {
+        guard let window = zoomWindow, let panel = zoomPanel, let canvas = zoomCanvas, let index = index(of: window.pageID) else { return }
+        let page = pages[index], area = panel.canvasArea.bounds
+        guard area.width > 0, window.rect.width > 0 else { return }
+        let scale = area.width / window.rect.width
+        if canvas.zoomScale != scale || canvas.minimumZoomScale != scale || canvas.maximumZoomScale != scale {
+            canvas.minimumZoomScale = min(canvas.minimumZoomScale, scale)
+            canvas.maximumZoomScale = max(canvas.maximumZoomScale, scale)
+            canvas.zoomScale = scale
+            canvas.minimumZoomScale = scale
+            canvas.maximumZoomScale = scale
+        }
+        if canvas.frame != area { canvas.frame = area }
+        let size = CGSize(width: page.size.width * scale, height: page.size.height * scale)
+        if canvas.contentSize != size { canvas.contentSize = size }
+        let offset = CGPoint(x: window.rect.minX * scale, y: window.rect.minY * scale)
+        if canvas.contentOffset != offset { canvas.contentOffset = offset }
+        canvas.overrideUserInterfaceStyle = page.effectivePaperColor.inkAppearance
+        canvas.accessibilityLabel = String(localized: "Zoom window, page \(index + 1)")
+        if canvas.pageID != page.id { loadZoomInk(page.id, into: canvas) }
+        panel.setTitle(String(localized: "Zoom Window · Page \(index + 1)"))
+        panel.setEnabled(zoomLevel > 0, for: .closer)
+        panel.setEnabled(zoomLevel < ZoomWindow.widths.count - 1, for: .further)
+
+        let assets = document.package.assetsDirectory, titles = linkTitles, rect = window.rect
+        panel.paper.image = UIGraphicsImageRenderer(size: area.size).image { context in
+            context.cgContext.translateBy(x: -rect.minX * scale, y: -rect.minY * scale)
+            PageRenderer.drawBackground(page, assets: assets, in: context.cgContext, size: size, links: titles)
+        }
+        layoutZoomTarget()
+    }
+
+    private func loadZoomInk(_ pageID: UUID, into canvas: PageCanvasView) {
+        canvas.pageID = pageID
+        if let ink = document.loadedInk(pageID) { return showZoomInk(ink, in: canvas) }
+        canvas.isLoaded = false
+        setDrawingEnabled(false, canvas)
+        Task { [weak self] in
+            guard let self else { return }
+            let ink = await document.ink(pageID)
+            if zoomCanvas === canvas, canvas.pageID == pageID { showZoomInk(ink, in: canvas) }
+        }
+    }
+
+    private func showZoomInk(_ ink: PKDrawing, in canvas: PageCanvasView) {
+        isApplyingDrawing = true
+        canvas.drawing = ink
+        canvas.strokeCount = nil
+        isApplyingDrawing = false
+        canvas.isLoaded = true
+        setDrawingEnabled(!document.isReadOnly && !isLocked, canvas)
+    }
+
+    private func layoutZoomTarget() {
+        guard let target = zoomTarget else { return }
+        guard let window = zoomWindow, let index = index(of: window.pageID) else { return target.isHidden = true }
+        let frame = layout.frames[index], scale = bakedScale
+        target.isHidden = false
+        target.frame = CGRect(x: (frame.minX + window.rect.minX) * scale, y: (frame.minY + window.rect.minY) * scale,
+                              width: window.rect.width * scale, height: window.rect.height * scale)
+        target.setNeedsLayout()
+        target.accessibilityPlace = String(localized: "Page \(index + 1)")
+        contentView.bringSubviewToFront(target)
+    }
+
+    private func revealZoomTarget() {
+        guard let window = zoomWindow, let index = index(of: window.pageID) else { return }
+        reveal(window.rect.insetBy(dx: 0, dy: -ZoomTargetView.tabSize.height / max(bakedScale, 0.1)), onPage: index, margin: 12)
+    }
+
+    private func zoomAction(_ action: ZoomWindowPanel.Action) {
+        zoomAdvance?.cancel()
+        switch action {
+        case .back: moveZoomWindow { $0.back() }
+        case .forward: moveZoomWindow(orTurnPage: true) { $0.advance() }
+        case .newLine: moveZoomWindow(orTurnPage: true) { $0.newLine() }
+        case .here:
+            let index = pendingPage ?? currentPage
+            placeZoomWindow(onPage: index, center: visibleCenter(ofPage: index))
+        case .closer, .further:
+            zoomLevel = min(max(zoomLevel + (action == .closer ? -1 : 1), 0), ZoomWindow.widths.count - 1)
+            resizeZoomWindow()
+            revealZoomTarget()
+        case .close:
+            closeZoomWindow()
+            session.zoomWindowDidClose()
+        }
+    }
+
+    /// Moves the window. One that can go no further down its page starts at the top of the next, if it is asked to.
+    private func moveZoomWindow(orTurnPage: Bool = false, _ change: (inout ZoomWindow) -> Bool) {
+        guard var window = zoomWindow else { return }
+        zoomReachedBand = false
+        if change(&window) {
+            zoomWindow = window
+            showZoomWindow()
+        } else if orTurnPage, window.isAtPageEnd, let index = index(of: window.pageID), pages.indices.contains(index + 1) {
+            let size = window.rect.size
+            placeZoomWindow(onPage: index + 1, center: CGPoint(x: window.lineStart + size.width / 2, y: size.height / 2 + window.lineHeight))
+        } else {
+            return
+        }
+        revealZoomTarget()
+    }
+
+    /// Ink that reaches the band on the right moves the window on, once the pen has rested.
+    private func zoomStrokeEnded(_ canvas: PageCanvasView, before: PKDrawing?) {
+        guard let window = zoomWindow, canvas.tool is PKInkingTool, let before, canvas.drawing.strokes.count == before.strokes.count + 1,
+              let stroke = canvas.drawing.strokes.last else { return }
+        if window.reachesAdvanceBand(stroke.renderBounds) { zoomReachedBand = true }
+        guard zoomReachedBand else { return }
+        zoomAdvance?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.moveZoomWindow(orTurnPage: true) { $0.advance() } }
+        zoomAdvance = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + ZoomWindow.rest, execute: work)
+    }
+
+    @objc private func zoomTargetPanned(_ gesture: UIPanGestureRecognizer) {
+        guard var window = zoomWindow, bakedScale > 0 else { return }
+        switch gesture.state {
+        case .began:
+            zoomAdvance?.cancel()
+            zoomDragOrigin = window.rect.origin
+        case .changed, .ended:
+            guard let origin = zoomDragOrigin else { return }
+            let moved = gesture.translation(in: contentView)
+            window.move(to: CGPoint(x: origin.x + moved.x / bakedScale, y: origin.y + moved.y / bakedScale))
+            zoomWindow = window
+            zoomReachedBand = false
+            showZoomWindow()
+            if gesture.state == .ended { zoomDragOrigin = nil }
+        default:
+            zoomDragOrigin = nil
+        }
+    }
+
     // MARK: Replaying a recording
 
     /// Shows the page as it was at `time` into the recording: ink written later is faint. Nil ends the replay.
@@ -1662,6 +2058,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         if !toolPickerSuppressed, textView == nil, session.isToolPickerVisible != toolPicker.isVisible {
             session.isToolPickerVisible = toolPicker.isVisible
         }
+        layoutZoomPanel()
         updateInsets()
         updateScrollTouches()
     }
@@ -1671,6 +2068,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     }
 
     func toolPickerFramesObscuredDidChange(_ toolPicker: PKToolPicker) {
+        layoutZoomPanel()
         updateInsets()
     }
 

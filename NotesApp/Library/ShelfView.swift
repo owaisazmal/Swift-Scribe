@@ -42,6 +42,7 @@ struct ShelfView: View {
     @State private var isSelecting = false
     @State private var selection: Set<UUID> = []
     @State private var importingPDF = false
+    @State private var scanning = false
     @State private var renaming: NotebookRecord?
     @State private var renameText = ""
     @State private var confirmingEmptyTrash = false
@@ -133,6 +134,13 @@ struct ShelfView: View {
         .toolbar { if isSelecting { selectionBar(visible) } }
         .fileImporter(isPresented: $importingPDF, allowedContentTypes: [.pdf], allowsMultipleSelection: true) { result in
             Task { await importPDFs(result) }
+        }
+        .fullScreenCover(isPresented: $scanning) {
+            DocumentScanner { images in
+                scanning = false
+                importScan(images)
+            }
+            .ignoresSafeArea()
         }
         .alert("Rename Notebook", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
             TextField("Title", text: $renameText)
@@ -425,6 +433,9 @@ struct ShelfView: View {
                         Button { onCreate() } label: { Label("New Notebook", systemImage: "book.closed") }
                         Button { onQuickNote() } label: { Label("Quick Note", systemImage: "square.and.pencil") }
                         Button { importingPDF = true } label: { Label("Import PDF…", systemImage: "doc.richtext") }
+                        if DocumentScan.isAvailable {
+                            Button(action: startScan) { Label("Scan Documents…", systemImage: "doc.viewfinder") }
+                        }
                     } label: {
                         Label("New", systemImage: "plus")
                     } primaryAction: {
@@ -477,7 +488,7 @@ struct ShelfView: View {
             Button {
                 Task { do { try await store.duplicate(record) } catch { errorMessage = error.localizedDescription } }
             } label: { Label("Duplicate", systemImage: "plus.square.on.square") }
-            Button { editingCover = record } label: { Label("Change Cover…", systemImage: "book.closed") }
+            Button { changeCover(record) } label: { Label("Change Cover…", systemImage: "book.closed") }
             Button { startExport(record, as: .pdf) } label: { Label("Export as PDF", systemImage: "square.and.arrow.up") }
             Button { startExport(record, as: .images) } label: { Label("Export as Images", systemImage: "photo.on.rectangle") }
             Toggle(isOn: Binding(get: { journalID == record.id.uuidString }, set: { journalID = $0 ? record.id.uuidString : "" })) {
@@ -497,6 +508,13 @@ struct ShelfView: View {
             if locked, !(await NotebookLock.shared.confirm(String(localized: "Export “\(title)”"))) { return }
             do { export = try await ExportJob.forNotebook(id, root: store.root, format: format) } catch { errorMessage = error.localizedDescription }
         }
+    }
+
+    /// The cover editor can show a notebook's first page, so a locked notebook asks first.
+    private func changeCover(_ record: NotebookRecord) {
+        guard record.isLocked else { return editingCover = record }
+        let title = record.title
+        Task { if await NotebookLock.shared.confirm(String(localized: "Unlock “\(title)”")) { editingCover = record } }
     }
 
     private func toggleLock(_ record: NotebookRecord) {
@@ -558,6 +576,26 @@ struct ShelfView: View {
                 Button("Import PDF") { importingPDF = true }.buttonStyle(.bordered)
             } illustration: {
                 ShelfIllustration()
+            }
+        }
+    }
+
+    private func startScan() {
+        #if DEBUG
+        if LaunchOptions.arguments.contains("-fakeScan") { return importScan(DocumentScan.samples()) }
+        #endif
+        scanning = true
+    }
+
+    private func importScan(_ images: [UIImage]) {
+        guard !images.isEmpty else { return }
+        Task {
+            do {
+                try await store.importScan(images, folder: folder)
+                AccessibilityNotification.Announcement(images.count == 1 ? String(localized: "1 page scanned into a new notebook")
+                                                                         : String(localized: "\(images.count) pages scanned into a new notebook")).post()
+            } catch {
+                errorMessage = error.localizedDescription
             }
         }
     }

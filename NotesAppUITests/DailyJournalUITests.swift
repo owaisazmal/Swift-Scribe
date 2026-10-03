@@ -34,6 +34,31 @@ final class DailyJournalUITests: XCTestCase {
         XCTAssertEqual(ribbon.label, "Page 1 of 1", "the same page, not another")
     }
 
+    func testTodaysEventsArePrintedOnTheDaysPage() {
+        let app = launch(["-resetStorage", "-seedLibrary", "2", "-fakeCalendar", "-journalAgenda", "YES"])
+        let start = app.buttons["Start a daily journal"]
+        XCTAssertTrue(start.waitForExistence(timeout: 30))
+        start.tap()
+        XCTAssertTrue(app.buttons["editor.ribbon"].waitForExistence(timeout: 20))
+        let printed = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Lecture: Cell Biology'")).firstMatch
+        XCTAssertTrue(printed.waitForExistence(timeout: 10), "the new day's page starts with the day's events")
+        XCTAssertTrue(printed.label.hasPrefix("All day  Library books due"), printed.label)
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = "journal-agenda"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+
+        app.buttons["editor.back"].tap()
+        let notebook = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'notebook.' AND NOT identifier CONTAINS 'Journal'")).firstMatch
+        XCTAssertTrue(notebook.waitForExistence(timeout: 20))
+        notebook.tap()
+        XCTAssertTrue(app.buttons["editor.ribbon"].waitForExistence(timeout: 20))
+        app.buttons["Add"].firstMatch.tap()
+        app.buttons["Today's Events"].firstMatch.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["editor.arrange.bar"].waitForExistence(timeout: 10), "on any other page they are added by hand, and selected")
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Lab group'")).firstMatch.waitForExistence(timeout: 5))
+    }
+
     func testReopensWhereYouLeftOff() {
         var app = launch(["-resetStorage", "-seedLibrary", "2"])
         let notebook = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "notebook.")).firstMatch

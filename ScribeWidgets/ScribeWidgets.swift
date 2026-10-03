@@ -1,5 +1,6 @@
 import WidgetKit
 import SwiftUI
+import AppIntents
 
 @main
 struct ScribeWidgetBundle: WidgetBundle {
@@ -7,6 +8,36 @@ struct ScribeWidgetBundle: WidgetBundle {
         ContinueWritingWidget()
         WritingWeekWidget()
         TodayPageWidget()
+        QuickNoteWidget()
+        QuickNoteControl()
+        TodayPageControl()
+    }
+}
+
+// MARK: Controls
+
+/// A button for Control Center, the Lock Screen or the Action button: a new note, ready to write.
+struct QuickNoteControl: ControlWidget {
+    var body: some ControlWidgetConfiguration {
+        StaticControlConfiguration(kind: "com.owais.NotesApp.control.quicknote") {
+            ControlWidgetButton(action: QuickNoteControlIntent()) {
+                Label("Quick Note", systemImage: "square.and.pencil")
+            }
+        }
+        .displayName("Quick Note")
+        .description("Starts a new note in Swift Scribe, ready to write.")
+    }
+}
+
+struct TodayPageControl: ControlWidget {
+    var body: some ControlWidgetConfiguration {
+        StaticControlConfiguration(kind: "com.owais.NotesApp.control.today") {
+            ControlWidgetButton(action: TodayPageControlIntent()) {
+                Label("Today's Page", systemImage: "calendar")
+            }
+        }
+        .displayName("Today's Page")
+        .description("Opens today's page in your daily journal.")
     }
 }
 
@@ -83,7 +114,48 @@ struct TodayPageWidget: Widget {
     }
 }
 
+struct QuickNoteWidget: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: "QuickNote", provider: ScribeProvider()) { _ in
+            QuickNoteView()
+                .containerBackground(Color.widgetPaper, for: .widget)
+        }
+        .configurationDisplayName("Quick Note")
+        .description("Starts a new note in Swift Scribe, ready to write.")
+        .supportedFamilies([.systemSmall, .accessoryCircular, .accessoryInline])
+    }
+}
+
 // MARK: Views
+
+struct QuickNoteView: View {
+    @Environment(\.widgetFamily) private var family
+
+    var body: some View {
+        Group {
+            switch family {
+            case .accessoryCircular:
+                ZStack {
+                    AccessoryWidgetBackground()
+                    Image(systemName: "square.and.pencil").font(.title2).widgetAccentable()
+                }
+            case .accessoryInline:
+                Label("Quick Note", systemImage: "square.and.pencil")
+            default:
+                VStack(alignment: .leading, spacing: 6) {
+                    Image(systemName: "square.and.pencil").font(.title).foregroundStyle(Color.widgetAccent).widgetAccentable()
+                    Spacer(minLength: 0)
+                    Text("Quick Note").font(.system(.headline, design: .serif)).foregroundStyle(Color.widgetInk)
+                    Text("A new note, ready to write.").font(.caption).foregroundStyle(Color.widgetSecondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            }
+        }
+        .widgetURL(URL(string: "swiftscribe://quicknote"))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Quick Note"))
+    }
+}
 
 struct ContinueWritingView: View {
     @Environment(\.widgetFamily) private var family

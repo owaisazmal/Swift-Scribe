@@ -45,17 +45,18 @@ actor HandwritingIndexer {
     }
 
     private func isCurrent(_ page: NotebookPage, in package: NotebookPackage) async -> Bool {
-        guard let text = await package.readText(page.id) else { return page.inkHash == nil && !page.hasPDFText && page.typedText.isEmpty }
+        guard let text = await package.readText(page.id) else { return page.inkHash == nil && !page.hasPDFText && !page.hasPicture && page.typedText.isEmpty }
         return text.hasPrefix(Self.header(for: page))
     }
 
     /// Typed text joins the stamp only on pages that have some, so pages read before text boxes existed stay current.
+    /// A scan or photo page is marked too, so one stamped before its picture was read is read again.
     nonisolated static func header(for page: NotebookPage) -> String {
-        let typed = page.typedText
-        guard !typed.isEmpty else { return "#ink:\(page.inkHash ?? "none")\n" }
+        let typed = page.typedText, picture = page.hasPicture ? "+img" : ""
+        guard !typed.isEmpty else { return "#ink:\(page.inkHash ?? "none")\(picture)\n" }
         var hash: UInt64 = 0xcbf2_9ce4_8422_2325
         for byte in typed.utf8 { hash = (hash ^ UInt64(byte)) &* 0x0100_0000_01b3 }
-        return "#ink:\(page.inkHash ?? "none")+\(String(hash, radix: 16))\n"
+        return "#ink:\(page.inkHash ?? "none")+\(String(hash, radix: 16))\(picture)\n"
     }
 
     /// Rendering and Vision run off the actor, so an edit's `cancel(page:)` gets through while they work.
@@ -65,6 +66,10 @@ actor HandwritingIndexer {
         var chunks: [String] = []
         if case .pdf(let file, let index) = page.background, let text = PDFDocument(url: package.assetURL(file))?.page(at: index)?.string {
             chunks.append(text)
+        }
+        if case .image(let file) = page.background, let picture = UIImage(contentsOfFile: package.assetURL(file).path(percentEncoded: false)) {
+            guard !Task.isCancelled, let lines = Self.recognizeText(in: picture) else { return }
+            chunks += lines
         }
         let typed = page.typedText
         if !typed.isEmpty { chunks.append(typed) }
@@ -93,6 +98,12 @@ actor HandwritingIndexer {
 extension NotebookPage {
     var hasPDFText: Bool {
         if case .pdf = background { return true }
+        return false
+    }
+
+    /// A scanned sheet or a photo fills the page: its printed words are read for search.
+    var hasPicture: Bool {
+        if case .image = background { return true }
         return false
     }
 }

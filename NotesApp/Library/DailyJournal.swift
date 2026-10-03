@@ -46,7 +46,8 @@ enum DailyJournal {
     }
 
     /// Idempotent. An empty last page from an earlier day is re-dated rather than adding another.
-    static func dateToday(_ key: String, newPageID: UUID, in manifest: inout NotebookManifest) {
+    /// The page that becomes today's is printed with `agenda`, the day's events, if there are any.
+    static func dateToday(_ key: String, newPageID: UUID, agenda: [AgendaEvent] = [], in manifest: inout NotebookManifest) {
         guard !manifest.pages.contains(where: { $0.day == key }) else { return }
         if let last = manifest.pages.last, last.template != nil, last.inkHash == nil,
            last.day.map({ $0 < key }) ?? (manifest.pages.count == 1) {
@@ -54,15 +55,25 @@ enum DailyJournal {
         } else {
             manifest.pages.append(makeTodayPage(after: manifest.pages, defaults: manifest.defaults, key: key, id: newPageID))
         }
+        print(agenda, on: &manifest.pages[manifest.pages.count - 1])
         manifest.modifiedAt = .now
     }
 
+    /// Events printed for an earlier day are taken off a page that is re-dated. A page holding anything else is left as it is.
+    static func print(_ agenda: [AgendaEvent], on page: inout NotebookPage) {
+        let items = page.hasItems ? page.items : []
+        guard items.allSatisfy(\.isPrintedAgenda) else { return }
+        let printed = Agenda.item(for: agenda, on: page).map { [$0] } ?? []
+        if !items.isEmpty || !printed.isEmpty { page.items = printed }
+    }
+
     @MainActor
-    static func ensureTodayPage(in document: NotebookDocument, now: Date = .now, calendar: Calendar = .current) -> UUID? {
+    static func ensureTodayPage(in document: NotebookDocument, now: Date = .now, calendar: Calendar = .current, agenda: [AgendaEvent] = []) -> UUID? {
         let key = dayKey(for: now, calendar: calendar)
         if let page = document.pages.last(where: { $0.day == key }) { return page.id }
         guard !document.isReadOnly else { return nil }
-        let page = makeTodayPage(after: document.pages, defaults: document.manifest.defaults, key: key)
+        var page = makeTodayPage(after: document.pages, defaults: document.manifest.defaults, key: key)
+        print(agenda, on: &page)
         document.insertPages([page], at: document.pages.count, actionName: String(localized: "Add Today's Page"))
         return page.id
     }

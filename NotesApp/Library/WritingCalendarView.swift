@@ -220,7 +220,7 @@ struct WritingCalendarView: View {
                             LazyVGrid(columns: [GridItem(.adaptive(minimum: dynamicTypeSize.isAccessibilitySize ? 132 : 80), spacing: Space.x4, alignment: .top)],
                                       alignment: .leading, spacing: Space.x4) {
                                 ForEach(notebook.pages) { entry in
-                                    CalendarPageCard(notebookID: notebook.id, title: notebook.title, entry: entry) {
+                                    CalendarPageCard(notebookID: notebook.id, title: notebook.title, entry: entry, isLocked: notebook.isLocked) {
                                         onChoose(CalendarChoice(notebookID: notebook.id, pageID: entry.page.id))
                                     }
                                 }
@@ -338,7 +338,9 @@ struct WritingCalendarView: View {
             guard let manifest = try? await NotebookPackage(root: root, id: id).readManifest().manifest,
                   manifest.library.deletedAt == nil else { continue }
             let entries = manifest.pages.enumerated().filter { pageIDs.contains($0.element.id) }.map { DayDetail.Entry(index: $0.offset, page: $0.element) }
-            if !entries.isEmpty { notebooks.append(DayDetail.Notebook(id: id, title: manifest.title, cloth: manifest.cover.cloth, pages: entries)) }
+            if !entries.isEmpty {
+                notebooks.append(DayDetail.Notebook(id: id, title: manifest.title, cloth: manifest.cover.cloth, pages: entries, isLocked: manifest.library.isLocked))
+            }
         }
         return notebooks.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
@@ -356,6 +358,7 @@ private struct DayDetail: Equatable {
         let title: String
         let cloth: ClothColor
         let pages: [Entry]
+        var isLocked = false
     }
 
     let key: String
@@ -368,6 +371,8 @@ private struct CalendarPageCard: View {
     let notebookID: UUID
     let title: String
     let entry: DayDetail.Entry
+    /// A locked notebook's pages are listed, but what is on them isn't shown.
+    var isLocked = false
     let action: () -> Void
     @Environment(LibraryStore.self) private var store
     @State private var image: UIImage?
@@ -384,6 +389,7 @@ private struct CalendarPageCard: View {
                 }
                 .aspectRatio(entry.page.size.width / max(entry.page.size.height, 1), contentMode: .fit)
                 .overlay { Rectangle().strokeBorder(Color.hairline, lineWidth: 1) }
+                .overlay { if isLocked { LockBadge(diameter: 28) } }
                 .shadow(color: .black.opacity(0.08), radius: 2, y: 1)
                 .contentShape(Rectangle())
             }
@@ -398,7 +404,8 @@ private struct CalendarPageCard: View {
                 .accessibilityHidden(true)
                 .onTapGesture(perform: action)
         }
-        .task(id: entry.page.thumbnailKey) {
+        .task(id: "\(entry.page.thumbnailKey)|\(isLocked)") {
+            guard !isLocked else { return image = nil }
             let loaded = await PageThumbnailer.thumbnail(package: NotebookPackage(root: store.root, id: notebookID), page: entry.page)
             withAnimation(Motion.quick) { image = loaded }
         }

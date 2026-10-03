@@ -25,9 +25,10 @@ extension XCTestCase {
                 print("AUDIT [\(screen)] ignored, text on the page: \(label)")
                 return true
             }
-            // Form rows and footers are flagged whatever they hold; all of it scales fully at AX5.
-            if issue.auditType == .dynamicType || (scrolled && issue.auditType == .textClipped), let label = element?.label,
-               formText.contains(where: label.hasPrefix) {
+            // Form rows and footers are flagged whatever they hold; all of it scales fully at AX5. Scrolled, the audit pulls
+            // a row out from under the bar and samples its colours mid-scroll; they were checked in the pass before.
+            if issue.auditType == .dynamicType || (scrolled && (issue.auditType == .textClipped || issue.auditType == .contrast)),
+               let label = element?.label, formText.contains(where: label.hasPrefix) {
                 print("AUDIT [\(screen)] ignored in a Form: \(label)")
                 return true
             }
@@ -54,6 +55,11 @@ extension XCTestCase {
             // The pairs it uses (Ink on Surface, Paper on the accent) are checked by DesignTokenTests.
             if let barFrame, issue.auditType == .contrast, let element, barFrame.contains(element.frame) {
                 print("AUDIT [\(screen)] ignored on a floating bar: \(element.label)")
+                return true
+            }
+            // A one-line text field on a floating bar scrolls what doesn't fit, and grows with the text size.
+            if let barFrame, issue.auditType == .textClipped, let element, element.elementType == .textField, barFrame.contains(element.frame) {
+                print("AUDIT [\(screen)] ignored, a text field on a floating bar: \(element.identifier)")
                 return true
             }
             // Now and then the audit reports a text-size issue with no element at all, on a different screen each time.

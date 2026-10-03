@@ -1,6 +1,81 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "" : {
+
+    },
+    "“%@” couldn't be deleted: %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„%1$@“ konnte nicht gelöscht werden: %2$@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "“%1$@” couldn't be deleted: %2$@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo eliminar “%1$@”: %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« %1$@ » n’a pas pu être supprimé : %2$@"
+          }
+        }
+      }
+    },
+    "“%@” is locked" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„%@“ ist gesperrt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” está bloqueado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« %@ » est verrouillé"
+          }
+        }
+      }
+    },
+    "“System Setting” follows Settings › Apple Pencil › Only Draw with Apple Pencil. With Straighten Shapes on, draw a line, circle, rectangle or triangle and hold still for a moment before lifting; Undo brings your own stroke back." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„Systemeinstellung“ folgt Einstellungen › Apple Pencil › Nur mit Apple Pencil zeichnen. Ist „Formen begradigen“ aktiviert, zeichne eine Linie, einen Kreis, ein Rechteck oder ein Dreieck und halte kurz still, bevor du den Stift anhebst. „Widerrufen“ bringt deinen eigenen Strich zurück."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“Ajuste del sistema” sigue Ajustes › Apple Pencil › Dibujar solo con el Apple Pencil. Con Enderezar figuras activado, dibuja una línea, un círculo, un rectángulo o un triángulo y mantén el lápiz quieto un momento antes de levantarlo; Deshacer recupera tu trazo original."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« Réglage système » suit Réglages › Apple Pencil › Dessiner seulement avec l’Apple Pencil. Lorsque « Redresser les formes » est activé, tracez une ligne, un cercle, un rectangle ou un triangle et restez immobile un instant avant de lever le crayon ; Annuler rétablit votre propre trait."
+          }
+        }
+      }
+    },
     "%@" : {
       "localizations" : {
         "de" : {
@@ -19,6 +94,84 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@"
+          }
+        }
+      }
+    },
+    "%@ · a fresh page" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · eine neue Seite"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · una página nueva"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · une page vierge"
+          }
+        }
+      }
+    },
+    "%@ · page %lld" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ · Seite %2$lld"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · page %2$lld"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ · página %2$lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ · page %2$lld"
+          }
+        }
+      }
+    },
+    "%@ · page %lld · written" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ · Seite %2$lld · geschrieben"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · page %2$lld · written"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ · página %2$lld · escrita"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ · page %2$lld · écrite"
           }
         }
       }
@@ -63,28 +216,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ (de la sauvegarde)"
-          }
-        }
-      }
-    },
-    "%@ Copy" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ Kopie"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Copia de %@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ copie"
           }
         }
       }
@@ -179,6 +310,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Icône toile %@"
+          }
+        }
+      }
+    },
+    "%@ Copy" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ Kopie"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copia de %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ copie"
           }
         }
       }
@@ -313,84 +466,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$@, vous avez commencé %2$@"
-          }
-        }
-      }
-    },
-    "%@ · a fresh page" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ · eine neue Seite"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ · una página nueva"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ · une page vierge"
-          }
-        }
-      }
-    },
-    "%@ · page %lld" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ · Seite %2$lld"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@ · page %2$lld"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ · página %2$lld"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ · page %2$lld"
-          }
-        }
-      }
-    },
-    "%@ · page %lld · written" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ · Seite %2$lld · geschrieben"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@ · page %2$lld · written"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ · página %2$lld · escrita"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ · page %2$lld · écrite"
           }
         }
       }
@@ -629,34 +704,6 @@
         }
       }
     },
-    "%@. Last synced %@." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@. Zuletzt synchronisiert um %2$@."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@. Last synced %2$@."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@. Última sincronización: %2$@."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@. Dernière synchronisation : %2$@."
-          }
-        }
-      }
-    },
     "%@: %@ on %@" : {
       "localizations" : {
         "de" : {
@@ -709,6 +756,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$@ : %2$@, page %3$lld"
+          }
+        }
+      }
+    },
+    "%@. Last synced %@." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@. Zuletzt synchronisiert um %2$@."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@. Last synced %2$@."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@. Última sincronización: %2$@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@. Dernière synchronisation : %2$@."
           }
         }
       }
@@ -779,6 +854,28 @@
         }
       }
     },
+    "%lld events added to the page" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld Termine zur Seite hinzugefügt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld eventos añadidos a la página"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld événements ajoutés à la page"
+          }
+        }
+      }
+    },
     "%lld folders were added." : {
       "localizations" : {
         "de" : {
@@ -797,6 +894,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld dossiers ont été ajoutés."
+          }
+        }
+      }
+    },
+    "%lld matches" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld Treffer"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld coincidencias"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld résultats"
           }
         }
       }
@@ -973,6 +1092,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld carnets étaient déjà présents."
+          }
+        }
+      }
+    },
+    "%lld of %lld" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld von %2$lld"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld of %2$lld"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld de %2$lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld sur %2$lld"
           }
         }
       }
@@ -1155,6 +1302,28 @@
         }
       }
     },
+    "%lld pages scanned into a new notebook" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld Seiten in ein neues Notizbuch gescannt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld páginas escaneadas en un cuaderno nuevo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld pages numérisées dans un nouveau carnet"
+          }
+        }
+      }
+    },
     "%lld selected" : {
       "localizations" : {
         "de" : {
@@ -1309,6 +1478,28 @@
         }
       }
     },
+    "+ %lld more" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "+ %lld weitere"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "+ %lld más"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "+ %lld de plus"
+          }
+        }
+      }
+    },
     "1 conflicted copy kept" : {
       "localizations" : {
         "de" : {
@@ -1375,6 +1566,28 @@
         }
       }
     },
+    "1 event added to the page" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 Termin zur Seite hinzugefügt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 evento añadido a la página"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 événement ajouté à la page"
+          }
+        }
+      }
+    },
     "1 folder was added." : {
       "localizations" : {
         "de" : {
@@ -1393,6 +1606,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "1 dossier a été ajouté."
+          }
+        }
+      }
+    },
+    "1 match" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 Treffer"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 coincidencia"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 résultat"
           }
         }
       }
@@ -1613,6 +1848,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "1 page sur 1 jour"
+          }
+        }
+      }
+    },
+    "1 page scanned into a new notebook" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 Seite in ein neues Notizbuch gescannt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 página escaneada en un cuaderno nuevo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 page numérisée dans un nouveau carnet"
           }
         }
       }
@@ -2035,6 +2292,28 @@
         }
       }
     },
+    "Add a Link" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Link hinzufügen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añadir un enlace"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter un lien"
+          }
+        }
+      }
+    },
     "Add Link" : {
       "localizations" : {
         "de" : {
@@ -2123,50 +2402,6 @@
         }
       }
     },
-    "Add Today's Page" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Heutige Seite hinzufügen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Añadir la página de hoy"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ajouter la page du jour"
-          }
-        }
-      }
-    },
-    "Add a Link" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Link hinzufügen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Añadir un enlace"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ajouter un lien"
-          }
-        }
-      }
-    },
     "Add to Page" : {
       "localizations" : {
         "de" : {
@@ -2189,24 +2424,46 @@
         }
       }
     },
-    "Added %lld notebooks to Favourites" : {
+    "Add Today's Events" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld Notizbücher zu Favoriten hinzugefügt"
+            "value" : "Heutige Termine hinzufügen"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld cuadernos añadidos a Favoritos"
+            "value" : "Añadir los eventos de hoy"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld carnets ajoutés aux favoris"
+            "value" : "Ajouter les événements du jour"
+          }
+        }
+      }
+    },
+    "Add Today's Page" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Heutige Seite hinzufügen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añadir la página de hoy"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter la page du jour"
           }
         }
       }
@@ -2229,6 +2486,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "« %@ » ajouté aux favoris"
+          }
+        }
+      }
+    },
+    "Added %lld notebooks to Favourites" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld Notizbücher zu Favoriten hinzugefügt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld cuadernos añadidos a Favoritos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld carnets ajoutés aux favoris"
           }
         }
       }
@@ -2317,6 +2596,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Alignement"
+          }
+        }
+      }
+    },
+    "All day" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ganztägig"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Todo el día"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toute la journée"
           }
         }
       }
@@ -2453,28 +2754,6 @@
         }
       }
     },
-    "Back Up Library…" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Backup erstellen …"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hacer copia de seguridad de la biblioteca…"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sauvegarder la bibliothèque…"
-          }
-        }
-      }
-    },
     "Back to %@" : {
       "localizations" : {
         "de" : {
@@ -2559,6 +2838,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Retour à l’écriture"
+          }
+        }
+      }
+    },
+    "Back Up Library…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Backup erstellen …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hacer copia de seguridad de la biblioteca…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sauvegarder la bibliothèque…"
           }
         }
       }
@@ -2849,6 +3150,50 @@
         }
       }
     },
+    "Bring the Zoom Area to This Page" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zoombereich auf diese Seite holen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Traer el área de zoom a esta página"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Amener la zone de zoom sur cette page"
+          }
+        }
+      }
+    },
+    "Calendar" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kalender"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calendario"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calendrier"
+          }
+        }
+      }
+    },
     "Cancel" : {
       "localizations" : {
         "de" : {
@@ -2867,6 +3212,35 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Annuler"
+          }
+        }
+      }
+    },
+    "canvas.empty" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Leer"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Empty"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vacía"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vide"
           }
         }
       }
@@ -3113,6 +3487,28 @@
         }
       }
     },
+    "Choose a day to see what you wrote." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wähle einen Tag, um zu sehen, was du geschrieben hast."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elige un día para ver lo que escribiste."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisissez un jour pour voir ce que vous avez écrit."
+          }
+        }
+      }
+    },
     "Choose Paper…" : {
       "localizations" : {
         "de" : {
@@ -3135,24 +3531,24 @@
         }
       }
     },
-    "Choose a day to see what you wrote." : {
+    "circle" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Wähle einen Tag, um zu sehen, was du geschrieben hast."
+            "value" : "Kreis"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Elige un día para ver lo que escribiste."
+            "value" : "círculo"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Choisissez un jour pour voir ce que vous avez écrit."
+            "value" : "cercle"
           }
         }
       }
@@ -3289,6 +3685,28 @@
         }
       }
     },
+    "Close Zoom Window" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zoomfenster schließen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cerrar la ventana de zoom"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fermer la fenêtre de zoom"
+          }
+        }
+      }
+    },
     "Cloth" : {
       "localizations" : {
         "de" : {
@@ -3399,7 +3817,7 @@
         }
       }
     },
-    "Continue Writing" : {
+    "Continue writing" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -3421,7 +3839,7 @@
         }
       }
     },
-    "Continue writing" : {
+    "Continue Writing" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -3599,6 +4017,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Impossible d’enregistrer vos dernières modifications. Swift Scribe va réessayer ; rien n’a été perdu."
+          }
+        }
+      }
+    },
+    "Couldn't Translate" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Übersetzen nicht möglich"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo traducir"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Traduction impossible"
           }
         }
       }
@@ -3807,28 +4247,6 @@
         }
       }
     },
-    "Cutting Out…" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wird ausgeschnitten …"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Recortando…"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Découpage…"
-          }
-        }
-      }
-    },
     "Cutting out the sticker" : {
       "localizations" : {
         "de" : {
@@ -3847,6 +4265,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Découpage de l’autocollant"
+          }
+        }
+      }
+    },
+    "Cutting Out…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wird ausgeschnitten …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recortando…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Découpage…"
           }
         }
       }
@@ -4005,6 +4445,28 @@
         }
       }
     },
+    "Delete “%@” permanently?" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„%@“ endgültig löschen?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Eliminar “%@” definitivamente?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer définitivement « %@ » ?"
+          }
+        }
+      }
+    },
     "Delete %lld notebooks permanently?" : {
       "localizations" : {
         "de" : {
@@ -4045,6 +4507,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tout supprimer"
+          }
+        }
+      }
+    },
+    "Delete all notebooks in Recently Deleted?" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle Notizbücher in „Zuletzt gelöscht“ löschen?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Eliminar todos los cuadernos de Eliminados recientemente?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer tous les carnets de « Supprimés récemment » ?"
           }
         }
       }
@@ -4115,6 +4599,28 @@
         }
       }
     },
+    "Delete page %lld?" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seite %lld löschen?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Eliminar la página %lld?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer la page %lld ?"
+          }
+        }
+      }
+    },
     "Delete Permanently" : {
       "localizations" : {
         "de" : {
@@ -4159,50 +4665,6 @@
         }
       }
     },
-    "Delete all notebooks in Recently Deleted?" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Alle Notizbücher in „Zuletzt gelöscht“ löschen?"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "¿Eliminar todos los cuadernos de Eliminados recientemente?"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Supprimer tous les carnets de « Supprimés récemment » ?"
-          }
-        }
-      }
-    },
-    "Delete page %lld?" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Seite %lld löschen?"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "¿Eliminar la página %lld?"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Supprimer la page %lld ?"
-          }
-        }
-      }
-    },
     "Delete this page?" : {
       "localizations" : {
         "de" : {
@@ -4221,28 +4683,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Supprimer cette page ?"
-          }
-        }
-      }
-    },
-    "Delete “%@” permanently?" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "„%@“ endgültig löschen?"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "¿Eliminar “%@” definitivamente?"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Supprimer définitivement « %@ » ?"
           }
         }
       }
@@ -4511,24 +4951,24 @@
         }
       }
     },
-    "Draw With" : {
+    "Drag to choose the part of the page the zoom window shows. Swipe up or down to move it along the line." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Zeichnen mit"
+            "value" : "Ziehe, um den Teil der Seite zu wählen, den das Zoomfenster zeigt. Streiche nach oben oder unten, um es entlang der Zeile zu bewegen."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dibujar con"
+            "value" : "Arrastra para elegir la parte de la página que muestra la ventana de zoom. Desliza hacia arriba o hacia abajo para moverla a lo largo de la línea."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dessiner avec"
+            "value" : "Faites glisser pour choisir la partie de la page que montre la fenêtre de zoom. Balayez vers le haut ou vers le bas pour la déplacer le long de la ligne."
           }
         }
       }
@@ -4551,6 +4991,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Entourez de l’encre sur n’importe quelle page"
+          }
+        }
+      }
+    },
+    "Draw With" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zeichnen mit"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dibujar con"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dessiner avec"
           }
         }
       }
@@ -4709,6 +5171,50 @@
         }
       }
     },
+    "edited %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "bearbeitet %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "editado %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "modifié %@"
+          }
+        }
+      }
+    },
+    "ellipse" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ellipse"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "elipse"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ellipse"
+          }
+        }
+      }
+    },
     "Empty" : {
       "localizations" : {
         "de" : {
@@ -4819,6 +5325,28 @@
         }
       }
     },
+    "example.com" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "example.com"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "example.com"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "example.com"
+          }
+        }
+      }
+    },
     "Exclamation Mark" : {
       "localizations" : {
         "de" : {
@@ -4885,68 +5413,24 @@
         }
       }
     },
-    "Export Images" : {
+    "Export “%@”" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bilder exportieren"
+            "value" : "„%@“ exportieren"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Exportar imágenes"
+            "value" : "Exportar “%@”"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Exporter les images"
-          }
-        }
-      }
-    },
-    "Export PDF" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "PDF exportieren"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Exportar PDF"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Exporter le PDF"
-          }
-        }
-      }
-    },
-    "Export Video" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Video exportieren"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Exportar vídeo"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Exporter la vidéo"
+            "value" : "Exporter « %@ »"
           }
         }
       }
@@ -5017,6 +5501,101 @@
         }
       }
     },
+    "Export Images" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bilder exportieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exportar imágenes"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exporter les images"
+          }
+        }
+      }
+    },
+    "Export PDF" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PDF exportieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exportar PDF"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exporter le PDF"
+          }
+        }
+      }
+    },
+    "Export Video" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Video exportieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exportar vídeo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exporter la vidéo"
+          }
+        }
+      }
+    },
+    "export.print" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drucken"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Print"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Imprimir"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Imprimer"
+          }
+        }
+      }
+    },
     "Exporting…" : {
       "localizations" : {
         "de" : {
@@ -5035,6 +5614,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Exportation…"
+          }
+        }
+      }
+    },
+    "favourite" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Favorit"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "favorito"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "favori"
           }
         }
       }
@@ -5083,7 +5684,95 @@
         }
       }
     },
-    "First Page" : {
+    "Find in Notebook" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Im Notizbuch suchen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buscar en el cuaderno"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rechercher dans le carnet"
+          }
+        }
+      }
+    },
+    "Find in notebook. Type what to look for." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Im Notizbuch suchen. Gib ein, wonach du suchst."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buscar en el cuaderno. Escribe lo que quieres buscar."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recherche dans le carnet. Saisissez ce que vous cherchez."
+          }
+        }
+      }
+    },
+    "Find in Notebook…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Im Notizbuch suchen …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buscar en el cuaderno…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rechercher dans le carnet…"
+          }
+        }
+      }
+    },
+    "Find Notebooks in Spotlight" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notizbücher in Spotlight finden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buscar cuadernos en Spotlight"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trouver les carnets dans Spotlight"
+          }
+        }
+      }
+    },
+    "First page" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -5105,7 +5794,7 @@
         }
       }
     },
-    "First page" : {
+    "First Page" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -5369,7 +6058,7 @@
         }
       }
     },
-    "Go to Page" : {
+    "Go to page" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -5391,7 +6080,7 @@
         }
       }
     },
-    "Go to page" : {
+    "Go to Page" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -5523,7 +6212,7 @@
         }
       }
     },
-    "Handwriting as Text" : {
+    "Handwriting as text" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -5545,7 +6234,7 @@
         }
       }
     },
-    "Handwriting as text" : {
+    "Handwriting as Text" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -5585,6 +6274,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Écriture manuscrite remplacée par du texte"
+          }
+        }
+      }
+    },
+    "has files that couldn't be read" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "enthält Dateien, die nicht gelesen werden konnten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "tiene archivos que no se pudieron leer"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "contient des fichiers illisibles"
           }
         }
       }
@@ -5655,28 +6366,6 @@
         }
       }
     },
-    "Hide Tools" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Werkzeuge ausblenden"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ocultar herramientas"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Masquer les outils"
-          }
-        }
-      }
-    },
     "Hide for Today" : {
       "localizations" : {
         "de" : {
@@ -5699,6 +6388,28 @@
         }
       }
     },
+    "Hide Tools" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Werkzeuge ausblenden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ocultar herramientas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Masquer les outils"
+          }
+        }
+      }
+    },
     "Highlighter Line" : {
       "localizations" : {
         "de" : {
@@ -5717,6 +6428,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Trait de surligneur"
+          }
+        }
+      }
+    },
+    "iCloud" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud"
+          }
+        }
+      }
+    },
+    "iCloud isn't available. Sign in to iCloud and turn on iCloud Drive in Settings; this copy of Swift Scribe also has to be built with the iCloud capability." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud ist nicht verfügbar. Melde dich bei iCloud an und aktiviere iCloud Drive in den Einstellungen. Außerdem muss diese Kopie von Swift Scribe mit der iCloud-Funktion erstellt sein."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud no está disponible. Inicia sesión en iCloud y activa iCloud Drive en Ajustes; además, esta copia de Swift Scribe debe estar compilada con la capacidad de iCloud."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud n’est pas disponible. Connectez-vous à iCloud et activez iCloud Drive dans Réglages ; cette copie de Swift Scribe doit aussi être compilée avec la fonctionnalité iCloud."
           }
         }
       }
@@ -5809,6 +6564,28 @@
         }
       }
     },
+    "in %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "in %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "en %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "dans %@"
+          }
+        }
+      }
+    },
     "Index Card" : {
       "localizations" : {
         "de" : {
@@ -5897,6 +6674,28 @@
         }
       }
     },
+    "Insert Page After" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seite danach einfügen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Insertar página después"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Insérer une page après"
+          }
+        }
+      }
+    },
     "Insert PDF" : {
       "localizations" : {
         "de" : {
@@ -5937,28 +6736,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Insérer un PDF…"
-          }
-        }
-      }
-    },
-    "Insert Page After" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Seite danach einfügen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Insertar página después"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Insérer une page après"
           }
         }
       }
@@ -6315,6 +7092,28 @@
         }
       }
     },
+    "last opened first" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "zuletzt geöffnete zuerst"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "últimos abiertos primero"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "derniers ouverts en premier"
+          }
+        }
+      }
+    },
     "Last Page" : {
       "localizations" : {
         "de" : {
@@ -6601,6 +7400,28 @@
         }
       }
     },
+    "line" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Linie"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "línea"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ligne"
+          }
+        }
+      }
+    },
     "Link added to the page" : {
       "localizations" : {
         "de" : {
@@ -6733,6 +7554,28 @@
         }
       }
     },
+    "Link…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Link …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enlace…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lien…"
+          }
+        }
+      }
+    },
     "Links to this page" : {
       "localizations" : {
         "de" : {
@@ -6755,24 +7598,112 @@
         }
       }
     },
-    "Link…" : {
+    "Lock “%@”" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Link …"
+            "value" : "„%@“ sperren"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Enlace…"
+            "value" : "Bloquear “%@”"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lien…"
+            "value" : "Verrouiller « %@ »"
+          }
+        }
+      }
+    },
+    "Lock removed from “%@”" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sperre von „%@“ entfernt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bloqueo quitado de “%@”"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verrouillage retiré de « %@ »"
+          }
+        }
+      }
+    },
+    "Lock…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sperren …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bloquear…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verrouiller…"
+          }
+        }
+      }
+    },
+    "locked" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "gesperrt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "bloqueado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "verrouillé"
+          }
+        }
+      }
+    },
+    "longest run %lld days" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "längste Serie %lld Tage"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "racha más larga: %lld días"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "plus longue série : %lld jours"
           }
         }
       }
@@ -6817,6 +7748,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Marques"
+          }
+        }
+      }
+    },
+    "Match %lld of %lld, page %lld" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Treffer %1$lld von %2$lld, Seite %3$lld"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Match %1$lld of %2$lld, page %3$lld"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coincidencia %1$lld de %2$lld, página %3$lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Résultat %1$lld sur %2$lld, page %3$lld"
           }
         }
       }
@@ -6975,6 +7934,72 @@
         }
       }
     },
+    "Move Along the Line" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entlang der Zeile weiter"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avanzar por la línea"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avancer le long de la ligne"
+          }
+        }
+      }
+    },
+    "Move Back Along the Line" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entlang der Zeile zurück"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retroceder por la línea"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reculer le long de la ligne"
+          }
+        }
+      }
+    },
+    "Move earlier" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nach vorne bewegen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mover antes"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déplacer avant"
+          }
+        }
+      }
+    },
     "Move Earlier" : {
       "localizations" : {
         "de" : {
@@ -7041,6 +8066,28 @@
         }
       }
     },
+    "Move later" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nach hinten bewegen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mover después"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déplacer après"
+          }
+        }
+      }
+    },
     "Move Later" : {
       "localizations" : {
         "de" : {
@@ -7085,50 +8132,6 @@
         }
       }
     },
-    "Move earlier" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nach vorne bewegen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mover antes"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Déplacer avant"
-          }
-        }
-      }
-    },
-    "Move later" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nach hinten bewegen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mover después"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Déplacer après"
-          }
-        }
-      }
-    },
     "Move to Shelf" : {
       "localizations" : {
         "de" : {
@@ -7147,6 +8150,56 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Déplacer vers une étagère"
+          }
+        }
+      }
+    },
+    "Moved “%@” to %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„%1$@“ in %2$@ bewegt"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Moved “%1$@” to %2$@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%1$@” movido a %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« %1$@ » déplacé vers %2$@"
+          }
+        }
+      }
+    },
+    "Moved “%@” to Recently Deleted" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„%@“ in „Zuletzt gelöscht“ bewegt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” movido a Eliminados recientemente"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« %@ » déplacé vers Supprimés récemment"
           }
         }
       }
@@ -7219,56 +8272,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Déplacement vers la page %lld"
-          }
-        }
-      }
-    },
-    "Moved “%@” to %@" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "„%1$@“ in %2$@ bewegt"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Moved “%1$@” to %2$@"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "“%1$@” movido a %2$@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "« %1$@ » déplacé vers %2$@"
-          }
-        }
-      }
-    },
-    "Moved “%@” to Recently Deleted" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "„%@“ in „Zuletzt gelöscht“ bewegt"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "“%@” movido a Eliminados recientemente"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "« %@ » déplacé vers Supprimés récemment"
           }
         }
       }
@@ -7361,28 +8364,6 @@
         }
       }
     },
-    "My Stickers" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Meine Sticker"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mis pegatinas"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mes autocollants"
-          }
-        }
-      }
-    },
     "My sticker %lld" : {
       "localizations" : {
         "de" : {
@@ -7401,6 +8382,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mon autocollant %lld"
+          }
+        }
+      }
+    },
+    "My Stickers" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Meine Sticker"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mis pegatinas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mes autocollants"
           }
         }
       }
@@ -7669,6 +8672,28 @@
         }
       }
     },
+    "newest first" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "neueste zuerst"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "más recientes primero"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "plus récents en premier"
+          }
+        }
+      }
+    },
     "Next" : {
       "localizations" : {
         "de" : {
@@ -7687,6 +8712,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Suivant"
+          }
+        }
+      }
+    },
+    "Next Line" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nächste Zeile"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Línea siguiente"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ligne suivante"
+          }
+        }
+      }
+    },
+    "Next Match" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nächster Treffer"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coincidencia siguiente"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Résultat suivant"
           }
         }
       }
@@ -7779,116 +8848,6 @@
         }
       }
     },
-    "No Other Notebooks" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Keine anderen Notizbücher"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No hay otros cuadernos"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aucun autre carnet"
-          }
-        }
-      }
-    },
-    "No Recordings" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Keine Aufnahmen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No hay grabaciones"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aucun enregistrement"
-          }
-        }
-      }
-    },
-    "No Subject Found" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kein Motiv gefunden"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No se encontró ningún sujeto"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aucun sujet trouvé"
-          }
-        }
-      }
-    },
-    "No Transcript Yet" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Noch kein Transkript"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aún no hay transcripción"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pas encore de transcription"
-          }
-        }
-      }
-    },
-    "No Words Found" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Keine Wörter gefunden"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No se encontraron palabras"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aucun mot trouvé"
-          }
-        }
-      }
-    },
     "No favourites yet" : {
       "localizations" : {
         "de" : {
@@ -7955,6 +8914,28 @@
         }
       }
     },
+    "No matches" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine Treffer"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sin coincidencias"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun résultat"
+          }
+        }
+      }
+    },
     "No notes for this page." : {
       "localizations" : {
         "de" : {
@@ -7977,6 +8958,50 @@
         }
       }
     },
+    "No Other Notebooks" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine anderen Notizbücher"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No hay otros cuadernos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun autre carnet"
+          }
+        }
+      }
+    },
+    "No Recordings" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine Aufnahmen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No hay grabaciones"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun enregistrement"
+          }
+        }
+      }
+    },
     "No speech was found in this recording." : {
       "localizations" : {
         "de" : {
@@ -7995,6 +9020,72 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucune parole n’a été trouvée dans cet enregistrement."
+          }
+        }
+      }
+    },
+    "No Subject Found" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kein Motiv gefunden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se encontró ningún sujeto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun sujet trouvé"
+          }
+        }
+      }
+    },
+    "No Transcript Yet" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noch kein Transkript"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aún no hay transcripción"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pas encore de transcription"
+          }
+        }
+      }
+    },
+    "No Words Found" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine Wörter gefunden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se encontraron palabras"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun mot trouvé"
           }
         }
       }
@@ -8087,6 +9178,28 @@
         }
       }
     },
+    "notebook" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notizbuch"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "cuaderno"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "carnet"
+          }
+        }
+      }
+    },
     "Notebook" : {
       "localizations" : {
         "de" : {
@@ -8127,6 +9240,72 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Carnet en PDF…"
+          }
+        }
+      }
+    },
+    "Notebook, %lld pages" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notizbuch, %lld Seiten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cuaderno, %lld páginas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carnet, %lld pages"
+          }
+        }
+      }
+    },
+    "Notebook, 1 page" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notizbuch, 1 Seite"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cuaderno, 1 página"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carnet, 1 page"
+          }
+        }
+      }
+    },
+    "Notebooks can be found from the Home Screen by their title or by the words in them. That index is kept by iPadOS on this iPad. Locked notebooks are never in it." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notizbücher lassen sich vom Home-Bildschirm aus über ihren Titel oder die darin enthaltenen Wörter finden. Dieser Index wird von iPadOS auf diesem iPad geführt. Gesperrte Notizbücher sind nie darin."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los cuadernos se pueden encontrar desde la pantalla de inicio por su título o por las palabras que contienen. Ese índice lo guarda iPadOS en este iPad. Los cuadernos bloqueados nunca están en él."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les carnets peuvent être trouvés depuis l’écran d’accueil par leur titre ou par les mots qu’ils contiennent. Cet index est conservé par iPadOS sur cet iPad. Les carnets verrouillés n’y figurent jamais."
           }
         }
       }
@@ -8197,7 +9376,7 @@
         }
       }
     },
-    "Notes for Page %lld" : {
+    "Notes for page %lld" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -8219,7 +9398,7 @@
         }
       }
     },
-    "Notes for page %lld" : {
+    "Notes for Page %lld" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -8329,28 +9508,6 @@
         }
       }
     },
-    "OK" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "OK"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "OK"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "OK"
-          }
-        }
-      }
-    },
     "Oat" : {
       "localizations" : {
         "de" : {
@@ -8369,6 +9526,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Avoine"
+          }
+        }
+      }
+    },
+    "of %lld" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "von %lld"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "de %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sur %lld"
+          }
+        }
+      }
+    },
+    "OK" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
           }
         }
       }
@@ -8945,28 +10146,6 @@
         }
       }
     },
-    "PDF page" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "PDF-Seite"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Página de PDF"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Page PDF"
-          }
-        }
-      }
-    },
     "Page" : {
       "localizations" : {
         "de" : {
@@ -9007,6 +10186,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Page %lld"
+          }
+        }
+      }
+    },
+    "Page %lld · %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seite %1$lld · %2$@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Page %1$lld · %2$@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Página %1$lld · %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Page %1$lld · %2$@"
           }
         }
       }
@@ -9123,34 +10330,6 @@
         }
       }
     },
-    "Page %lld · %@" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Seite %1$lld · %2$@"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Page %1$lld · %2$@"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Página %1$lld · %2$@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Page %1$lld · %2$@"
-          }
-        }
-      }
-    },
     "Page %lld, %@, handwriting" : {
       "localizations" : {
         "de" : {
@@ -9245,28 +10424,6 @@
         }
       }
     },
-    "Page Size" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Seitengröße"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tamaño de página"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Taille de page"
-          }
-        }
-      }
-    },
     "Page at End" : {
       "localizations" : {
         "de" : {
@@ -9329,6 +10486,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Page supprimée. %@"
+          }
+        }
+      }
+    },
+    "Page Size" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seitengröße"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tamaño de página"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Taille de page"
           }
         }
       }
@@ -9461,6 +10640,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Pause"
+          }
+        }
+      }
+    },
+    "PDF page" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PDF-Seite"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Página de PDF"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Page PDF"
           }
         }
       }
@@ -10021,6 +11222,28 @@
         }
       }
     },
+    "Previous Match" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vorheriger Treffer"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coincidencia anterior"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Résultat précédent"
+          }
+        }
+      }
+    },
     "Previous Month" : {
       "localizations" : {
         "de" : {
@@ -10127,6 +11350,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Icône imprimé"
+          }
+        }
+      }
+    },
+    "Print Today's Events" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Heutige Termine drucken"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Imprimir los eventos de hoy"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Imprimer les événements du jour"
           }
         }
       }
@@ -10285,6 +11530,28 @@
         }
       }
     },
+    "read-only" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "schreibgeschützt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "solo lectura"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "lecture seule"
+          }
+        }
+      }
+    },
     "Reading your handwriting…" : {
       "localizations" : {
         "de" : {
@@ -10347,6 +11614,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Supprimés récemment"
+          }
+        }
+      }
+    },
+    "recently edited first" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "zuletzt bearbeitete zuerst"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "últimos editados primero"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "derniers modifiés en premier"
           }
         }
       }
@@ -10505,6 +11794,28 @@
         }
       }
     },
+    "rectangle" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rechteck"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "rectángulo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "rectangle"
+          }
+        }
+      }
+    },
     "Red" : {
       "localizations" : {
         "de" : {
@@ -10593,6 +11904,50 @@
         }
       }
     },
+    "Remove Lock…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sperre entfernen …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quitar bloqueo…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer le verrouillage…"
+          }
+        }
+      }
+    },
+    "Remove the lock from “%@”" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sperre von „%@“ entfernen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quitar el bloqueo de “%@”"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer le verrouillage de « %@ »"
+          }
+        }
+      }
+    },
     "Remove Transcript" : {
       "localizations" : {
         "de" : {
@@ -10615,28 +11970,6 @@
         }
       }
     },
-    "Removed %lld notebooks from Favourites" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld Notizbücher aus Favoriten entfernt"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld cuadernos quitados de Favoritos"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld carnets retirés des favoris"
-          }
-        }
-      }
-    },
     "Removed “%@” from Favourites" : {
       "localizations" : {
         "de" : {
@@ -10655,6 +11988,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "« %@ » retiré des favoris"
+          }
+        }
+      }
+    },
+    "Removed %lld notebooks from Favourites" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld Notizbücher aus Favoriten entfernt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld cuadernos quitados de Favoritos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld carnets retirés des favoris"
           }
         }
       }
@@ -10945,6 +12300,28 @@
         }
       }
     },
+    "Restored “%@”" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„%@“ wiederhergestellt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” restaurado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« %@ » restauré"
+          }
+        }
+      }
+    },
     "Restored %lld notebooks" : {
       "localizations" : {
         "de" : {
@@ -11007,28 +12384,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "1 carnet restauré."
-          }
-        }
-      }
-    },
-    "Restored “%@”" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "„%@“ wiederhergestellt"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "“%@” restaurado"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "« %@ » restauré"
           }
         }
       }
@@ -11165,28 +12520,6 @@
         }
       }
     },
-    "SIL Open Font License 1.1" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "SIL Open Font License 1.1"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "SIL Open Font License 1.1"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "SIL Open Font License 1.1"
-          }
-        }
-      }
-    },
     "Sage" : {
       "localizations" : {
         "de" : {
@@ -11227,6 +12560,72 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Enregistrer"
+          }
+        }
+      }
+    },
+    "Scan %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scan %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escaneo %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Numérisation %@"
+          }
+        }
+      }
+    },
+    "Scan Documents" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dokumente scannen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escanear documentos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Numériser des documents"
+          }
+        }
+      }
+    },
+    "Scan Documents…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dokumente scannen …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escanear documentos…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Numériser des documents…"
           }
         }
       }
@@ -11561,6 +12960,28 @@
         }
       }
     },
+    "shape" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Form"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "figura"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "forme"
+          }
+        }
+      }
+    },
     "Share" : {
       "localizations" : {
         "de" : {
@@ -11693,6 +13114,28 @@
         }
       }
     },
+    "Show Original" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Original anzeigen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar original"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher l’original"
+          }
+        }
+      }
+    },
     "Show Tools" : {
       "localizations" : {
         "de" : {
@@ -11799,6 +13242,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mélanger"
+          }
+        }
+      }
+    },
+    "SIL Open Font License 1.1" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SIL Open Font License 1.1"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SIL Open Font License 1.1"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SIL Open Font License 1.1"
           }
         }
       }
@@ -12375,6 +13840,28 @@
         }
       }
     },
+    "Sticker…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sticker …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pegatina…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autocollant…"
+          }
+        }
+      }
+    },
     "Stickers" : {
       "localizations" : {
         "de" : {
@@ -12415,28 +13902,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les autocollants se placent sous votre encre : vous pouvez donc écrire sur une note ou une étiquette. Maintenez le doigt sur un autocollant de la page pour le déplacer, le redimensionner ou le retirer."
-          }
-        }
-      }
-    },
-    "Sticker…" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sticker …"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pegatina…"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Autocollant…"
           }
         }
       }
@@ -12529,6 +13994,28 @@
         }
       }
     },
+    "straight lines" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "gerade Linien"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "líneas rectas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "lignes droites"
+          }
+        }
+      }
+    },
     "Straighten Shape" : {
       "localizations" : {
         "de" : {
@@ -12595,7 +14082,7 @@
         }
       }
     },
-    "Study Tape" : {
+    "Study tape" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -12617,7 +14104,7 @@
         }
       }
     },
-    "Study tape" : {
+    "Study Tape" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -12789,6 +14276,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Swift Scribe est gratuit et open source. Pas de publicité, pas d’abonnement, pas de suivi. Vos notes restent sur votre appareil."
+          }
+        }
+      }
+    },
+    "Swift Scribe isn't allowed to read your calendar. Allow it in Settings › Privacy & Security › Calendars." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Swift Scribe darf deinen Kalender nicht lesen. Erlaube es unter Einstellungen › Datenschutz & Sicherheit › Kalender."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Swift Scribe no tiene permiso para leer tu calendario. Permítelo en Ajustes › Privacidad y seguridad › Calendarios."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Swift Scribe n’est pas autorisé à lire votre calendrier. Autorisez-le dans Réglages › Confidentialité et sécurité › Calendriers."
           }
         }
       }
@@ -13167,6 +14676,28 @@
         }
       }
     },
+    "Text box" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Textfeld"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cuadro de texto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zone de texte"
+          }
+        }
+      }
+    },
     "Text Box" : {
       "localizations" : {
         "de" : {
@@ -13207,50 +14738,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Style de texte"
-          }
-        }
-      }
-    },
-    "Text box" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Textfeld"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cuadro de texto"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Zone de texte"
-          }
-        }
-      }
-    },
-    "The Whole Notebook" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Das ganze Notizbuch"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Todo el cuaderno"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tout le carnet"
           }
         }
       }
@@ -13679,6 +15166,28 @@
         }
       }
     },
+    "the save didn't finish" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "das Sichern wurde nicht abgeschlossen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "el guardado no terminó"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "l’enregistrement n’a pas abouti"
+          }
+        }
+      }
+    },
     "The video couldn't be made: %@" : {
       "localizations" : {
         "de" : {
@@ -13723,6 +15232,28 @@
         }
       }
     },
+    "The Whole Notebook" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das ganze Notizbuch"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Todo el cuaderno"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tout le carnet"
+          }
+        }
+      }
+    },
     "There is no ink on this page to film." : {
       "localizations" : {
         "de" : {
@@ -13745,90 +15276,24 @@
         }
       }
     },
-    "This Notebook" : {
+    "There is nothing in your calendar today." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dieses Notizbuch"
+            "value" : "Heute steht nichts in deinem Kalender."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Este cuaderno"
+            "value" : "Hoy no hay nada en tu calendario."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ce carnet"
-          }
-        }
-      }
-    },
-    "This PDF is password protected. Unlock it in Files or Preview, then import it again." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dieses PDF ist passwortgeschützt. Entsperre es in „Dateien“ oder „Vorschau“ und importiere es dann erneut."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Este PDF está protegido con contraseña. Desbloquéalo en Archivos o Vista Previa y vuelve a importarlo."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ce PDF est protégé par un mot de passe. Déverrouillez-le dans Fichiers ou Aperçu, puis importez-le à nouveau."
-          }
-        }
-      }
-    },
-    "This Page as a Time-lapse Video…" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Diese Seite als Zeitraffervideo …"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Esta página como vídeo time-lapse…"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cette page en vidéo accélérée…"
-          }
-        }
-      }
-    },
-    "This Page as an Image…" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Diese Seite als Bild …"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Esta página como imagen…"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cette page en image…"
+            "value" : "Il n’y a rien dans votre calendrier aujourd’hui."
           }
         }
       }
@@ -13921,6 +15386,28 @@
         }
       }
     },
+    "this iPad can't encode it" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "dieses iPad kann es nicht codieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "este iPad no puede codificarlo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "cet iPad ne peut pas l’encoder"
+          }
+        }
+      }
+    },
     "This iPad can't transcribe %@ on the device. Swift Scribe never sends a recording away to be transcribed, so it was left as it is." : {
       "localizations" : {
         "de" : {
@@ -13965,6 +15452,28 @@
         }
       }
     },
+    "This Notebook" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieses Notizbuch"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este cuaderno"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce carnet"
+          }
+        }
+      }
+    },
     "This notebook couldn't be opened" : {
       "localizations" : {
         "de" : {
@@ -13983,6 +15492,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ce carnet n’a pas pu être ouvert"
+          }
+        }
+      }
+    },
+    "This notebook is locked, so its pages aren't shown here." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieses Notizbuch ist gesperrt, daher werden seine Seiten hier nicht angezeigt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este cuaderno está bloqueado, así que sus páginas no se muestran aquí."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce carnet est verrouillé, ses pages ne sont donc pas affichées ici."
           }
         }
       }
@@ -14053,6 +15584,72 @@
         }
       }
     },
+    "This Page as a Time-lapse Video…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Seite als Zeitraffervideo …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta página como vídeo time-lapse…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette page en vidéo accélérée…"
+          }
+        }
+      }
+    },
+    "This Page as an Image…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Seite als Bild …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta página como imagen…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette page en image…"
+          }
+        }
+      }
+    },
+    "This PDF is password protected. Unlock it in Files or Preview, then import it again." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieses PDF ist passwortgeschützt. Entsperre es in „Dateien“ oder „Vorschau“ und importiere es dann erneut."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este PDF está protegido con contraseña. Desbloquéalo en Archivos o Vista Previa y vuelve a importarlo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce PDF est protégé par un mot de passe. Déverrouillez-le dans Fichiers ou Aperçu, puis importez-le à nouveau."
+          }
+        }
+      }
+    },
     "This photo couldn't be read." : {
       "localizations" : {
         "de" : {
@@ -14115,6 +15712,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cette semaine"
+          }
+        }
+      }
+    },
+    "this week · %lld days" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "diese Woche · %lld Tage"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "esta semana · %lld días"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "cette semaine · %lld jours"
+          }
+        }
+      }
+    },
+    "this week · 1 day" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "diese Woche · 1 Tag"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "esta semana · 1 día"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "cette semaine · 1 jour"
           }
         }
       }
@@ -14235,6 +15876,28 @@
         }
       }
     },
+    "To lock notebooks, set a passcode on this iPad in Settings first." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Um Notizbücher zu sperren, richte zuerst in den Einstellungen einen Code auf diesem iPad ein."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Para bloquear cuadernos, configura primero un código en este iPad en Ajustes."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pour verrouiller des carnets, définissez d’abord un code sur cet iPad dans Réglages."
+          }
+        }
+      }
+    },
     "Today" : {
       "localizations" : {
         "de" : {
@@ -14253,6 +15916,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aujourd’hui"
+          }
+        }
+      }
+    },
+    "Today's Events" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Heutige Termine"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventos de hoy"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Événements du jour"
           }
         }
       }
@@ -14357,28 +16042,6 @@
         }
       }
     },
-    "Took %lld notebooks off their shelves" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld Notizbücher aus ihren Regalen genommen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld cuadernos retirados de sus estantes"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld carnets retirés de leurs étagères"
-          }
-        }
-      }
-    },
     "Took “%@” off its shelf" : {
       "localizations" : {
         "de" : {
@@ -14397,6 +16060,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "« %@ » retiré de son étagère"
+          }
+        }
+      }
+    },
+    "Took %lld notebooks off their shelves" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld Notizbücher aus ihren Regalen genommen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld cuadernos retirados de sus estantes"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld carnets retirés de leurs étagères"
           }
         }
       }
@@ -14467,24 +16152,24 @@
         }
       }
     },
-    "Touch and hold a notebook, then choose Use as Daily Journal. Press ⌘T in the library to open today's page." : {
+    "Touch and hold a notebook, then choose Use as Daily Journal. Press ⌘T in the library to open today's page. With Print Today's Events on, each new day's page starts with that day's events from your calendar, as text you can move or delete. They are read on this iPad." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Halte ein Notizbuch gedrückt und wähle dann „Als Tagebuch verwenden“. Drücke in der Bibliothek ⌘T, um die heutige Seite zu öffnen."
+            "value" : "Halte ein Notizbuch gedrückt und wähle dann „Als Tagebuch verwenden“. Drücke in der Bibliothek ⌘T, um die heutige Seite zu öffnen. Ist „Heutige Termine drucken“ aktiviert, beginnt die Seite jedes neuen Tages mit den Terminen dieses Tages aus deinem Kalender, als Text, den du bewegen oder löschen kannst. Sie werden auf diesem iPad gelesen."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mantén pulsado un cuaderno y elige Usar como diario. Pulsa ⌘T en la biblioteca para abrir la página de hoy."
+            "value" : "Mantén pulsado un cuaderno y elige Usar como diario. Pulsa ⌘T en la biblioteca para abrir la página de hoy. Con Imprimir los eventos de hoy activado, la página de cada nuevo día empieza con los eventos de ese día de tu calendario, como texto que puedes mover o eliminar. Se leen en este iPad."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Maintenez le doigt sur un carnet, puis choisissez « Utiliser comme journal ». Appuyez sur ⌘T dans la bibliothèque pour ouvrir la page du jour."
+            "value" : "Maintenez le doigt sur un carnet, puis choisissez « Utiliser comme journal ». Appuyez sur ⌘T dans la bibliothèque pour ouvrir la page du jour. Lorsque « Imprimer les événements du jour » est activé, la page de chaque nouveau jour commence par les événements de ce jour dans votre calendrier, sous forme de texte que vous pouvez déplacer ou supprimer. Ils sont lus sur cet iPad."
           }
         }
       }
@@ -14665,6 +16350,116 @@
         }
       }
     },
+    "Translate" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Übersetzen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Traducir"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Traduire"
+          }
+        }
+      }
+    },
+    "Translated" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Übersetzt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Traducido"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Traduit"
+          }
+        }
+      }
+    },
+    "Translated into %@ on this iPad." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auf diesem iPad übersetzt: %@."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Traducido al %@ en este iPad."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Traduit en %@ sur cet iPad."
+          }
+        }
+      }
+    },
+    "Translating…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wird übersetzt …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Traduciendo…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Traduction…"
+          }
+        }
+      }
+    },
+    "triangle" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dreieck"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "triángulo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "triangle"
+          }
+        }
+      }
+    },
     "Try Again" : {
       "localizations" : {
         "de" : {
@@ -14709,28 +16504,6 @@
         }
       }
     },
-    "Turn Off On This Day" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "„An diesem Tag“ deaktivieren"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Desactivar “Tal día como hoy”"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Désactiver « Ce jour-là »"
-          }
-        }
-      }
-    },
     "Turn into Text" : {
       "localizations" : {
         "de" : {
@@ -14753,24 +16526,24 @@
         }
       }
     },
-    "US Letter" : {
+    "Turn Off On This Day" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "US Letter"
+            "value" : "„An diesem Tag“ deaktivieren"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Carta EE. UU."
+            "value" : "Desactivar “Tal día como hoy”"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lettre US"
+            "value" : "Désactiver « Ce jour-là »"
           }
         }
       }
@@ -14819,6 +16592,72 @@
         }
       }
     },
+    "Unlock" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entsperren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desbloquear"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déverrouiller"
+          }
+        }
+      }
+    },
+    "Unlock “%@”" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„%@“ entsperren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desbloquear “%@”"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déverrouiller « %@ »"
+          }
+        }
+      }
+    },
+    "Unlock it with Face ID, Touch ID or this iPad's passcode." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entsperre es mit Face ID, Touch ID oder dem Code dieses iPad."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desbloquéalo con Face ID, Touch ID o el código de este iPad."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déverrouillez-le avec Face ID, Touch ID ou le code de cet iPad."
+          }
+        }
+      }
+    },
     "Untitled" : {
       "localizations" : {
         "de" : {
@@ -14863,24 +16702,24 @@
         }
       }
     },
-    "Use Whole Photo" : {
+    "US Letter" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ganzes Foto verwenden"
+            "value" : "US Letter"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Usar la foto entera"
+            "value" : "Carta EE. UU."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Utiliser la photo entière"
+            "value" : "Lettre US"
           }
         }
       }
@@ -14925,6 +16764,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Utiliser ce papier pour les notes rapides"
+          }
+        }
+      }
+    },
+    "Use Whole Photo" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ganzes Foto verwenden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usar la foto entera"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Utiliser la photo entière"
           }
         }
       }
@@ -15325,28 +17186,6 @@
         }
       }
     },
-    "Your PDF is ready." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dein PDF ist fertig."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tu PDF está listo."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Votre PDF est prêt."
-          }
-        }
-      }
-    },
     "Your image is ready." : {
       "localizations" : {
         "de" : {
@@ -15387,6 +17226,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vos dernières modifications ne sont pas encore enregistrées"
+          }
+        }
+      }
+    },
+    "Your PDF is ready." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dein PDF ist fertig."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu PDF está listo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre PDF est prêt."
           }
         }
       }
@@ -15435,658 +17296,178 @@
         }
       }
     },
-    "canvas.empty" : {
+    "Zoom area" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Leer"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Empty"
+            "value" : "Zoombereich"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vacía"
+            "value" : "Área de zoom"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vide"
+            "value" : "Zone de zoom"
           }
         }
       }
     },
-    "circle" : {
+    "Zoom In" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Kreis"
+            "value" : "Einzoomen"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "círculo"
+            "value" : "Acercar"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "cercle"
+            "value" : "Zoom avant"
           }
         }
       }
     },
-    "edited %@" : {
+    "Zoom Out" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "bearbeitet %@"
+            "value" : "Auszoomen"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "editado %@"
+            "value" : "Alejar"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "modifié %@"
+            "value" : "Zoom arrière"
           }
         }
       }
     },
-    "ellipse" : {
+    "Zoom Window" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ellipse"
+            "value" : "Zoomfenster"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "elipse"
+            "value" : "Ventana de zoom"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ellipse"
+            "value" : "Fenêtre de zoom"
           }
         }
       }
     },
-    "example.com" : {
+    "Zoom Window · Page %lld" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "example.com"
+            "value" : "Zoomfenster · Seite %lld"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "example.com"
+            "value" : "Ventana de zoom · Página %lld"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "example.com"
+            "value" : "Fenêtre de zoom · Page %lld"
           }
         }
       }
     },
-    "export.print" : {
+    "Zoom window closed" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Drucken"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Print"
+            "value" : "Zoomfenster geschlossen"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Imprimir"
+            "value" : "Ventana de zoom cerrada"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Imprimer"
+            "value" : "Fenêtre de zoom fermée"
           }
         }
       }
     },
-    "favourite" : {
+    "Zoom window open. Write in the strip at the bottom." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Favorit"
+            "value" : "Zoomfenster geöffnet. Schreibe in den Streifen unten."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "favorito"
+            "value" : "Ventana de zoom abierta. Escribe en la franja de abajo."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "favori"
+            "value" : "Fenêtre de zoom ouverte. Écrivez dans la bande du bas."
           }
         }
       }
     },
-    "has files that couldn't be read" : {
+    "Zoom window, page %lld" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "enthält Dateien, die nicht gelesen werden konnten"
+            "value" : "Zoomfenster, Seite %lld"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "tiene archivos que no se pudieron leer"
+            "value" : "Ventana de zoom, página %lld"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "contient des fichiers illisibles"
-          }
-        }
-      }
-    },
-    "iCloud" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iCloud"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iCloud"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iCloud"
-          }
-        }
-      }
-    },
-    "iCloud isn't available. Sign in to iCloud and turn on iCloud Drive in Settings; this copy of Swift Scribe also has to be built with the iCloud capability." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iCloud ist nicht verfügbar. Melde dich bei iCloud an und aktiviere iCloud Drive in den Einstellungen. Außerdem muss diese Kopie von Swift Scribe mit der iCloud-Funktion erstellt sein."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iCloud no está disponible. Inicia sesión en iCloud y activa iCloud Drive en Ajustes; además, esta copia de Swift Scribe debe estar compilada con la capacidad de iCloud."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iCloud n’est pas disponible. Connectez-vous à iCloud et activez iCloud Drive dans Réglages ; cette copie de Swift Scribe doit aussi être compilée avec la fonctionnalité iCloud."
-          }
-        }
-      }
-    },
-    "in %@" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "in %@"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "en %@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "dans %@"
-          }
-        }
-      }
-    },
-    "last opened first" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "zuletzt geöffnete zuerst"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "últimos abiertos primero"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "derniers ouverts en premier"
-          }
-        }
-      }
-    },
-    "line" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Linie"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "línea"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ligne"
-          }
-        }
-      }
-    },
-    "longest run %lld days" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "längste Serie %lld Tage"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "racha más larga: %lld días"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "plus longue série : %lld jours"
-          }
-        }
-      }
-    },
-    "newest first" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "neueste zuerst"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "más recientes primero"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "plus récents en premier"
-          }
-        }
-      }
-    },
-    "notebook" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Notizbuch"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "cuaderno"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "carnet"
-          }
-        }
-      }
-    },
-    "of %lld" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "von %lld"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "de %lld"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "sur %lld"
-          }
-        }
-      }
-    },
-    "read-only" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "schreibgeschützt"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "solo lectura"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "lecture seule"
-          }
-        }
-      }
-    },
-    "recently edited first" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "zuletzt bearbeitete zuerst"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "últimos editados primero"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "derniers modifiés en premier"
-          }
-        }
-      }
-    },
-    "rectangle" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rechteck"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "rectángulo"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "rectangle"
-          }
-        }
-      }
-    },
-    "shape" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Form"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "figura"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "forme"
-          }
-        }
-      }
-    },
-    "straight lines" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "gerade Linien"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "líneas rectas"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "lignes droites"
-          }
-        }
-      }
-    },
-    "the save didn't finish" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "das Sichern wurde nicht abgeschlossen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "el guardado no terminó"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "l’enregistrement n’a pas abouti"
-          }
-        }
-      }
-    },
-    "this iPad can't encode it" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "dieses iPad kann es nicht codieren"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "este iPad no puede codificarlo"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "cet iPad ne peut pas l’encoder"
-          }
-        }
-      }
-    },
-    "this week · %lld days" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "diese Woche · %lld Tage"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "esta semana · %lld días"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "cette semaine · %lld jours"
-          }
-        }
-      }
-    },
-    "this week · 1 day" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "diese Woche · 1 Tag"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "esta semana · 1 día"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "cette semaine · 1 jour"
-          }
-        }
-      }
-    },
-    "triangle" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dreieck"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "triángulo"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "triangle"
-          }
-        }
-      }
-    },
-    "“%@” couldn't be deleted: %@" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "„%1$@“ konnte nicht gelöscht werden: %2$@"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "“%1$@” couldn't be deleted: %2$@"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No se pudo eliminar “%1$@”: %2$@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "« %1$@ » n’a pas pu être supprimé : %2$@"
-          }
-        }
-      }
-    },
-    "“System Setting” follows Settings › Apple Pencil › Only Draw with Apple Pencil. With Straighten Shapes on, draw a line, circle, rectangle or triangle and hold still for a moment before lifting; Undo brings your own stroke back." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "„Systemeinstellung“ folgt Einstellungen › Apple Pencil › Nur mit Apple Pencil zeichnen. Ist „Formen begradigen“ aktiviert, zeichne eine Linie, einen Kreis, ein Rechteck oder ein Dreieck und halte kurz still, bevor du den Stift anhebst. „Widerrufen“ bringt deinen eigenen Strich zurück."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "“Ajuste del sistema” sigue Ajustes › Apple Pencil › Dibujar solo con el Apple Pencil. Con Enderezar figuras activado, dibuja una línea, un círculo, un rectángulo o un triángulo y mantén el lápiz quieto un momento antes de levantarlo; Deshacer recupera tu trazo original."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "« Réglage système » suit Réglages › Apple Pencil › Dessiner seulement avec l’Apple Pencil. Lorsque « Redresser les formes » est activé, tracez une ligne, un cercle, un rectangle ou un triangle et restez immobile un instant avant de lever le crayon ; Annuler rétablit votre propre trait."
+            "value" : "Fenêtre de zoom, page %lld"
           }
         }
       }
