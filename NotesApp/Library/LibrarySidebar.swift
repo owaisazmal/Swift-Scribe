@@ -196,8 +196,7 @@ struct LibrarySidebar: View {
         }
         .padding(.leading, CGFloat(row.depth) * Space.x4)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(count == 1 ? String(localized: "\(folder.name), folder, 1 notebook")
-                                       : String(localized: "\(folder.name), folder, \(count) notebooks"))
+        .accessibilityLabel(String(localized: "\(folder.name), folder, \(count) notebooks"))
         .accessibilityValue(tree.parent(of: folder.id).map { String(localized: "Inside \(tree.name(of: $0))") } ?? "")
         .accessibilityAddTraits(.isButton)
         .accessibilityActions {

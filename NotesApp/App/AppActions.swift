@@ -65,7 +65,7 @@ struct NotebookEntity: AppEntity {
     let pages: Int
 
     var displayRepresentation: DisplayRepresentation {
-        DisplayRepresentation(title: "\(title)", subtitle: pages == 1 ? "1 page" : "\(pages) pages")
+        DisplayRepresentation(title: "\(title)", subtitle: "\(pages) pages")
     }
 
     @MainActor

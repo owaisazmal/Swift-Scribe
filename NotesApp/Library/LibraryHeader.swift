@@ -164,30 +164,21 @@ struct WeekSummarySection: View {
 
 extension WeekSummary {
     var pagesLine: String {
-        switch pageCount {
-        case 0: String(localized: "A fresh week")
-        case 1: String(localized: "1 page")
-        default: String(localized: "\(pageCount) pages")
-        }
+        pageCount == 0 ? String(localized: "A fresh week") : String(localized: "\(pageCount) pages")
     }
 
     var daysLine: String {
-        dayCount == 1 ? String(localized: "this week · 1 day") : String(localized: "this week · \(dayCount) days")
+        String(localized: "this week · \(dayCount) days")
     }
 
     var headline: String {
-        switch (pageCount, dayCount) {
-        case (0, _): String(localized: "A fresh week")
-        case (1, _): String(localized: "1 page on 1 day")
-        case (_, 1): String(localized: "\(pageCount) pages on 1 day")
-        default: String(localized: "\(pageCount) pages on \(dayCount) days")
-        }
+        pageCount == 0 ? String(localized: "A fresh week") : String(localized: "\(pageCount) pages on \(dayCount) days")
     }
 
     var accessibilityLabel: String {
         guard pageCount > 0 else { return String(localized: "This week: no pages written") }
         let names = days.filter { $0.pages > 0 }.map { $0.date.formatted(.dateTime.weekday(.wide)) }.formatted(.list(type: .and))
-        let pages = pageCount == 1 ? String(localized: "1 page") : String(localized: "\(pageCount) pages")
+        let pages = String(localized: "\(pageCount) pages")
         return String(localized: "This week: \(pages), on \(names)")
     }
 }

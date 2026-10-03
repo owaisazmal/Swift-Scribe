@@ -323,7 +323,7 @@ struct PageThumbnailCell: View {
 extension NotebookDocument {
     /// "1 page", "12 pages".
     var pageCountText: String {
-        pages.count == 1 ? String(localized: "1 page") : String(localized: "\(pages.count) pages")
+        String(localized: "\(pages.count) pages")
     }
 
     /// Thumbnail reflecting unsaved ink when the page is in memory, otherwise the cached saved one.

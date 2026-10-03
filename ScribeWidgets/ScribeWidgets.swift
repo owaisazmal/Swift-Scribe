@@ -216,8 +216,8 @@ struct WritingWeekView: View {
             if family == .accessoryRectangular {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("This week").font(.headline).widgetAccentable()
-                    Text(pages == 1 ? "1 page" : "\(pages) pages")
-                    Text(written == 1 ? "1 day" : "\(written) days").foregroundStyle(.secondary)
+                    Text("\(pages) pages")
+                    Text("\(written) days").foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             } else {
@@ -225,7 +225,7 @@ struct WritingWeekView: View {
                     Text("This week").widgetMeta()
                     Text(pages, format: .number).font(.system(size: 40, weight: .semibold, design: .serif)).foregroundStyle(Color.widgetInk)
                         .minimumScaleFactor(0.6).lineLimit(1)
-                    Text(pages == 1 ? "page" : "pages").font(.caption).foregroundStyle(Color.widgetSecondary)
+                    Text(String(localized: "widget.pagesCaption", defaultValue: "\(pages) pages")).font(.caption).foregroundStyle(Color.widgetSecondary)
                     Spacer(minLength: 2)
                     WeekStrip(days: days)
                     if run > 1 { Text("\(run) days in a row").widgetMeta() }

@@ -119,7 +119,7 @@ extension NotebookRecord {
     }
 
     var pageCountText: String {
-        pageCount == 1 ? String(localized: "1 page") : String(localized: "\(pageCount) pages")
+        String(localized: "\(pageCount) pages")
     }
 
     var metaLine: String {

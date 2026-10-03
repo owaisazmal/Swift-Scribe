@@ -1089,7 +1089,7 @@ fileprivate struct EditorContent: View {
             // With ink caught, the buttons need the room in a narrow pane and at the largest text sizes.
             if count == 0 || !(isCompact || dynamicTypeSize.isAccessibilitySize) {
                 Text(count == 0 ? String(localized: "Draw round ink on any page")
-                                : count == 1 ? String(localized: "1 stroke. Drag it to move it.") : String(localized: "\(count) strokes. Drag them to move them."))
+                                : String(localized: "\(count) strokes. Drag them to move them."))
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Color.ink)
                     .lineLimit(1)
@@ -1478,7 +1478,7 @@ extension EditorContent {
                     return
                 }
                 session.addAgenda(events)
-                announce(events.count == 1 ? String(localized: "1 event added to the page") : String(localized: "\(events.count) events added to the page"))
+                announce(String(localized: "\(events.count) events added to the page"))
             } catch {
                 errorMessage = error.localizedDescription
             }

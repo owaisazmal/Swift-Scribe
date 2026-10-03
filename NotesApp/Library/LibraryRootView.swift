@@ -112,8 +112,13 @@ struct LibraryRootView: View {
                 window.active = nil
                 window.toolPicker = nil
             }
+            rememberWindow()
         }
-        .onChange(of: window.beside?.id) { restoredBeside = open == nil ? "" : $1?.uuidString ?? "" }
+        .onChange(of: window.beside?.id) {
+            restoredBeside = open == nil ? "" : $1?.uuidString ?? ""
+            rememberWindow()
+        }
+        .onChange(of: sceneID) { Task { await restoreOpenNotebook() } }
         .onAppear { window.openNotebook = { id, page in Task { await perform(.open(id, page: page)) } } }
         .task(id: app.phase) {
             await restoreOpenNotebook()
@@ -194,18 +199,26 @@ struct LibraryRootView: View {
         }
     }
 
+    private func rememberWindow() {
+        guard let sceneID else { return }
+        WindowMemory.remember(open?.id, beside: window.beside?.id, in: sceneID)
+    }
+
     /// Skipped once if the last restore crashed.
     private func restoreOpenNotebook() async {
-        guard app.phase == .ready, open == nil, !triedRestore else { return }
+        guard app.phase == .ready, open == nil, !triedRestore, let sceneID else { return }
         triedRestore = true
+        WindowMemory.keep(only: Set(UIApplication.shared.openSessions.map(\.persistentIdentifier)))
         let defaults = UserDefaults.standard, flag = "scribe.restoreInFlight"
         if defaults.bool(forKey: flag) {
             defaults.removeObject(forKey: flag)
             restoredNotebook = ""
+            WindowMemory.remember(nil, beside: nil, in: sceneID)
             return
         }
-        guard let id = UUID(uuidString: restoredNotebook), let record = store.record(id), !record.isTrashed else { return }
-        let beside = UUID(uuidString: restoredBeside).flatMap(store.record)
+        let remembered = WindowMemory.remembered(in: sceneID) ?? (UUID(uuidString: restoredNotebook), UUID(uuidString: restoredBeside))
+        guard let id = remembered.notebook, let record = store.record(id), !record.isTrashed else { return }
+        let beside = remembered.beside.flatMap(store.record)
         defaults.set(true, forKey: flag)
         openNotebook(id)
         if let beside, beside.id != id, !beside.isTrashed, open?.id == id { window.beside = OpenNotebook(id: beside.id) }
@@ -274,6 +287,32 @@ extension View {
 }
 
 /// Reports the window scene's persistent identifier, which keys the one-editor-per-notebook rule.
+/// What each window has open, kept the moment it changes. iPadOS saves a window's own state only on the way to
+/// the background, so an app stopped straight after would otherwise reopen with what was open before.
+enum WindowMemory {
+    private static let key = "scribe.windowNotebooks"
+
+    private static var all: [String: [String]] {
+        get { UserDefaults.standard.dictionary(forKey: key) as? [String: [String]] ?? [:] }
+        set { UserDefaults.standard.set(newValue, forKey: key) }
+    }
+
+    static func remember(_ notebook: UUID?, beside: UUID?, in scene: String) {
+        all[scene] = [notebook?.uuidString ?? "", notebook == nil ? "" : beside?.uuidString ?? ""]
+    }
+
+    /// Nil when the window has nothing kept here yet; a notebook of nil when it had none open.
+    static func remembered(in scene: String) -> (notebook: UUID?, beside: UUID?)? {
+        all[scene].map { (UUID(uuidString: $0.first ?? ""), UUID(uuidString: $0.last ?? "")) }
+    }
+
+    /// Lets go of windows iPadOS no longer keeps.
+    static func keep(only scenes: Set<String>) {
+        let kept = all.filter { scenes.contains($0.key) }
+        if kept.count != all.count { all = kept }
+    }
+}
+
 struct SceneReader: UIViewRepresentable {
     let onChange: (String?) -> Void
 

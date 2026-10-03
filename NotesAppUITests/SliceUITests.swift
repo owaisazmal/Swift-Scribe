@@ -177,6 +177,8 @@ final class SliceUITests: XCTestCase {
         _ = app.descendants(matching: .any)["page.canvas.1"].waitForExistence(timeout: 15)
         sleep(1)
         attach(app, "editor-dark")
+        app.buttons["editor.back"].tap()
+        waitForLibrary(app)
         app.terminate()
 
         XCUIDevice.shared.appearance = .light

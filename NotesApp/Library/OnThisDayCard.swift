@@ -22,7 +22,7 @@ struct OnThisDayCard: View {
 
     private var detail: String {
         if let number = memory.number { return String(localized: "Page \(number) · \(fullDate)") }
-        let pages = record.pageCount == 1 ? String(localized: "1 page") : String(localized: "\(record.pageCount) pages")
+        let pages = String(localized: "\(record.pageCount) pages")
         return "\(fullDate) · \(pages)"
     }
 
