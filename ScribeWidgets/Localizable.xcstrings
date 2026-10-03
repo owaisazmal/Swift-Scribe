@@ -111,6 +111,28 @@
         }
       }
     },
+    "A new note, ready to write." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eine neue Notiz, bereit zum Schreiben."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una nota nueva, lista para escribir."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une nouvelle note, prête à écrire."
+          }
+        }
+      }
+    },
     "Continue Writing" : {
       "localizations" : {
         "de" : {
@@ -151,6 +173,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Continuer à écrire"
+          }
+        }
+      }
+    },
+    "New Quick Note" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neue Schnellnotiz"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nueva nota rápida"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouvelle note rapide"
+          }
+        }
+      }
+    },
+    "Open Today's Journal Page" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Heutige Tagebuchseite öffnen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir la página de hoy del diario"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir la page du jour du journal"
           }
         }
       }
@@ -205,6 +271,28 @@
         }
       }
     },
+    "Quick Note" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schnellnotiz"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nota rápida"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Note rapide"
+          }
+        }
+      }
+    },
     "Start a notebook" : {
       "localizations" : {
         "de" : {
@@ -223,6 +311,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Commencer un carnet"
+          }
+        }
+      }
+    },
+    "Starts a new note in Swift Scribe, ready to write." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beginnt eine neue Notiz in Swift Scribe, bereit zum Schreiben."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Empieza una nota nueva en Swift Scribe, lista para escribir."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Commence une nouvelle note dans Swift Scribe, prête à écrire."
           }
         }
       }

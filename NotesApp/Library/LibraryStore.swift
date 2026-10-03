@@ -1,5 +1,4 @@
-import Foundation
-import CoreGraphics
+import UIKit
 import SwiftData
 import Observation
 import os
@@ -36,6 +35,8 @@ final class LibraryStore {
     @ObservationIgnored var onPermanentlyDeleted: (([UUID]) -> Void)?
     /// Called after every change to the index made on this device, so a sync can follow it.
     @ObservationIgnored var onIndexSaved: (() -> Void)?
+    /// Called when the words read from a notebook change.
+    @ObservationIgnored var onSearchTextChanged: ((UUID) -> Void)?
 
     init(root: StorageRoot, context: ModelContext) {
         self.root = root
@@ -90,6 +91,29 @@ final class LibraryStore {
             var cover = CoverSpec.defaultCloth(for: id)
             cover.style = .firstPage
             var manifest = NotebookManifest(id: id, title: url.deletingPathExtension().lastPathComponent, cover: cover,
+                                            defaults: PageDefaults(template: .blank, paperColor: .white, pageSize: .letter), pages: pages)
+            manifest.library.folderID = folderID
+            try await package.create(manifest)
+            index(manifest)
+            indexHandwriting(package: package, pages: pages)
+            return id
+        } catch {
+            try? FileManager.default.removeItem(at: package.url)
+            throw error
+        }
+    }
+
+    /// A new notebook whose pages are sheets scanned with the camera.
+    @discardableResult
+    func importScan(_ images: [UIImage], folder: FolderRecord?) async throws -> UUID {
+        let folderID = folder?.id
+        let id = UUID()
+        let package = NotebookPackage(root: root, id: id)
+        do {
+            let pages = try await DocumentScan.pages(from: images, in: package)
+            var cover = CoverSpec.defaultCloth(for: id)
+            cover.style = .firstPage
+            var manifest = NotebookManifest(id: id, title: String(localized: "Scan \(Date.now.formatted(date: .abbreviated, time: .shortened))"), cover: cover,
                                             defaults: PageDefaults(template: .blank, paperColor: .white, pageSize: .letter), pages: pages)
             manifest.library.folderID = folderID
             try await package.create(manifest)
@@ -403,6 +427,7 @@ final class LibraryStore {
     func updateSearchText(_ text: String, for id: UUID) {
         guard record(id) != nil, LibraryIndex.setSearchText(text, for: id, in: context) else { return }
         searchVersion &+= 1
+        onSearchTextChanged?(id)
         saveIndex()
     }
 
@@ -425,6 +450,7 @@ final class LibraryStore {
         let defaults = PageDefaults(template: NotebookStarter.journal.template, paperColor: NotebookStarter.journal.paperColor, pageSize: size)
         var page = defaults.newPage()
         page.day = DailyJournal.dayKey(for: now, calendar: calendar)
+        DailyJournal.print(await Agenda.forJournal(now: now, calendar: calendar), on: &page)
         var manifest = NotebookManifest(id: id, title: NotebookStarter.journal.title, createdAt: now,
                                         cover: NotebookStarter.journal.spec(for: id), defaults: defaults, pages: [page])
         manifest.library.lastOpenedAt = now
@@ -437,14 +463,15 @@ final class LibraryStore {
     /// Nil for read-only notebooks and ones still opening, which then open at their saved page.
     func prepareTodayPage(_ id: UUID, now: Date = .now, calendar: Calendar = .current) async -> UUID? {
         guard let journal = record(id), !journal.isReadOnly else { return nil }
+        let key = DailyJournal.dayKey(for: now, calendar: calendar)
         if let document = DocumentRegistry.shared.document(for: id) {
-            return DailyJournal.ensureTodayPage(in: document, now: now, calendar: calendar)
+            if let page = document.pages.last(where: { $0.day == key }) { return page.id }
+            let agenda = await Agenda.forJournal(now: now, calendar: calendar)
+            return DailyJournal.ensureTodayPage(in: document, now: now, calendar: calendar, agenda: agenda)
         }
         guard !DocumentRegistry.shared.isOpening(id) else { return nil }
-        let key = DailyJournal.dayKey(for: now, calendar: calendar)
         let package = NotebookPackage(root: root, id: id)
         let pageID = UUID()
-        let change: @Sendable (inout NotebookManifest) -> Void = { DailyJournal.dateToday(key, newPageID: pageID, in: &$0) }
         let token = UUID()
         defer {
             changesInFlight[id]?[token] = nil
@@ -452,6 +479,10 @@ final class LibraryStore {
         }
         do {
             if let page = try await package.readManifest().manifest.pages.last(where: { $0.day == key }) { return page.id }
+            // The calendar is only read on a day that has no page yet.
+            let agenda = await Agenda.forJournal(now: now, calendar: calendar)
+            guard DocumentRegistry.shared.document(for: id) == nil, !DocumentRegistry.shared.isOpening(id) else { return nil }
+            let change: @Sendable (inout NotebookManifest) -> Void = { DailyJournal.dateToday(key, newPageID: pageID, agenda: agenda, in: &$0) }
             changesInFlight[id, default: [:]][token] = change
             let manifest = try await package.updateManifest(change)
             index(manifest)

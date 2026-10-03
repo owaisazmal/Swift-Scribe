@@ -15,6 +15,7 @@ final class AppModel {
     let library: LibraryStore
     let activity: WritingActivity
     let sync: SyncCenter
+    let spotlight: SpotlightIndexer
     private(set) var phase: Phase = .starting
     /// Set by a shortcut; the front window's library takes it and carries it out.
     var pendingAction: AppAction?
@@ -31,10 +32,21 @@ final class AppModel {
         library = LibraryStore(root: root, context: container.mainContext)
         activity = WritingActivity(root: root)
         sync = SyncCenter(root: root)
+        spotlight = SpotlightIndexer(container: container)
         library.onPermanentlyDeleted = { [activity] in activity.forget(notebooks: $0) }
         sync.busy = { Set(DocumentRegistry.shared.openDocuments.map(\.id)) }
         sync.onLibraryChanged = { [library] _ in await library.reloadFromDisk() }
-        library.onIndexSaved = { [sync] in sync.schedule() }
+        library.onIndexSaved = { [sync, spotlight, weak library] in
+            sync.schedule()
+            if let library { spotlight.schedule(library) }
+        }
+        library.onSearchTextChanged = { [spotlight] in spotlight.noteTextChanged($0) }
+    }
+
+    /// A Control Center button was pressed: what it asked for becomes the pending action.
+    func takeControlAction() {
+        guard let name = ControlRelay.take(), let url = URL(string: "\(AppAction.scheme)://\(name)"), let action = AppAction(url: url) else { return }
+        pendingAction = action
     }
 
     /// Safe to call from anywhere: later callers wait for the first one to finish.
@@ -67,6 +79,7 @@ final class AppModel {
         await activity.load()
         library.purgeExpiredTrash()
         phase = .ready
+        spotlight.schedule(library)
         Task {
             await sync.resolve()
             await sync.syncNow()

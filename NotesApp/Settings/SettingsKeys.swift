@@ -37,4 +37,6 @@ enum SettingsKey {
     static let tapeColor = "tapeColor"
     static let transcriptLanguage = "transcriptLanguage"
     static let indexSchema = "libraryIndexSchema"
+    static let journalAgenda = "journalAgenda"
+    static let spotlight = "showsInSpotlight"
 }

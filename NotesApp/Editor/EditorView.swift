@@ -26,6 +26,9 @@ protocol EditorCanvasControlling: AnyObject {
     func selectedInk() -> [PKDrawing]
     func replaceInkSelection(with text: String) -> ItemSelection?
     func tapesDidChange()
+    func setFinding(_ finding: Bool)
+    func showFind(_ matches: [FindMatch], current: FindMatch?)
+    func setZoomWindow(_ open: Bool)
 }
 
 struct ItemSelection: Equatable {
@@ -37,14 +40,15 @@ enum PageFit { case width, page }
 
 /// Focus hides the chrome and leaves the tools; presenting hides both and turns the Pencil into a laser pointer;
 /// replaying plays a recording while the ink written during it appears as it was written; selecting picks ink out
-/// across pages to move, copy or delete.
-enum EditorMode: Equatable { case writing, focus, presenting, replaying, selecting }
+/// across pages to move, copy or delete; finding looks for words and marks them on the pages.
+enum EditorMode: Equatable { case writing, focus, presenting, replaying, selecting, finding }
 
 @MainActor
 @Observable
 final class EditorSession {
     let document: NotebookDocument
     let recorder: NotebookRecorder
+    let finder: NotebookFinder
     var currentPage: Int
     var isToolPickerVisible = true
     var canUndo = false
@@ -62,6 +66,8 @@ final class EditorSession {
     /// The recording being replayed with its ink, and what was said in it if it has been transcribed.
     private(set) var replay: ReplayTimeline?
     private(set) var replayLines: [Transcript.Line] = []
+    /// The zoom window: a magnified strip at the foot of the editor for writing small and neat.
+    private(set) var isZoomWindowOpen = false
     @ObservationIgnored private var replayPage: UUID?
     var laserColor = LaserColor.red {
         didSet { canvas?.setLaserColor(laserColor) }
@@ -86,9 +92,15 @@ final class EditorSession {
     init(document: NotebookDocument, initialPageID: UUID? = nil) {
         self.document = document
         recorder = NotebookRecorder(document: document)
+        finder = NotebookFinder(document: document)
         let saved = document.manifest.library.currentPage
         currentPage = max(0, min(initialPageID.flatMap(document.index(of:)) ?? saved, document.pages.count - 1))
         drawingInput = UserDefaults.standard.string(forKey: SettingsKey.drawingInput).flatMap(DrawingInput.init(rawValue:)) ?? .system
+        finder.startPage = { [weak self] in self?.currentPage ?? 0 }
+        finder.onChange = { [weak self] in
+            guard let self else { return }
+            self.canvas?.showFind(self.finder.matches, current: self.finder.current)
+        }
     }
 
     func pageDidChange(_ index: Int) {
@@ -109,9 +121,32 @@ final class EditorSession {
         guard newMode != .selecting || !document.isReadOnly else { return }
         if mode == .replaying { stopReplay() }
         if mode == .selecting { canvas?.setSelectingInk(false) }
+        if mode == .finding {
+            finder.clear()
+            canvas?.setFinding(false)
+        }
+        if newMode != .writing, newMode != .focus { setZoomWindow(false) }
         mode = newMode
         canvas?.setPresenting(newMode == .presenting)
         if newMode == .selecting { canvas?.setSelectingInk(true) }
+        if newMode == .finding { canvas?.setFinding(true) }
+    }
+
+    // MARK: Zoom window
+
+    func setZoomWindow(_ open: Bool) {
+        guard open != isZoomWindowOpen, !open || (!document.isReadOnly && (mode == .writing || mode == .focus)) else { return }
+        isZoomWindowOpen = open
+        canvas?.setZoomWindow(open)
+        AccessibilityNotification.Announcement(open ? String(localized: "Zoom window open. Write in the strip at the bottom.")
+                                                    : String(localized: "Zoom window closed")).post()
+    }
+
+    /// The canvas closed it itself: its page was deleted, or its close button was pressed.
+    func zoomWindowDidClose() {
+        guard isZoomWindowOpen else { return }
+        isZoomWindowOpen = false
+        AccessibilityNotification.Announcement(String(localized: "Zoom window closed")).post()
     }
 
     // MARK: Replaying a recording
@@ -246,6 +281,18 @@ final class EditorSession {
             guard let index = items.firstIndex(where: { $0.id == selection.itemID }), items[index].tape != nil else { return }
             items[index].content = .tape(color)
         }
+    }
+
+    // MARK: Today's events
+
+    /// Prints the day's events on the current page as a text box, which can then be moved, restyled or deleted.
+    func addAgenda(_ events: [AgendaEvent], on day: Date = .now) {
+        guard !document.isReadOnly, document.pages.indices.contains(currentPage) else { return }
+        let page = document.pages[currentPage]
+        var box = TextBox(string: Agenda.text(for: events, heading: page.day == nil ? day.formatted(.dateTime.weekday(.wide).day().month(.wide)) : nil))
+        box.fontSize = 13
+        let width = min(max(box.naturalWidth(limit: page.size.width * 0.6), 150), page.size.width * 0.6)
+        addItem(.text(box), size: CGSize(width: width, height: box.height(width: width)), actionName: String(localized: "Add Today's Events"))
     }
 
     // MARK: Text boxes
@@ -444,6 +491,9 @@ fileprivate struct EditorContent: View {
     @State private var presentingSince = Date.now
     @State private var readingInk: InkToRead?
     @State private var hidesTranscript = false
+    @State private var scanning = false
+    @State private var findText = ""
+    @FocusState private var findFocused: Bool
 
     private struct NotesTarget: Identifiable {
         let id: UUID
@@ -517,7 +567,13 @@ fileprivate struct EditorContent: View {
                 Group {
                     Button("Page After Current") { session.addPage(after: session.currentPage) }
                         .keyboardShortcut(shortcut("n", always: true))
-                        .disabled(document.isReadOnly || session.mode == .replaying || session.mode == .selecting)
+                        .disabled(document.isReadOnly || session.mode == .replaying || session.mode == .selecting || session.mode == .finding)
+                    Button("Find in Notebook") { enter(.finding) }
+                        .keyboardShortcut(shortcut("f"))
+                    if session.mode == .finding {
+                        Button("Next Match") { session.finder.step(1) }.keyboardShortcut(shortcut("g", always: true))
+                        Button("Previous Match") { session.finder.step(-1) }.keyboardShortcut(shortcut("g", [.command, .shift], always: true))
+                    }
                     Button("Focus Mode") { enter(session.mode == .focus ? .writing : .focus) }
                         .keyboardShortcut(shortcut("f", [.command, .control], always: true))
                     Button("Present") { enter(session.mode == .presenting ? .writing : .presenting) }
@@ -533,12 +589,20 @@ fileprivate struct EditorContent: View {
                 switch session.mode {
                 case .writing: ribbons
                 case .focus: focusExit
-                case .presenting, .replaying, .selecting: EmptyView()
+                case .presenting, .replaying, .selecting, .finding: EmptyView()
                 }
             }
             .overlay(alignment: .top) { banners }
             .overlay(alignment: .top) {
-                if session.mode == .selecting { inkBar } else if session.selection != nil, session.mode != .presenting { arrangeBar } else { returnBar }
+                if session.mode == .selecting {
+                    inkBar
+                } else if session.mode == .finding {
+                    findBar
+                } else if session.selection != nil, session.mode != .presenting {
+                    arrangeBar
+                } else {
+                    returnBar
+                }
             }
             .overlay(alignment: .bottom) {
                 if session.mode == .presenting {
@@ -587,6 +651,13 @@ fileprivate struct EditorContent: View {
             document.perform { await insertPDF(result, at: position) }
         }
         .photosPicker(isPresented: $showingPhotoPicker, selection: $photoItem, matching: .images)
+        .fullScreenCover(isPresented: $scanning) {
+            DocumentScanner { images in
+                scanning = false
+                insertScan(images)
+            }
+            .ignoresSafeArea()
+        }
         .onChange(of: photoItem) { _, item in
             guard let item else { return }
             let position = session.currentPage + 1
@@ -673,7 +744,7 @@ fileprivate struct EditorContent: View {
     private var isPresentingModal: Bool {
         showingPages || showingRecordings || showingRecordingsSheet || pickingBeside || export != nil || importingPDF || showingPhotoPicker || renaming || goToPage || paperMode != nil
             || editingCover != nil || namingBookmark != nil || showingStickers || pickingLink || renamingLink || editingNotes != nil || readingInk != nil
-            || isCovered
+            || isCovered || scanning
     }
 
     private func enter(_ mode: EditorMode) {
@@ -689,6 +760,9 @@ fileprivate struct EditorContent: View {
         case .presenting: announce(String(localized: "Presenting. Drag on the page to point."))
         case .replaying: announce(String(localized: "Replaying. Ink appears as it was written; tap ink to jump to that moment."))
         case .selecting: announce(String(localized: "Selecting ink. Draw round ink on any page, then drag it."))
+        case .finding:
+            findText = ""
+            announce(String(localized: "Find in notebook. Type what to look for."))
         }
     }
 
@@ -1048,6 +1122,61 @@ fileprivate struct EditorContent: View {
         .accessibilityIdentifier("editor.ink.bar")
     }
 
+    /// While the notebook is being searched: what to look for, how many times it was found, and the way from one to the next.
+    private var findBar: some View {
+        let finder = session.finder, count = finder.matches.count
+        let asked = !finder.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let status = count > 0 ? String(localized: "\((finder.position ?? 0) + 1) of \(count)")
+                               : asked && !finder.isSearching ? String(localized: "No matches") : ""
+        return HStack(spacing: 0) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(Color.textSecondary)
+                .padding(.trailing, Space.x2)
+                .accessibilityHidden(true)
+            TextField("Find in Notebook", text: $findText, prompt: Text("Find in Notebook").foregroundStyle(Color.textSecondary))
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .submitLabel(.search)
+                .focused($findFocused)
+                .foregroundStyle(Color.ink)
+                .frame(width: isCompact || dynamicTypeSize.isAccessibilitySize ? 150 : 220)
+                .frame(minHeight: 44)
+                .onSubmit {
+                    finder.step(1)
+                    findFocused = true
+                }
+                .onChange(of: findText) { _, text in finder.search(text) }
+                .accessibilityValue(Text(status))
+                .accessibilityIdentifier("editor.find.field")
+            if finder.isSearching, count == 0 {
+                ProgressView().controlSize(.small).padding(.horizontal, Space.x2)
+            } else if !status.isEmpty {
+                Text(status)
+                    .font(.subheadline.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(Color.ink)
+                    .lineLimit(1)
+                    .padding(.horizontal, Space.x2)
+                    .accessibilityIdentifier("editor.find.status")
+            }
+            arrangeButton("Previous Match", "chevron.up") { finder.step(-1) }
+                .disabled(count == 0)
+                .accessibilityIdentifier("editor.find.previous")
+            arrangeButton("Next Match", "chevron.down") { finder.step(1) }
+                .disabled(count == 0)
+                .accessibilityIdentifier("editor.find.next")
+            Divider().frame(height: 24).padding(.horizontal, Space.x2)
+            barDone { enter(.writing) }
+                .accessibilityIdentifier("editor.find.done")
+        }
+        .floatingBar()
+        .padding(.top, Space.x2)
+        .transition(.move(edge: .top).combined(with: .opacity))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(Text("Find in Notebook"))
+        .accessibilityIdentifier("editor.find.bar")
+        .onAppear { findFocused = true }
+    }
+
     /// After a link was followed: the way back to the page it was on, or to the notebook it was in.
     @ViewBuilder
     private var returnBar: some View {
@@ -1203,12 +1332,16 @@ fileprivate struct EditorContent: View {
             Divider()
             Button { importingPDF = true } label: { Label("Insert PDF…", systemImage: "doc.richtext") }
             Button { photoBecomesPage = true; showingPhotoPicker = true } label: { Label("Insert Photo…", systemImage: "photo") }
+            if DocumentScan.isAvailable {
+                Button(action: startScan) { Label("Scan Documents…", systemImage: "doc.viewfinder") }
+            }
             Divider()
             Button { photoBecomesPage = false; showingPhotoPicker = true } label: { Label("Picture on This Page…", systemImage: "photo.on.rectangle.angled") }
             Button { showingStickers = true } label: { Label("Sticker…", systemImage: "seal") }
             Button { session.addText() } label: { Label("Text Box", systemImage: "character.textbox") }
             Button { pickingLink = true } label: { Label("Link…", systemImage: "link") }
             Button { session.addTape() } label: { Label("Study Tape", systemImage: "rectangle.dashed") }
+            Button(action: addAgenda) { Label("Today's Events", systemImage: "calendar") }
         } label: {
             Label("Add", systemImage: "plus")
         }
@@ -1259,6 +1392,12 @@ fileprivate struct EditorContent: View {
             }
             if !session.liftedTapes.isEmpty {
                 Button { session.coverAllTapes() } label: { Label("Put All Tape Back", systemImage: "eye.slash") }
+            }
+            Button { enter(.finding) } label: { Label("Find in Notebook…", systemImage: "magnifyingglass") }
+            if !document.isReadOnly {
+                Button { session.setZoomWindow(!session.isZoomWindowOpen) } label: {
+                    Label(session.isZoomWindowOpen ? "Close Zoom Window" : "Zoom Window", systemImage: "plus.magnifyingglass")
+                }
             }
             Divider()
             Button { enter(.focus) } label: { Label("Focus Mode", systemImage: "arrow.up.left.and.arrow.down.right") }
@@ -1327,6 +1466,46 @@ extension EditorContent {
             }
         }
         session.notebookTitles = titles
+    }
+
+    /// Asks for the calendar the first time, then prints today's events on the page.
+    fileprivate func addAgenda() {
+        document.perform {
+            do {
+                let events = Agenda.ordered(try await Agenda.calendar.events(on: .now, calendar: .current))
+                guard !events.isEmpty else {
+                    errorMessage = String(localized: "There is nothing in your calendar today.")
+                    return
+                }
+                session.addAgenda(events)
+                announce(events.count == 1 ? String(localized: "1 event added to the page") : String(localized: "\(events.count) events added to the page"))
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    fileprivate func startScan() {
+        #if DEBUG
+        if LaunchOptions.arguments.contains("-fakeScan") { return insertScan(DocumentScan.samples()) }
+        #endif
+        scanning = true
+    }
+
+    /// Each scanned sheet becomes a page after the current one, as one undo step.
+    fileprivate func insertScan(_ images: [UIImage]) {
+        guard !images.isEmpty else { return }
+        let position = session.currentPage + 1
+        document.perform {
+            do {
+                let pages = try await DocumentScan.pages(from: images, in: document.package)
+                let position = min(position, document.pages.count)
+                document.insertPages(pages, at: position, actionName: String(localized: "Scan Documents"))
+                session.go(to: position)
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
     }
 
     fileprivate func toggleLock() {

@@ -37,9 +37,6 @@ final class LockUITests: XCTestCase {
             typed = text.count
             sleep(3)
         }
-        search("hello")
-        XCTAssertTrue(notebook.waitForExistence(timeout: 10), "its handwriting is found while it is unlocked")
-        search("")
         notebook.press(forDuration: 1.2)
         app.buttons["Lock…"].firstMatch.tap()
         let locked = NSPredicate(format: "label CONTAINS 'locked'")
@@ -92,5 +89,8 @@ final class LockUITests: XCTestCase {
         app.buttons["editor.back"].tap()
         XCTAssertTrue(notebook.waitForExistence(timeout: 15))
         wait(for: [expectation(for: NSPredicate(format: "NOT (label CONTAINS 'locked')"), evaluatedWith: notebook)], timeout: 10)
+        typed = 0
+        search("hello")
+        XCTAssertTrue(notebook.waitForExistence(timeout: 10), "with the lock off, its handwriting is searched again")
     }
 }

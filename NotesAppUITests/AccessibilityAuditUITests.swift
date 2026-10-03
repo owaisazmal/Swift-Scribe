@@ -37,7 +37,7 @@ final class AccessibilityAuditUITests: XCTestCase {
         empty.terminate()
 
         let app = XCUIApplication()
-        app.launchArguments = ["-storageRoot", "audit", "-resetStorage", "-seedLibrary", "6", "-seedLongPDF", "-seedJournal", "-indexSeed", "-seedActivity", "-seedReplay", "-seedHandwriting", "-fakeTranscript", "-drawingInput", "anyInput"] + extra
+        app.launchArguments = ["-storageRoot", "audit", "-resetStorage", "-seedLibrary", "6", "-seedLongPDF", "-seedJournal", "-indexSeed", "-seedActivity", "-seedReplay", "-seedHandwriting", "-fakeTranscript", "-fakeTranslate", "-fakeCalendar", "-fakeScan", "-fakeUnlockOnce", "-drawingInput", "anyInput"] + extra
         app.launch()
         let textbook = app.buttons["notebook.Textbook"]
         XCTAssertTrue(textbook.waitForExistence(timeout: 90))
@@ -134,7 +134,8 @@ final class AccessibilityAuditUITests: XCTestCase {
         try checkSheet("settings", scrolling: app.collectionViews.firstMatch,
                        formText: ["Cobalt", "Tomato", "Moss", "Oxblood", "Mustard", "Print",
                                   "Stop Using Daily Journal", "About", "Sync with iCloud", "iCloud isn't available", "Sync Now",
-                                  "Back Up Library", "Restore from a Backup", "Straighten Shapes",
+                                  "Back Up Library", "Restore from a Backup", "Straighten Shapes", "Print Today's Events",
+                                  "Find Notebooks in Spotlight", "Notebooks can be found", "Touch and hold a notebook", "A backup is one file",
                                   "Report a Problem or Request a Feature", "Swift Scribe is free and open source"])
         app.buttons["Done"].firstMatch.tap()
 
@@ -330,9 +331,43 @@ final class AccessibilityAuditUITests: XCTestCase {
         XCTAssertTrue(app.textViews["inktext.editor"].waitForExistence(timeout: 20))
         sleep(1)
         try check("handwriting as text", modal: true)
+        let translate = app.buttons["inktext.translate"]
+        XCTAssertTrue(translate.waitForExistence(timeout: 10))
+        translate.tap()
+        app.buttons["French"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["inktext.original"].waitForExistence(timeout: 10))
+        sleep(1)
+        try check("handwriting translated", modal: true, formText: ["Translated into French"])
         app.buttons["Cancel"].firstMatch.tap()
         app.buttons["editor.ink.done"].tap()
         XCTAssertTrue(app.buttons["editor.ribbon"].waitForExistence(timeout: 5))
+
+        // Find, the zoom window, today's events and a scanned sheet.
+        app.buttons["More"].firstMatch.tap()
+        app.buttons["Find in Notebook…"].firstMatch.tap()
+        let find = app.textFields["editor.find.field"]
+        XCTAssertTrue(find.waitForExistence(timeout: 5))
+        find.typeText("hello")
+        XCTAssertTrue(app.staticTexts["editor.find.status"].waitForExistence(timeout: 40))
+        dismissKeyboard()
+        try check("find", bar: app.otherElements["editor.find.bar"])
+        app.buttons["editor.find.done"].tap()
+        XCTAssertTrue(app.buttons["editor.ribbon"].waitForExistence(timeout: 5))
+
+        app.buttons["More"].firstMatch.tap()
+        app.buttons["Zoom Window"].firstMatch.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["zoom.canvas"].waitForExistence(timeout: 10))
+        sleep(1)
+        try check("zoom window")
+        app.buttons["zoom.close"].tap()
+
+        app.buttons["Add"].firstMatch.tap()
+        app.buttons["Today's Events"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["editor.arrange.done"].waitForExistence(timeout: 10))
+        pageText += ["All day", Date.now.formatted(.dateTime.weekday(.wide).day().month(.wide))]
+        sleep(1)
+        try check("today's events", bar: app.otherElements["editor.arrange.bar"])
+        app.buttons["editor.arrange.done"].tap()
 
         app.buttons["editor.title"].tap()
         app.buttons["Export"].firstMatch.tap()
@@ -343,6 +378,13 @@ final class AccessibilityAuditUITests: XCTestCase {
         sleep(1)
         try check("export video", modal: true)
         app.buttons["Done"].firstMatch.tap()
+
+        app.buttons["Add"].firstMatch.tap()
+        app.buttons["Scan Documents…"].firstMatch.tap()
+        let scanned = expectation(for: NSPredicate(format: "label == 'Page 2 of 4'"), evaluatedWith: app.buttons["editor.ribbon"])
+        wait(for: [scanned], timeout: 20)
+        sleep(1)
+        try check("scanned page")
         app.buttons["editor.back"].firstMatch.tap()
 
         // A transcript, and the replay it leads.
@@ -376,5 +418,30 @@ final class AccessibilityAuditUITests: XCTestCase {
         try check("replay with transcript", bar: app.otherElements["editor.replay.bar"])
         app.buttons["editor.replay.done"].tap()
         XCTAssertTrue(app.buttons["editor.ribbon"].waitForExistence(timeout: 5))
+        app.buttons["editor.back"].firstMatch.tap()
+
+        // A notebook locked while it is open stays open until the app leaves the screen; back in front, it is behind its lock.
+        let recipes = app.buttons["notebook.Recipes 4"]
+        // At the large text size the library is a list, and a row further down isn't there until it is scrolled to.
+        for _ in 0..<6 where !recipes.waitForExistence(timeout: 5) {
+            app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.65, dy: 0.7))
+                .press(forDuration: 0.05, thenDragTo: app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.65, dy: 0.3)))
+        }
+        XCTAssertTrue(recipes.exists)
+        recipes.tap()
+        XCTAssertTrue(app.buttons["editor.ribbon"].waitForExistence(timeout: 20))
+        app.buttons["editor.title"].tap()
+        app.buttons["Lock…"].firstMatch.tap()
+        sleep(2)
+        XCUIDevice.shared.press(.home)
+        sleep(2)
+        app.activate()
+        XCTAssertTrue(app.buttons["lock.unlock"].waitForExistence(timeout: 15))
+        sleep(2)
+        try check("locked notebook")
+        app.buttons["lock.close"].tap()
+        XCTAssertTrue(recipes.waitForExistence(timeout: 20))
+        sleep(1)
+        try check("library with a locked notebook")
     }
 }

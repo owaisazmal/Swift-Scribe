@@ -12,10 +12,12 @@ Swift Scribe is built entirely on Apple frameworks (SwiftUI, PencilKit, PDFKit, 
 - Draw and hold: draw a line, circle, ellipse, rectangle, triangle or any figure with straight sides and rest the pen a moment before lifting, and it straightens. Undo gives your own stroke back; Settings › Input turns it off
 - Select ink across pages (⋯ › Select Ink Across Pages): draw round ink on any page, or drag across it, then drag what you caught to move it, onto another page if you like, or duplicate or delete it. Each is one undo step
 - Handwriting to text: with ink selected, Turn into Text reads it on the device and shows the words to correct, copy, or type onto the page in the handwriting's place. One undo brings the handwriting back
+- Translate handwriting: in that same sheet, Translate turns the words into another language with Apple's translator, which works on the iPad once iPadOS has downloaded the language. Show Original brings the words back as they were read. **Needs a check on a device:** the simulator has no translator, so the translation itself has only run through a stand-in
+- Zoom window (⋯ › Zoom Window): a magnified strip along the bottom for writing small and neat. What you write in the strip lands on the page inside a blue outline; when your writing reaches the tinted band on the right and the pen rests, the window moves along the line, and at the end of the line it drops to the start of the next. Drag the outline's tab to place it, and use the strip's buttons to step back and forward, start a new line, bring it to the page you are looking at, or zoom in and out
 - Pinch to zoom up to 5× with crisp ink and backgrounds at every zoom level
 - Pages keep their true relative size; Fit Width (⌘0) and Fit Page (⌘9) enlarge a smaller page
 - Undo / redo (toolbar, tool palette, ⌘Z / ⇧⌘Z), including page operations
-- Hardware keyboard: arrows, space and Page Up/Down to scroll, ⌘↑/⌘↓ for the first and last page, ⌘N for a new page, ⇧⌘P for the page navigator, and ⌘Z to undo library changes too
+- Hardware keyboard: arrows, space and Page Up/Down to scroll, ⌘↑/⌘↓ for the first and last page, ⌘N for a new page, ⇧⌘P for the page navigator, ⌘F to find in the notebook, and ⌘Z to undo library changes too
 - Choose to draw with Apple Pencil only, finger and pencil, or follow the system setting
 - Focus mode (⌃⌘F) puts the toolbar away and leaves the page and your tools
 - Two notebooks in one window: choose Open Another Notebook Beside from a notebook's title menu and write in both, side by side in landscape or one above the other in portrait, with a divider you can drag. Each keeps its own undo, and the tool you choose is the tool in both
@@ -40,11 +42,13 @@ Swift Scribe is built entirely on Apple frameworks (SwiftUI, PencilKit, PDFKit, 
 **PDFs & images**
 - Import PDFs as new notebooks, or insert them into an existing one, and annotate them
 - Insert photos as pages
+- Scan documents (+ › Scan Documents in a notebook, or the library's New menu for a notebook of its own): the camera finds the paper, straightens and crops it, and each sheet becomes a page you can write on. What is printed on a scan or a photo page is read on the device, so search finds it
 - Pictures on a page: add from Photos, drop from another app, or paste (⌘V), then move, resize, rotate, layer or delete them
 - Forty built-in stickers in a soft paper-craft style (sticky notes in six colours, an index card, a taped grid note, torn paper, a kraft tag, washi tapes, doodles, marks and pastel tags), drawn as vectors so they stay sharp at any zoom; ink goes over them, so you can write on a note
 - Stickers of your own: pick a photo and its subject is lifted out with a white die-cut edge (on-device, with Vision), kept in the sticker drawer for every notebook
 - Study tape (+ › Study Tape): a strip of washi tape in four colours that covers what is under it, ink included. Tap it to lift it and tap again to put it back, with a finger or the Pencil; touch and hold to move, stretch or turn it. Lifting is for looking and is never saved, so every strip is back in place the next time you open the notebook. While presenting, lifting a strip reveals the answer on the second screen too
 - Typed text boxes: type on the page, then move, resize, turn and restyle the box (size, bold, colour, alignment); typed text is searchable
+- Today's events (+ › Today's Events): the day's events from your calendar, printed on the page as a text box you can move, restyle or delete
 - Export any notebook as a PDF from the editor or the library (vector backgrounds, stickers and typed text, PDF text stays selectable, bookmarks become the PDF's outline, links between pages and to the web keep working), then share or print
 - Export pages as images: every page of a notebook, or just the one you're on, as PNGs at twice the page's size
 - Export a page as a time-lapse video: the page being written, every stroke in the order and at the pace you made it with the waits taken out, sped up to fit twenty seconds at most. It plays in the export sheet and shares like any video
@@ -62,19 +66,23 @@ Swift Scribe is built entirely on Apple frameworks (SwiftUI, PencilKit, PDFKit, 
 **Organization & search**
 - Cloth, Print (riso) and first-page notebook covers, changeable at any time
 - Quick Note (⇧⌘N) for a new notebook with your default paper
-- A daily journal: Today's page (⌘T) is printed with the date, "On this day" brings back the page from a month or a year ago, and the app reopens the notebook you left open
+- A daily journal: Today's page (⌘T) is printed with the date, "On this day" brings back the page from a month or a year ago, and the app reopens the notebook you left open. With Settings › Daily Journal › Print Today's Events on, each new day's page starts with that day's events from your calendar
+- Locked notebooks: touch and hold a notebook and choose Lock, and it asks for Face ID, Touch ID or the iPad's passcode every time it is opened. Its cover is blurred under a padlock, what is written in it is left out of search, Spotlight, the widgets and On This Day, and it is covered again whenever the app leaves the screen. A lock keeps a notebook closed in the app; it does not encrypt its files
 - Folders with spine colours, and folders inside folders: drag notebooks onto folders in the sidebar, reorder folders, fold a folder's own folders away. A folder shows what is in it and in the folders inside it
 - Favorites, sorting (last opened, modified, created, title), duplicate, rename
 - Recently Deleted with 30-day auto-purge
 - iCloud sync between your iPads (Settings › iCloud, off by default): each notebook is copied whole, a notebook changed on two devices keeps both versions, and a delete never beats newer writing. **Experimental:** the sync logic is tested with a folder standing in for iCloud, but it has not yet run against real iCloud, and it needs a build with the iCloud capability (see Getting started)
 - Back up the whole library into one file (Settings › Backup) and restore it on this or another iPad. Restoring adds what is missing and never replaces a notebook: one that differs from the backup comes back beside yours as a copy
-- Search by title, **handwriting** (on-device OCR with Vision), typed text, imported PDF text, and what was said in transcribed recordings, with page-level results that open at the matching page
+- Search by title, **handwriting** (on-device OCR with Vision), typed text, imported PDF text, the print on scans and photo pages, and what was said in transcribed recordings, with page-level results that open at the matching page
+- Find in a notebook (⌘F, or ⋯ › Find in Notebook): every place the words appear, in handwriting, typed text, PDF text and scans, is marked on the page, and the arrows (or ⌘G and ⇧⌘G) step from one to the next
+- Spotlight: notebooks can be found from the Home Screen by their title or by the words in them (Settings › Search turns it off). The index is kept by iPadOS on the iPad
 
 **Languages**
 - English, Spanish, French and German, including the widgets, the Siri phrases and the permission prompts. The translations were machine-made for this release and have not been reviewed by native speakers; corrections are very welcome
 
 **Widgets & shortcuts**
-- Home Screen widgets: Continue Writing (your last notebook's cover and page), This Week, and Today's Page, plus Lock Screen versions
+- Home Screen widgets: Continue Writing (your last notebook's cover and page), This Week, Today's Page and Quick Note, plus Lock Screen versions
+- Control Center buttons for Quick Note and Today's Page, which can also go on the Action button
 - Shortcuts and Siri: open today's journal page, start a quick note, continue writing, or open a notebook by name
 
 ## Requirements
@@ -85,9 +93,11 @@ Swift Scribe is built entirely on Apple frameworks (SwiftUI, PencilKit, PDFKit, 
 
 ## Privacy
 
-Swift Scribe has no accounts and no analytics. Handwriting and speech are recognised on the device: a recording is only transcribed when you ask, and only if the iPad can do it without sending it anywhere. iCloud sync is off unless you turn it on; with it on, your notebooks, folders and stickers are copied to the app's private container in your own iCloud storage, which Apple syncs between your devices. The writing history is never synced. The writing history behind the week strip and calendar is a small file on your device (`Library/activity.json`) listing the days you wrote and which pages. It is never shared, and Settings › Writing History turns it off or clears it.
+Swift Scribe has no accounts and no analytics. Handwriting and speech are recognised on the device: a recording is only transcribed when you ask, and only if the iPad can do it without sending it anywhere. Translation uses Apple's translator on the iPad. Your calendar is read only when you ask for today's events, or when you have turned on printing them in the journal, and the events go nowhere but onto the page. The camera is used only while you scan. iCloud sync is off unless you turn it on; with it on, your notebooks, folders and stickers are copied to the app's private container in your own iCloud storage, which Apple syncs between your devices. The writing history is never synced. The writing history behind the week strip and calendar is a small file on your device (`Library/activity.json`) listing the days you wrote and which pages. It is never shared, and Settings › Writing History turns it off or clears it.
 
-The widgets read a small snapshot the app writes to its own shared container on the device (the last notebook's title, page and cover, and page counts for recent days). With writing history off, no days are written there.
+The widgets read a small snapshot the app writes to its own shared container on the device (the last notebook's title, page and cover, and page counts for recent days). With writing history off, no days are written there. A locked notebook is never in that snapshot, nor in Spotlight's index, which iPadOS keeps on the device and which Settings › Search switches off.
+
+A locked notebook is closed to anyone using the app without Face ID, Touch ID or the passcode. Its files are not encrypted beyond what iPadOS does for every app, and a backup or an iCloud copy holds it like any other notebook.
 
 ## Getting started
 
@@ -118,11 +128,12 @@ NotesApp/
 ├── Editor/       NotebookDocument (model, undo, autosave), editor chrome, navigator, recorder, second screen
 ├── Library/      Library views, covers, new-notebook sheet, library store, one-editor registry
 ├── Design/       Colour tokens, typography (Fraunces, Bricolage Grotesque), cover renderer
-├── Services/     PDF, image and video export, library backup, iCloud sync, handwriting and speech recognition
+├── Services/     PDF, image and video export, library backup, iCloud sync, handwriting and speech recognition,
+│                 scanning, translation, the calendar, notebook locks, Spotlight
 ├── Settings/     Settings and acknowledgements
 └── Resources/    Bundled fonts with their licences, privacy manifest, string catalogs
-ScribeWidgets/    The widget extension: Continue Writing, This Week, Today's Page
-Shared/           The snapshot the app writes and the widgets read
+ScribeWidgets/    The widget extension: Continue Writing, This Week, Today's Page, Quick Note, and the Control Center buttons
+Shared/           The snapshot the app writes and the widgets read, and what a Control Center button hands the app
 ```
 
 Key design decisions (details and measurements in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); visual system in [docs/DESIGN.md](docs/DESIGN.md)):
@@ -144,6 +155,7 @@ Contributions toward any of these are very welcome:
 
 - [ ] Try iCloud sync on two real devices (it has only run against a stand-in folder), then sync a notebook while it is open
 - [ ] Try transcription on a real iPad, with real speech and a long recording (the simulator can't recognise speech on the device)
+- [ ] Try on a real iPad what the simulator can only stand in for: scanning with the camera, Face ID on a locked notebook, translation, the calendar's permission prompt, the Control Center buttons, and the zoom window with a Pencil
 - [ ] A ruler that spans pages (PencilKit's ruler belongs to one canvas, and each page has its own)
 - [ ] Native-speaker review of the Spanish, French and German translations, and more languages
 - [ ] Plural rules for languages with more than two forms (counts are written as "1 page" / "%lld pages" pairs today)

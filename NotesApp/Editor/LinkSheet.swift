@@ -156,13 +156,17 @@ private struct LinkNotebookPages: View {
                 .prominentButton()
                 .accessibilityHint(Text("The link opens the notebook where you left it"))
                 .accessibilityIdentifier("link.notebook.whole")
-                Text("Or choose the page it opens at.").font(.footnote).foregroundStyle(Color.textSecondary)
-                if dynamicTypeSize.isAccessibilitySize {
-                    LazyVStack(spacing: Space.x3) { cells }
+                if record.isLocked {
+                    Text("This notebook is locked, so its pages aren't shown here.").font(.footnote).foregroundStyle(Color.textSecondary)
                 } else {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 130, maximum: 180), spacing: Space.x5, alignment: .top)], spacing: Space.x6) { cells }
+                    Text("Or choose the page it opens at.").font(.footnote).foregroundStyle(Color.textSecondary)
+                    if dynamicTypeSize.isAccessibilitySize {
+                        LazyVStack(spacing: Space.x3) { cells }
+                    } else {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 130, maximum: 180), spacing: Space.x5, alignment: .top)], spacing: Space.x6) { cells }
+                    }
+                    if !loaded { ProgressView().frame(maxWidth: .infinity) }
                 }
-                if !loaded { ProgressView().frame(maxWidth: .infinity) }
             }
             .padding(Space.x5)
         }
@@ -170,6 +174,7 @@ private struct LinkNotebookPages: View {
         .navigationTitle(record.title)
         .navigationBarTitleDisplayMode(.inline)
         .task(id: record.id) {
+            guard !record.isLocked else { return }
             if let open = DocumentRegistry.shared.document(for: record.id) {
                 pages = open.pages
             } else {

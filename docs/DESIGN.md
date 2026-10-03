@@ -98,6 +98,7 @@ The styles:
 - **Every row stands on a ledge:** a 5 pt Surface band with a Hairline top edge and a baked shadow beneath, 8 pt wider than the row on each side. The "pages, edited" line sits just under it, at the cover's width.
 - Search results show page cards whose matches are bold on a highlighter band (never colour alone): mustard under OnMustard in dark mode, ochre `#806113` under LabelCream on light paper (5.3:1 on Surface, 5.1:1 for the text), because Apple's audit reads a pale band as faint text. The Pages row fades in.
 - The sidebar shows a cloth spine chip for each folder. A folder inside another is indented one step under it, and a folder that holds folders has a chevron on its trailing edge that folds them away.
+- **Locked notebooks.** The cover is blurred past reading (9% of its width) under a cream disc with an ink padlock, and its title is written beneath it, since the cover no longer says it. Behind the lock, the editor shows a padlock in a Surface circle, the notebook's name in the display face, and Unlock beside the way back.
 - **Covers are real buttons.** Each has a full VoiceOver description (title, page count, last edit, favourite, folder), a hover lift, and a typed drag payload (`com.owais.swiftscribe.notebook-reference`).
 - At accessibility text sizes, the grid becomes a list, led by a Continue writing row.
 - **Empty states look like the library.** A new library shows a small illustrated shelf (ghost spines leaning on a cloth notebook) above "Your shelf is ready."; an empty folder says so by name and offers a new notebook there; empty Favourites shows the ribbon.
@@ -111,6 +112,9 @@ The styles:
 - **Replay.** The transport is the floating bar at the bottom: play or pause, the time in semibold tabular numerals, a scrubber, the length, and a filled Done. Ink still to come stays on the page at 16% opacity.
 - **Study tape.** A strip of washi tape in Mustard, Rose, Sage or Sky with pinked ends, pale diagonal stripes and a darker lower edge, 200 by 30 points when placed. It is opaque, because its job is to hide. Lifted, it is a dashed outline in the deeper shade of its colour over a 14% wash, so the answer reads clearly and the strip can still be found.
 - **Transcript.** Lines are rows with the time in small tabular numerals and the words in the body size. The line being said is semibold on a 20% Mustard wash with a Mustard edge, so it never relies on colour alone. Beside a replay it is a 300 pt Surface panel with a Hairline edge, like the presenter view.
+- **Find.** The find bar is a floating bar at the top: a magnifying glass, the field, "3 of 12" in tabular numerals, up and down arrows and a filled Done. Every match on a page gets a 30% Mustard wash with a darker Mustard edge; the one being shown is a 50% wash with an Ink outline (cream on dark paper), so it is told apart by more than colour.
+- **Zoom window.** A Surface strip along the foot of the editor with a Hairline top edge: a row of 44 pt buttons over the magnified paper. The area it shows is outlined on the page in the accent colour, with a small filled tab to drag it by. The last three tenths of both the outline and the strip carry an 8% accent tint: writing there moves the window on.
+- **Today's events.** Plain text in the small size, one event to a line with the time first, below a journal page's printed date and against the right margin. It is a text box like any other once it is there.
 - **Floating bars.** The arrange bar (top, while something on the page is selected), the way back from a link (top) and the presenter's bar (bottom) are one style: a Surface capsule with a Hairline edge and a soft shadow, 44 pt targets, never blurred, and a filled Done.
 - **Selection.** A selected picture, sticker, text box or link gets the stitched outline (mustard dashes over an ink line, so it shows on any paper) and one round handle at its lower corner.
 - **Stickers** are drawn in code (`Sticker`), 100 units wide, in four families. They share one look, taken from the sticky notes: a soft pastel fill, a thin edge in the deeper shade of the same hue, a little light across the top and a faint layered shadow, so each reads as a piece of paper resting on the page. Nothing has a hard white border.
@@ -132,6 +136,7 @@ The styles:
 - **Continue Writing** shows the cover exactly as the shelf draws it (the app renders it), the title, "Page 3 of 12" and, in the medium size, the week strip.
 - **This Week** is the page count for the week over seven leaves, filled on the days written, with today's initial in heavy type. A run of days is mentioned only from two days up, and never as a streak to keep.
 - **Today's Page** is a tear-off calendar leaf: weekday, a large day number, the month, and whether today has been written.
+- **Quick Note** is the pencil-on-square symbol in the accent colour over its name, and the bare symbol on the Lock Screen. The Control Center buttons use the same symbol, and a calendar for Today's Page.
 
 ## App icon
 
