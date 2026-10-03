@@ -1,5 +1,7 @@
 # Swift Scribe
 
+[![CI](https://github.com/owaisazmal/Swift-Scribe/actions/workflows/ci.yml/badge.svg)](https://github.com/owaisazmal/Swift-Scribe/actions/workflows/ci.yml)
+
 **A free, open-source handwritten notes app for iPad. It is a Notability / GoodNotes alternative with no subscriptions, no ads, and no tracking.**
 
 Swift Scribe is built entirely on Apple frameworks (SwiftUI, PencilKit, PDFKit, Vision, SwiftData). Your notes stay on your device unless you turn on iCloud sync, which keeps a copy in your own private iCloud storage.
