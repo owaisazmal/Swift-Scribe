@@ -78,9 +78,7 @@ final class AccessibilityAuditUITests: XCTestCase {
 
         try check("library")
 
-        let field = app.searchFields.firstMatch
-        if !field.exists { app.buttons["Search"].firstMatch.tap() }
-        field.tap()
+        let field = app.openLibrarySearch()
         field.typeText("Chapter 142")
         field.typeText("\n")
         let hit = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Textbook, page 142:")).firstMatch
@@ -199,7 +197,7 @@ final class AccessibilityAuditUITests: XCTestCase {
 
         app.buttons["Add"].firstMatch.tap()
         app.buttons["Link…"].firstMatch.tap()
-        let linkTabs = app.segmentedControls["link.tabs"]
+        let linkTabs = app.element("link.tabs")
         XCTAssertTrue(linkTabs.waitForExistence(timeout: 10))
         sleep(1)
         try check("link picker", modal: true)
@@ -345,7 +343,7 @@ final class AccessibilityAuditUITests: XCTestCase {
         // Find, the zoom window, today's events and a scanned sheet.
         app.buttons["More"].firstMatch.tap()
         app.buttons["Find in Notebook…"].firstMatch.tap()
-        let find = app.textFields["editor.find.field"]
+        let find = app.element("editor.find.field")
         XCTAssertTrue(find.waitForExistence(timeout: 5))
         find.typeText("hello")
         XCTAssertTrue(app.staticTexts["editor.find.status"].waitForExistence(timeout: 40))

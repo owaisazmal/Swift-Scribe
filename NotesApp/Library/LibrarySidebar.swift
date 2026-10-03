@@ -125,8 +125,10 @@ struct LibrarySidebar: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button { showingSettings = true } label: { Label("Settings", systemImage: "gearshape") }
+                    .buttonStyle(.boardIcon)
                     .keyboardShortcut(",", modifiers: .command)
             }
+            .boardBackground()
         }
         .alert("New Folder", isPresented: $creatingFolder) {
             TextField("Name", text: $folderName)

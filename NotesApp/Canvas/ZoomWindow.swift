@@ -250,7 +250,7 @@ final class ZoomWindowPanel: UIView {
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        backgroundColor = .surface
+        backgroundColor = .board
         rule.backgroundColor = .hairline
 
         title.font = .preferredFont(forTextStyle: .subheadline).bold()
@@ -265,12 +265,23 @@ final class ZoomWindowPanel: UIView {
         bar.alignment = .center
         bar.spacing = 2
         bar.addArrangedSubview(title)
+        bar.addInteraction(UILargeContentViewerInteraction())
         for action in Action.allCases {
             var configuration = UIButton.Configuration.plain()
-            configuration.image = UIImage(systemName: action.symbol, withConfiguration: UIImage.SymbolConfiguration(pointSize: 17, weight: .semibold))
+            configuration.image = UIImage(systemName: action.symbol, withConfiguration: UIImage.SymbolConfiguration(pointSize: 17, weight: .medium, scale: .large))
+            configuration.cornerStyle = .capsule
+            configuration.background.backgroundInsets = NSDirectionalEdgeInsets(top: 3, leading: 3, bottom: 3, trailing: 3)
             let button = UIButton(configuration: configuration, primaryAction: UIAction { [weak self] _ in self?.onAction?(action) })
+            button.configurationUpdateHandler = { button in
+                button.configuration?.baseForegroundColor = button.isEnabled ? .ink : UIColor.ink.withAlphaComponent(0.35)
+                let pressed = button.isHighlighted && button.isEnabled
+                button.configuration?.background.backgroundColor = pressed || UIAccessibility.buttonShapesEnabled ? .well : .clear
+            }
             button.accessibilityLabel = action.title
             button.accessibilityIdentifier = action.identifier
+            button.showsLargeContentViewer = true
+            button.largeContentTitle = action.title
+            button.scalesLargeContentImage = true
             button.isPointerInteractionEnabled = true
             button.widthAnchor.constraint(equalToConstant: 44).isActive = true
             button.heightAnchor.constraint(equalToConstant: 44).isActive = true
@@ -308,9 +319,15 @@ final class ZoomWindowPanel: UIView {
             rule.heightAnchor.constraint(equalToConstant: 1),
         ])
         accessibilityIdentifier = "zoom.panel"
+        NotificationCenter.default.addObserver(self, selector: #selector(buttonShapesChanged),
+                                               name: UIAccessibility.buttonShapesEnabledStatusDidChangeNotification, object: nil)
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    @objc private func buttonShapesChanged() {
+        buttons.values.forEach { $0.setNeedsUpdateConfiguration() }
+    }
 
     func setTitle(_ text: String) { title.text = text }
 

@@ -37,10 +37,7 @@ struct CoverEditorView: View {
                         inkPair = RisoInk.pairs.firstIndex { $0.0 == spec.inks.0 && $0.1 == spec.inks.1 } ?? inkPair
                     }
                     .frame(maxWidth: .infinity)
-                    Picker("Cover", selection: $spec.style) {
-                        ForEach(CoverStyle.allCases) { Text($0.displayName).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
+                    ScribeSegmentedPicker("Cover", selection: $spec.style, options: CoverStyle.allCases) { Text($0.displayName) }
                     switch spec.style {
                     case .cloth, .firstPage:
                         Text(spec.style == .cloth ? "Cloth" : "Spine").metaStyle(.footnote).accessibilityAddTraits(.isHeader)
@@ -61,14 +58,19 @@ struct CoverEditorView: View {
             .navigationTitle("Change Cover")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }.buttonStyle(.scribe(.secondary, inBar: true))
+                }
+                .boardBackground()
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         store.setCover(spec, for: record)
                         dismiss()
                     }
+                    .buttonStyle(.scribe(.primary, inBar: true))
                     .keyboardShortcut(.defaultAction)
                 }
+                .boardBackground()
             }
             .onChange(of: inkPair) { _, index in spec.inks = RisoInk.pairs[index] }
         }

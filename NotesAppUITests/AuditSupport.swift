@@ -58,7 +58,8 @@ extension XCTestCase {
                 return true
             }
             // A one-line text field on a floating bar scrolls what doesn't fit, and grows with the text size.
-            if let barFrame, issue.auditType == .textClipped, let element, element.elementType == .textField, barFrame.contains(element.frame) {
+            if let barFrame, issue.auditType == .textClipped, let element, [.textField, .searchField].contains(element.elementType),
+               barFrame.contains(element.frame) {
                 print("AUDIT [\(screen)] ignored, a text field on a floating bar: \(element.identifier)")
                 return true
             }

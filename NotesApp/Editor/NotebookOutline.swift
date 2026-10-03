@@ -98,14 +98,14 @@ struct NotebookOutline: View {
             if bookmarks.isEmpty, contents.isEmpty {
                 ScrollView {
                     ContentUnavailableView {
-                        Label("No Bookmarks Yet", systemImage: "bookmark").foregroundStyle(Color.ink)
+                        Label { Text("No Bookmarks Yet") } icon: { Image(systemName: "bookmark").foregroundStyle(Color.textSecondary) }
+                            .foregroundStyle(Color.ink)
                     } description: {
                         Text("Tap the small ribbon beside the page number to bookmark a page. Bookmarks and a PDF's table of contents are listed here.")
                             .foregroundStyle(Color.textSecondary)
                     }
                 }
                 .scrollBounceBehavior(.basedOnSize)
-                .background(Color.surface)
             } else {
                 List {
                     if !bookmarks.isEmpty {

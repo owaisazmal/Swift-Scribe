@@ -26,15 +26,10 @@ final class LockUITests: XCTestCase {
         let app = XCUIApplication()
         var notebook = launch(app, reset: true, unlock: "-fakeUnlockOnce")
         XCTAssertFalse(notebook.label.contains("locked"))
-        var typed = 0
         func search(_ text: String) {
-            let field = app.searchFields.firstMatch
-            if !field.exists { app.buttons["Search"].firstMatch.tap() }
-            XCTAssertTrue(field.waitForExistence(timeout: 5))
-            field.tap()
+            let field = app.openLibrarySearch()
             XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
-            field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: typed) + text)
-            typed = text.count
+            if !text.isEmpty { field.typeText(text) }
             sleep(3)
         }
         notebook.press(forDuration: 1.2)
@@ -74,6 +69,8 @@ final class LockUITests: XCTestCase {
         XCTAssertTrue(unlock.exists, "and stays when the unlock is refused")
         app.buttons["lock.close"].tap()
         XCTAssertTrue(unlock.waitForNonExistence(timeout: 10))
+        app.buttons["editor.back"].tap()
+        XCTAssertTrue(notebook.waitForExistence(timeout: 15))
         app.terminate()
 
         notebook = launch(app, reset: false, unlock: "-fakeUnlock")
@@ -89,7 +86,6 @@ final class LockUITests: XCTestCase {
         app.buttons["editor.back"].tap()
         XCTAssertTrue(notebook.waitForExistence(timeout: 15))
         wait(for: [expectation(for: NSPredicate(format: "NOT (label CONTAINS 'locked')"), evaluatedWith: notebook)], timeout: 10)
-        typed = 0
         search("hello")
         XCTAssertTrue(notebook.waitForExistence(timeout: 10), "with the lock off, its handwriting is searched again")
     }

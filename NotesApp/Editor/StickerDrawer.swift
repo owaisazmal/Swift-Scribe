@@ -50,7 +50,10 @@ struct StickerDrawer: View {
             .navigationTitle("Stickers")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }.buttonStyle(.scribe(.secondary, inBar: true))
+                }
+                .boardBackground()
             }
         }
         .presentationDetents([.medium, .large])
@@ -91,7 +94,7 @@ struct StickerDrawer: View {
         let root = store.root
         do {
             let photo = SharedPhoto(image: image)
-            try await Task.detached(priority: .userInitiated) { try StickerShelf.add(StickerCutout.sticker(from: photo.image), to: root) }.value
+            _ = try await Task.detached(priority: .userInitiated) { try StickerShelf.add(StickerCutout.sticker(from: photo.image), to: root) }.value
             await reload()
             AccessibilityNotification.Announcement(String(localized: "Sticker made")).post()
         } catch StickerCutout.Failure.noSubject {
@@ -105,7 +108,7 @@ struct StickerDrawer: View {
         let root = store.root, photo = SharedPhoto(image: image)
         Task {
             do {
-                try await Task.detached(priority: .userInitiated) { try StickerShelf.add(StickerCutout.wholePhoto(photo.image), to: root) }.value
+                _ = try await Task.detached(priority: .userInitiated) { try StickerShelf.add(StickerCutout.wholePhoto(photo.image), to: root) }.value
                 await reload()
             } catch {
                 failure = error.localizedDescription

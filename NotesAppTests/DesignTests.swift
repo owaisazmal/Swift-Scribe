@@ -80,6 +80,34 @@ final class DesignTokenTests: XCTestCase {
                              contrast(UIColor.textSecondary.resolvedColor(with: normal), UIColor.desk.resolvedColor(with: normal)))
     }
 
+    private func composite(_ top: UIColor, over bottom: UIColor) -> UIColor {
+        var (r1, g1, b1, a1): (CGFloat, CGFloat, CGFloat, CGFloat) = (0, 0, 0, 0)
+        var (r2, g2, b2, a2): (CGFloat, CGFloat, CGFloat, CGFloat) = (0, 0, 0, 0)
+        top.getRed(&r1, green: &g1, blue: &b1, alpha: &a1)
+        bottom.getRed(&r2, green: &g2, blue: &b2, alpha: &a2)
+        return UIColor(red: r1 * a1 + r2 * (1 - a1), green: g1 * a1 + g2 * (1 - a1), blue: b1 * a1 + b2 * (1 - a1), alpha: 1)
+    }
+
+    /// Words in fields and on buttons: ink and placeholders in a well on every ground, and the label on each kind of button.
+    func testControlTextPairsReachAA() {
+        for style in [UIUserInterfaceStyle.light, .dark] {
+            for level in [UIAccessibilityContrast.normal, .high] {
+                let traits = UITraitCollection { $0.userInterfaceStyle = style; $0.accessibilityContrast = level }
+                let mode = "\(style == .dark ? "dark" : "light")\(level == .high ? "+IC" : "")"
+                for (ground, groundName) in [(UIColor.paper, "paper"), (.desk, "desk"), (.surface, "surface")] {
+                    let well = composite(UIColor.well.resolvedColor(with: traits), over: ground.resolvedColor(with: traits))
+                    XCTAssertGreaterThanOrEqual(contrast(UIColor.ink.resolvedColor(with: traits), well), 7, "ink in a well on \(groundName), \(mode)")
+                    XCTAssertGreaterThanOrEqual(contrast(UIColor.textSecondary.resolvedColor(with: traits), well), 4.5,
+                                                "placeholder in a well on \(groundName), \(mode)")
+                }
+                for (text, fill, name) in [(UIColor.onPrimaryCloth, UIColor.primaryCloth, "primary"), (.onDestructiveCloth, .destructiveCloth, "destructive"),
+                                           (.ink, .board, "board"), (.textSecondary, .board, "board, secondary text")] {
+                    XCTAssertGreaterThanOrEqual(contrast(text.resolvedColor(with: traits), fill.resolvedColor(with: traits)), 4.5, "\(name) button, \(mode)")
+                }
+            }
+        }
+    }
+
     func testIncreaseContrastStrengthensSecondaryText() {
         let normal = UITraitCollection { $0.userInterfaceStyle = .light }
         let high = UITraitCollection { $0.userInterfaceStyle = .light; $0.accessibilityContrast = .high }

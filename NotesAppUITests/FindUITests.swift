@@ -42,7 +42,7 @@ final class FindUITests: XCTestCase {
 
         app.buttons["More"].firstMatch.tap()
         app.buttons["Find in Notebook…"].firstMatch.tap()
-        let field = app.textFields["editor.find.field"]
+        let field = app.element("editor.find.field")
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         field.typeText("hello")
         let status = app.staticTexts["editor.find.status"]
@@ -64,6 +64,6 @@ final class FindUITests: XCTestCase {
         wait(for: [expectation(for: NSPredicate(format: "label == 'No matches'"), evaluatedWith: status)], timeout: 20)
         app.buttons["editor.find.done"].tap()
         XCTAssertTrue(ribbon.waitForExistence(timeout: 5), "back to writing")
-        XCTAssertFalse(app.textFields["editor.find.field"].exists)
+        XCTAssertFalse(app.element("editor.find.field").exists)
     }
 }

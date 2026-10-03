@@ -5,7 +5,7 @@ The visual system is **Clothbound**: a library that looks like a shelf of cloth-
 ## Principles
 
 - The canvas stays quiet. Paper and ink only, and nothing moves while you write.
-- System chrome stays system. Bars, menus and the tool picker are Liquid Glass. We tint them and never imitate them or add blur of our own.
+- Controls are bound like the notebooks. Buttons and bars are boards standing on the desk, fields and tab tracks are wells pressed into it, and the action that finishes a task is cloth. No Liquid Glass and no blur of our own. Menus, alerts, the share sheet and the tool picker stay system.
 - Each control appears in one place. Undo and redo live in the tool picker and return to the top bar only while it's hidden.
 - Colour never carries meaning alone. Favourites get a ribbon plus a spoken label; selection gets stitching plus a check mark.
 
@@ -17,7 +17,7 @@ All tokens live in `Assets.xcassets` with light, dark, and Increase Contrast var
 |---|---|---|---|
 | Paper | `#F1EDE4` | `#181613` | Library ground |
 | Desk | `#E7E2D7` | `#121110` | Around the page in the editor |
-| Surface | `#F8F6F1` | `#211F1B` | Sidebar, sheets |
+| Surface | `#F8F6F1` | `#211F1B` | Sidebar, sheets, and the rows of Settings (which lie on Paper) |
 | Ink | `#1B2230` | `#ECE6DA` | Text |
 | InkSecondary | `#5A6070` | `#A8A194` | Secondary text, small-caps metadata |
 | AccentColor (cobalt ink) | `#2747B8` | `#8FA8FF` | Tint, links, selection |
@@ -28,6 +28,10 @@ All tokens live in `Assets.xcassets` with light, dark, and Increase Contrast var
 | LabelCream | `#F7F1E3` | `#E9E1CE` | Cloth cover labels (kept light in dark mode) |
 | LabelInk, LabelInkSecondary | `#1B2230`, `#5A6070` | `#1B2230`, `#505665` | Text on labels |
 | Hairline | Ink at 15% | Ink at 15% | Rules, page edges; 32% with Increase Contrast |
+| Board | `#FAF7F0` | `#2A2722` | Buttons, bars and tab thumbs (lighter than a dark sheet, so they lift at night) |
+| Well | `#5A4526` at 9% | Black at 38% | Fields and tab tracks, over any ground; 14% and 55% with Increase Contrast |
+| PrimaryCloth, OnPrimaryCloth | `#2747B8`, `#F1EDE4` | `#3A5BB8`, `#ECE6DA` | The finishing button. At night it is the dark app icon's cloth, not the bright tint |
+| DestructiveCloth, OnDestructiveCloth | `#C9452F`, `#FFFFFF` | `#A83E2B`, `#ECE6DA` | The stop-recording button |
 
 Every text pair is checked by `DesignTokenTests.testEveryTextPairReachesAA` in all four appearances. The lowest ratios:
 
@@ -58,6 +62,24 @@ Every text pair is checked by `DesignTokenTests.testEveryTextPairReachesAA` in a
   - 0.18 s ease-out (`Motion.standard`). The favourite ribbon drops on a spring (`Motion.ribbon`).
   - Opening a notebook zooms from its cover on iOS 18+.
   - With Reduce Motion, or on iOS 17, every one of these becomes a cross-fade.
+
+## Controls
+
+Every button, field and tab in the app is drawn by `Design/Controls.swift`, in three materials:
+
+- **Board** (`.board(in:)`): Board fill, a Hairline edge, a lit top edge (white at 85%, 9% at night) and a two-layer umber shadow (`#2A2116`, 10% at 0.5 pt and 7% at 6 pt; black at night). Pressed, it sinks into the well and loses its shadow; disabled, it lies flat. Increase Contrast drops the lit edge.
+- **Well** (`.well(in:)`): the Well colour with an umber inner shadow and a lit lower lip. Its edge is the Hairline, ink at 50% with Increase Contrast, and a 1.5 pt accent ring while it has focus.
+- **Cloth** (`.scribe(.primary)`): PrimaryCloth with the covers' own two-way weave (a 4 pt tile, white 6% and black 7%), the cover board's bevel (white 18% over black 20%) and an umber shadow. Disabled cloth is a well with secondary text. Increase Contrast drops the weave and bevel.
+
+The pieces:
+
+- **Buttons.** `.scribe` is a board with Ink in the medium weight; `.scribe(.primary)` is cloth in semibold, for the one action that finishes a task (Done, Create, Save, Share); `.scribe(.destructive)` is tomato cloth, used only for the stop-recording button. Anything else that deletes is a tomato icon on a board, or an Ink word, and asks before it acts or can be undone. Shapes are 22 pt continuous rounded rectangles, so a one-line button is a capsule and a wrapped one stays a slab. `compact` draws 34 pt inside a 44 pt target. At accessibility sizes, buttons in content wrap to three lines.
+- **Bars.** `BarGroup` puts a row of 44 pt icons (`.barIcon`, Ink, a small well while pressed, Tomato for a destructive role) on one board capsule; `.boardIcon` is a single icon on a round board. Toolbar items wear `.boardBackground()`, which removes the system glass on iPadOS 26 and later. Everything in a bar stops growing at the largest standard text size and shows the Large Content Viewer instead.
+- **Under the bar.** When a bar has no room for a field or a set of tabs (a narrow window, a long translation, text above the Large size), they take a row of their own under it: the navigator's go-to field, the link sheet's tabs, the library's search.
+- **Fields.** `ScribeSearchField` is a capsule well with a glyph, a 44 pt clear button and room for one more control (the navigator's Go arrow). Escape clears it, then leaves it. Sheet fields use `.scribeField(focused:)`, a rounded well.
+- **The library bar.** A board with Sort, New and Select, then the search well (260 pt). When the bar has no room for the field (a narrow window, or a long translation beside the sidebar), it moves to a row of its own under the bar instead of into the system's overflow menu. The sidebar button is a round board like Settings beside it; it shows and hides the sidebar the way the system's did, over the shelves in portrait and beside them in landscape.
+- **Tabs.** `ScribeSegmentedPicker` lays its segments out in equal widths on a well, with one board thumb that slides to the chosen one (it jumps with Reduce Motion). The chosen label is Ink semibold, the others TextSecondary medium, so it never relies on colour alone. In dark mode the thumb carries a 10% ink wash, and with Increase Contrast an InkSecondary edge. VoiceOver reads the segments as tabs.
+- Boards never sit inside scrolling grids or lists, where their shadows would be drawn live.
 
 ## Covers
 
@@ -113,9 +135,9 @@ The styles:
 - **Study tape.** A strip of washi tape in Mustard, Rose, Sage or Sky with pinked ends, pale diagonal stripes and a darker lower edge, 200 by 30 points when placed. It is opaque, because its job is to hide. Lifted, it is a dashed outline in the deeper shade of its colour over a 14% wash, so the answer reads clearly and the strip can still be found.
 - **Transcript.** Lines are rows with the time in small tabular numerals and the words in the body size. The line being said is semibold on a 20% Mustard wash with a Mustard edge, so it never relies on colour alone. Beside a replay it is a 300 pt Surface panel with a Hairline edge, like the presenter view.
 - **Find.** The find bar is a floating bar at the top: a magnifying glass, the field, "3 of 12" in tabular numerals, up and down arrows and a filled Done. Every match on a page gets a 30% Mustard wash with a darker Mustard edge; the one being shown is a 50% wash with an Ink outline (cream on dark paper), so it is told apart by more than colour.
-- **Zoom window.** A Surface strip along the foot of the editor with a Hairline top edge: a row of 44 pt buttons over the magnified paper. The area it shows is outlined on the page in the accent colour, with a small filled tab to drag it by. The last three tenths of both the outline and the strip carry an 8% accent tint: writing there moves the window on.
+- **Zoom window.** A Board strip along the foot of the editor with a Hairline top edge: a row of 44 pt bar icons over the magnified paper. The area it shows is outlined on the page in the accent colour, with a small filled tab to drag it by. The last three tenths of both the outline and the strip carry an 8% accent tint: writing there moves the window on.
 - **Today's events.** Plain text in the small size, one event to a line with the time first, below a journal page's printed date and against the right margin. It is a text box like any other once it is there.
-- **Floating bars.** The arrange bar (top, while something on the page is selected), the way back from a link (top) and the presenter's bar (bottom) are one style: a Surface capsule with a Hairline edge and a soft shadow, 44 pt targets, never blurred, and a filled Done.
+- **Floating bars.** The arrange bar (top, while something on the page is selected), the way back from a link (top) and the presenter's bar (bottom) are one style: a board capsule (see Controls), 44 pt targets, never blurred, and a compact cloth Done.
 - **Selection.** A selected picture, sticker, text box or link gets the stitched outline (mustard dashes over an ink line, so it shows on any paper) and one round handle at its lower corner.
 - **Stickers** are drawn in code (`Sticker`), 100 units wide, in four families. They share one look, taken from the sticky notes: a soft pastel fill, a thin edge in the deeper shade of the same hue, a little light across the top and a faint layered shadow, so each reads as a piece of paper resting on the page. Nothing has a hard white border.
   - Notes and Tape: sticky notes with a folded corner in butter, pink, blue, mint, lavender and peach; a ruled index card, a grid note held by a strip of tape, a torn strip of ruled paper, a kraft tag on a string, the cream label with the cloth label's double hairline, a speech bubble, a ribbon banner, and five washi tapes with pinked ends (three striped, one dotted, one gingham).
@@ -127,7 +149,7 @@ The styles:
 - **Text boxes** are set in the system face, Regular or Bold, at Small (13), Body (17), Large (24) or Title (34), in five tints from the cloth palette: Ink, Tomato, Cobalt, Moss and Plum. On Charcoal and Chalkboard each tint switches to a lighter value. While selected a text box has two handles: the round one at its lower left scales the type, the pill on its right edge changes the width.
 - **Links** are an index tab: a Mustard square with an ink arrow, then the page's name in semibold on label cream, with a white die-cut edge. A link to another notebook has a sage square with a small book, and a web link a sky-blue square with an arrow leaving the page; a link whose page or notebook was deleted has a grey square. After following one, a floating "Back to Page N" (or "Back to" the notebook it came from) sits where the arrange bar would.
 - **The second screen** shows only the page on black, and the laser drawn larger so it reads from across a room. The presenter's bar on the iPad gains a small screen symbol while it is in use.
-- **Focus mode** leaves one control: a 44 pt Surface circle at the top right to come back.
+- **Focus mode** leaves one control: a 44 pt round board at the top right to come back.
 - **The laser** is red `#FF3B2F` or green `#22D36B` with a white core and a glow, and a tail that fades over 0.9 s.
 
 ## Widgets

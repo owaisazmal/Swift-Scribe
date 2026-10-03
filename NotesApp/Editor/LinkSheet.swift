@@ -19,21 +19,29 @@ struct LinkSheet: View {
                 case .web: LinkAddressForm(choose: choose)
                 }
             }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                ScribeSegmentedPicker("Link to", selection: $tab, options: [Tab.pages, .notebooks, .web]) { tab in
+                    switch tab {
+                    case .pages: Text("This Notebook")
+                    case .notebooks: Text("Another Notebook")
+                    case .web: Text("Web")
+                    }
+                }
+                .accessibilityIdentifier("link.tabs")
+                .padding(.horizontal, Space.x5)
+                .padding(.top, Space.x2)
+                .padding(.bottom, Space.x1)
+                .background(Color.desk)
+            }
             .background(Color.desk)
             .navigationTitle("Add a Link")
             .navigationBarTitleDisplayMode(.inline)
+            .barGround(Color.desk)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .principal) {
-                    Picker("Link to", selection: $tab) {
-                        Text("This Notebook").tag(Tab.pages)
-                        Text("Another Notebook").tag(Tab.notebooks)
-                        Text("Web").tag(Tab.web)
-                    }
-                    .pickerStyle(.segmented)
-                    .fixedSize()
-                    .accessibilityIdentifier("link.tabs")
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }.buttonStyle(.scribe(.secondary, inBar: true))
                 }
+                .boardBackground()
             }
         }
     }
@@ -230,36 +238,53 @@ private struct LinkAddressForm: View {
     let choose: (PageLink) -> Void
     @State private var address = ""
     @State private var label = ""
-    @FocusState private var focused: Bool
+    @FocusState private var field: Field?
+
+    private enum Field { case address, name }
 
     private var url: URL? { WebAddress.url(from: address) }
 
     var body: some View {
-        Form {
-            Section {
-                TextField("Address", text: $address, prompt: Text("example.com"))
-                    .keyboardType(.URL)
-                    .textContentType(.URL)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .focused($focused)
-                    .submitLabel(.done)
-                    .onSubmit(add)
-                    .accessibilityIdentifier("link.web.address")
-                TextField("Name", text: $label, prompt: Text("Optional"))
-                    .accessibilityIdentifier("link.web.name")
-            } footer: {
-                Text("Tapping the link opens the address in your browser. Without a name, the link shows the address.")
-                    .foregroundStyle(Color.textSecondary)
-            }
-            Section {
+        ScrollView {
+            VStack(alignment: .leading, spacing: Space.x5) {
+                VStack(alignment: .leading, spacing: Space.x2) {
+                    Text("Address").metaStyle(.footnote).accessibilityHidden(true)
+                    TextField("Address", text: $address, prompt: Text("example.com").foregroundStyle(Color.textSecondary))
+                        .keyboardType(.URL)
+                        .textContentType(.URL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .focused($field, equals: .address)
+                        .submitLabel(.done)
+                        .onSubmit(add)
+                        .accessibilityIdentifier("link.web.address")
+                        .padding(.vertical, Space.x2)
+                        .scribeField(focused: field == .address)
+                }
+                VStack(alignment: .leading, spacing: Space.x2) {
+                    Text("Name").metaStyle(.footnote).accessibilityHidden(true)
+                    TextField("Name", text: $label, prompt: Text("Optional").foregroundStyle(Color.textSecondary))
+                        .focused($field, equals: .name)
+                        .submitLabel(.done)
+                        .onSubmit(add)
+                        .accessibilityIdentifier("link.web.name")
+                        .padding(.vertical, Space.x2)
+                        .scribeField(focused: field == .name)
+                    Text("Tapping the link opens the address in your browser. Without a name, the link shows the address.")
+                        .font(.footnote)
+                        .foregroundStyle(Color.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 Button("Add Link", action: add)
+                    .buttonStyle(.scribe(.primary))
                     .disabled(url == nil)
                     .accessibilityIdentifier("link.web.add")
+                    .frame(maxWidth: .infinity, alignment: .trailing)
             }
+            .padding(Space.x5)
         }
-        .scrollContentBackground(.hidden)
-        .onAppear { focused = true }
+        .scrollBounceBehavior(.basedOnSize)
+        .onAppear { field = .address }
     }
 
     private func add() {

@@ -57,9 +57,9 @@ extension ClothColor {
 }
 
 extension View {
-    /// The filled button, with paper-coloured text: white fails on the dark-mode tint.
-    func prominentButton() -> some View {
-        buttonStyle(.borderedProminent).foregroundStyle(Color.paper)
+    /// The filled cloth button that finishes a task.
+    func prominentButton(compact: Bool = false) -> some View {
+        buttonStyle(.scribe(.primary, compact: compact))
     }
 }
 

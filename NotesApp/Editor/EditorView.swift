@@ -494,6 +494,10 @@ fileprivate struct EditorContent: View {
     @State private var scanning = false
     @State private var findText = ""
     @FocusState private var findFocused: Bool
+    @ScaledMetric(relativeTo: .body) private var findWidth: CGFloat = 260
+    @ScaledMetric(relativeTo: .body) private var compactFindWidth: CGFloat = 190
+    @State private var undoGroupWidth: CGFloat = 96
+    @State private var buttonGroupWidth: CGFloat = 232
 
     private struct NotesTarget: Identifiable {
         let id: UUID
@@ -797,31 +801,59 @@ fileprivate struct EditorContent: View {
             } label: {
                 if pane == .secondary { Label("Close", systemImage: "xmark") } else { Label("Library", systemImage: "chevron.backward") }
             }
+            .buttonStyle(.boardIcon)
             .keyboardShortcut(shortcut("w", always: true))
             .accessibilityIdentifier(pane == .secondary ? "editor.close.pane" : "editor.back")
         }
+        .boardBackground()
         ToolbarItem(placement: .principal) { titleMenu }
-        ToolbarItemGroup(placement: .topBarTrailing) {
-            Button { document.undoManager.undo() } label: { Label("Undo", systemImage: "arrow.uturn.backward") }
-                .keyboardShortcut(session.isEditingText ? nil : shortcut("z"))
-                .disabled(!session.canUndo)
-                .accessibilityIdentifier("editor.undo")
-            Button { document.undoManager.redo() } label: { Label("Redo", systemImage: "arrow.uturn.forward") }
-                .keyboardShortcut(session.isEditingText ? nil : shortcut("z", [.command, .shift]))
-                .disabled(!session.canRedo)
-                .accessibilityIdentifier("editor.redo")
-        }
-        ToolbarItemGroup(placement: .topBarTrailing) {
-            addMenu
-            if !isNarrow {
-                recordButton
-                recordingsButton
-                toolsButton
-            } else if session.recorder.isRecording {
-                recordButton
+        if isNarrow {
+            ToolbarItem(placement: .topBarTrailing) {
+                BarGroup {
+                    undoButtons
+                    addMenu
+                    if session.recorder.isRecording { recordButton }
+                    moreMenu
+                }
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { buttonGroupWidth = $0 }
             }
-            moreMenu
+            .boardBackground()
+        } else {
+            ToolbarItem(placement: .topBarTrailing) {
+                BarGroup { undoButtons }
+                    .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { undoGroupWidth = $0 }
+            }
+            .boardBackground()
+            ToolbarItem(placement: .topBarTrailing) {
+                BarGroup {
+                    addMenu
+                    recordButton
+                    recordingsButton
+                    toolsButton
+                    moreMenu
+                }
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { buttonGroupWidth = $0 }
+            }
+            .boardBackground()
         }
+    }
+
+    @ViewBuilder
+    private var undoButtons: some View {
+        Button { document.undoManager.undo() } label: { Label("Undo", systemImage: "arrow.uturn.backward") }
+            .keyboardShortcut(session.isEditingText ? nil : shortcut("z"))
+            .disabled(!session.canUndo)
+            .accessibilityIdentifier("editor.undo")
+        Button { document.undoManager.redo() } label: { Label("Redo", systemImage: "arrow.uturn.forward") }
+            .keyboardShortcut(session.isEditingText ? nil : shortcut("z", [.command, .shift]))
+            .disabled(!session.canRedo)
+            .accessibilityIdentifier("editor.redo")
+    }
+
+    /// The bar lets a long title run under the buttons, so the title is given what they leave.
+    private var titleRoom: CGFloat {
+        let buttons = isNarrow ? buttonGroupWidth : undoGroupWidth + buttonGroupWidth + Space.x4
+        return max(paneWidth - buttons - 90, 44)
     }
 
     private var toolsButton: some View {
@@ -868,6 +900,8 @@ fileprivate struct EditorContent: View {
                 Text(document.title).font(.headline).foregroundStyle(Color.ink).lineLimit(1)
                 Image(systemName: "chevron.down").font(.caption.weight(.semibold)).foregroundStyle(Color.textSecondary)
             }
+            .frame(maxWidth: titleRoom)
+            .fixedSize(horizontal: true, vertical: false)
         }
         .accessibilityLabel(Text("\(document.title), notebook options"))
         .accessibilityIdentifier("editor.title")
@@ -877,7 +911,7 @@ fileprivate struct EditorContent: View {
         Button { showingRecordings = true } label: { Label("Recordings", systemImage: "waveform") }
             .popover(isPresented: $showingRecordings) {
                 recordingList { showingRecordings = false }
-                    .frame(minWidth: 400, minHeight: 440)
+                    .frame(minWidth: 460, minHeight: 440)
                     .presentationBackground(Color.surface)
                     .presentationCompactAdaptation(.sheet)
             }
@@ -978,20 +1012,11 @@ fileprivate struct EditorContent: View {
     }
 
     private var focusExit: some View {
-        Button { enter(.writing) } label: {
-            Image(systemName: "arrow.down.right.and.arrow.up.left")
-                .font(.body.weight(.semibold))
-                .foregroundStyle(Color.ink)
-                .frame(width: 44, height: 44)
-                .background(Color.surface, in: Circle())
-                .overlay { Circle().strokeBorder(Color.hairline) }
-        }
-        .buttonStyle(.plain)
-        .hoverEffect(.lift)
-        .padding(.trailing, Space.x5)
-        .padding(.top, Space.x2)
-        .accessibilityLabel(Text("Exit Focus Mode"))
-        .accessibilityIdentifier("editor.focus.exit")
+        Button { enter(.writing) } label: { Label("Exit Focus Mode", systemImage: "arrow.down.right.and.arrow.up.left") }
+            .buttonStyle(.boardIcon)
+            .padding(.trailing, Space.x8)
+            .padding(.top, Space.x2)
+            .accessibilityIdentifier("editor.focus.exit")
     }
 
     /// Shown while something on the page is selected. A text box and a link add their own controls in front.
@@ -1024,17 +1049,15 @@ fileprivate struct EditorContent: View {
                     Button { session.moveSelection(forward: true) } label: { Label("Bring Forward", systemImage: "square.2.layers.3d.top.filled") }
                     Button { session.moveSelection(forward: false) } label: { Label("Send Backward", systemImage: "square.2.layers.3d.bottom.filled") }
                 } label: {
-                    Image(systemName: "ellipsis").frame(width: 44, height: 44)
+                    Label("More", systemImage: "ellipsis")
                 }
-                .accessibilityLabel(Text("More"))
             } else {
                 arrangeButton("Duplicate", "plus.square.on.square") { session.duplicateSelection() }
                 arrangeButton("Bring Forward", "square.2.layers.3d.top.filled") { session.moveSelection(forward: true) }
                 arrangeButton("Send Backward", "square.2.layers.3d.bottom.filled") { session.moveSelection(forward: false) }
             }
-            arrangeButton("Delete", "trash") { session.deleteSelection() }
-                .foregroundStyle(Color.tomato)
-            Divider().frame(height: 24).padding(.horizontal, Space.x2)
+            arrangeButton("Delete", "trash", role: .destructive) { session.deleteSelection() }
+            barRule
             barDone { session.canvas?.select(nil) }
                 .accessibilityIdentifier("editor.arrange.done")
         }
@@ -1063,9 +1086,8 @@ fileprivate struct EditorContent: View {
             }
             .pickerStyle(.menu)
         } label: {
-            Image(systemName: "textformat.size").frame(width: 44, height: 44)
+            Label("Text Style", systemImage: "textformat.size")
         }
-        .accessibilityLabel(Text("Text Style"))
         .accessibilityIdentifier("editor.arrange.style")
     }
 
@@ -1075,9 +1097,8 @@ fileprivate struct EditorContent: View {
                 ForEach(TapeColor.allCases) { Text($0.displayName).tag($0) }
             }
         } label: {
-            Image(systemName: "paintpalette").frame(width: 44, height: 44)
+            Label("Tape Colour", systemImage: "paintpalette")
         }
-        .accessibilityLabel(Text("Tape Colour"))
         .accessibilityValue(Text(current.displayName))
         .accessibilityIdentifier("editor.arrange.tape")
     }
@@ -1085,9 +1106,10 @@ fileprivate struct EditorContent: View {
     /// While ink is being selected across pages: what to do, then what can be done with what was caught.
     private var inkBar: some View {
         let count = session.inkSelectionCount
+        // With ink caught, the buttons need the room in a narrow pane and at the largest text sizes.
+        let says = count == 0 || !(isCompact || dynamicTypeSize.isAccessibilitySize)
         return HStack(spacing: 0) {
-            // With ink caught, the buttons need the room in a narrow pane and at the largest text sizes.
-            if count == 0 || !(isCompact || dynamicTypeSize.isAccessibilitySize) {
+            if says {
                 Text(count == 0 ? String(localized: "Draw round ink on any page")
                                 : String(localized: "\(count) strokes. Drag them to move them."))
                     .font(.subheadline.weight(.semibold))
@@ -1103,18 +1125,17 @@ fileprivate struct EditorContent: View {
                 .accessibilityIdentifier("editor.ink.text")
                 arrangeButton("Duplicate", "plus.square.on.square") { session.canvas?.duplicateInkSelection() }
                     .accessibilityIdentifier("editor.ink.duplicate")
-                arrangeButton("Delete", "trash") { session.canvas?.deleteInkSelection() }
-                    .foregroundStyle(Color.tomato)
+                arrangeButton("Delete", "trash", role: .destructive) { session.canvas?.deleteInkSelection() }
                     .accessibilityIdentifier("editor.ink.delete")
             }
             arrangeButton("Undo", "arrow.uturn.backward") { document.undoManager.undo() }
                 .disabled(!session.canUndo)
                 .accessibilityIdentifier("editor.ink.undo")
-            Divider().frame(height: 24).padding(.horizontal, Space.x2)
+            barRule
             barDone { enter(.writing) }
                 .accessibilityIdentifier("editor.ink.done")
         }
-        .floatingBar()
+        .floatingBar(leading: says ? Space.x5 : Space.x1)
         .padding(.top, Space.x2)
         .transition(.move(edge: .top).combined(with: .opacity))
         .accessibilityElement(children: .contain)
@@ -1129,25 +1150,17 @@ fileprivate struct EditorContent: View {
         let status = count > 0 ? String(localized: "\((finder.position ?? 0) + 1) of \(count)")
                                : asked && !finder.isSearching ? String(localized: "No matches") : ""
         return HStack(spacing: 0) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(Color.textSecondary)
-                .padding(.trailing, Space.x2)
-                .accessibilityHidden(true)
-            TextField("Find in Notebook", text: $findText, prompt: Text("Find in Notebook").foregroundStyle(Color.textSecondary))
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .submitLabel(.search)
-                .focused($findFocused)
-                .foregroundStyle(Color.ink)
-                .frame(width: isCompact || dynamicTypeSize.isAccessibilitySize ? 150 : 220)
-                .frame(minHeight: 44)
+            ScribeSearchField("Find in Notebook", text: $findText, handlesEscape: false, capsTextSize: false, identifier: "editor.find.field",
+                              value: Text(status), focus: $findFocused)
+                .fontWeight(.regular)
                 .onSubmit {
                     finder.step(1)
                     findFocused = true
                 }
                 .onChange(of: findText) { _, text in finder.search(text) }
-                .accessibilityValue(Text(status))
-                .accessibilityIdentifier("editor.find.field")
+                .frame(width: isCompact || dynamicTypeSize.isAccessibilitySize ? min(compactFindWidth, 240) : min(findWidth, 340))
+                .padding(.vertical, 2)
+                .padding(.trailing, Space.x1)
             if finder.isSearching, count == 0 {
                 ProgressView().controlSize(.small).padding(.horizontal, Space.x2)
             } else if !status.isEmpty {
@@ -1164,7 +1177,7 @@ fileprivate struct EditorContent: View {
             arrangeButton("Next Match", "chevron.down") { finder.step(1) }
                 .disabled(count == 0)
                 .accessibilityIdentifier("editor.find.next")
-            Divider().frame(height: 24).padding(.horizontal, Space.x2)
+            barRule
             barDone { enter(.writing) }
                 .accessibilityIdentifier("editor.find.done")
         }
@@ -1193,59 +1206,60 @@ fileprivate struct EditorContent: View {
     private func returnBar(_ title: String, back: @escaping () -> Void, dismiss: @escaping () -> Void) -> some View {
         HStack(spacing: 0) {
             Button(action: back) {
-                Label(title, systemImage: "arrow.uturn.backward")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Color.ink)
-                    .lineLimit(1)
-                    .frame(minHeight: 44)
+                HStack(spacing: Space.x2) {
+                    Image(systemName: "arrow.uturn.backward").accessibilityHidden(true)
+                    Text(title)
+                }
+                .font(.subheadline.weight(.semibold))
+                .imageScale(.medium)
+                .padding(.horizontal, Space.x1)
             }
             .accessibilityIdentifier("editor.link.back")
-            Button(action: dismiss) { Image(systemName: "xmark").font(.footnote.weight(.bold)).frame(width: 44, height: 44) }
-                .foregroundStyle(Color.textSecondary)
-                .accessibilityLabel(Text("Dismiss"))
+            barRule
+            Button(action: dismiss) { Label("Dismiss", systemImage: "xmark").imageScale(.medium) }
         }
-        .padding(.leading, Space.x2)
         .frame(maxWidth: 420)
-        .floatingBar()
+        .floatingBar(leading: Space.x1, trailing: Space.x1)
         .padding(.top, Space.x2)
         .transition(.move(edge: .top).combined(with: .opacity))
     }
 
-    /// Filled, like the library slip's Undo.
+    /// Cloth, like the library slip's Undo.
     private func barDone(_ action: @escaping () -> Void) -> some View {
         Button("Done", action: action)
-            .font(.subheadline.weight(.semibold))
-            .lineLimit(1)
-            .fixedSize()
-            .prominentButton()
+            .buttonStyle(.scribe(.primary, compact: true, inBar: true))
             .padding(.leading, Space.x1)
     }
 
-    private func arrangeButton(_ title: LocalizedStringKey, _ symbol: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) { Image(systemName: symbol).frame(width: 44, height: 44) }
-            .accessibilityLabel(Text(title))
+    private var barRule: some View {
+        Rectangle().fill(Color.hairline).frame(width: 1, height: 24).padding(.horizontal, Space.x2)
+    }
+
+    private func arrangeButton(_ title: LocalizedStringKey, _ symbol: String, role: ButtonRole? = nil, action: @escaping () -> Void) -> some View {
+        Button(role: role, action: action) { Label(title, systemImage: symbol) }
     }
 
     private var presentationBar: some View {
         let page = min(session.currentPage + 1, document.pages.count), count = document.pages.count
-        return HStack(spacing: Space.x2) {
-            Button { session.step(-1) } label: { Image(systemName: "chevron.up").frame(width: 44, height: 44) }
+        return HStack(spacing: 0) {
+            Button { session.step(-1) } label: { Label("Previous Page", systemImage: "chevron.up") }
                 .disabled(page <= 1)
-                .accessibilityLabel(Text("Previous Page"))
             Text("Page \(page) of \(count)")
                 .font(.subheadline.weight(.semibold).monospacedDigit())
                 .foregroundStyle(Color.ink)
                 .lineLimit(1)
                 .fixedSize()
-            Button { session.step(1) } label: { Image(systemName: "chevron.down").frame(width: 44, height: 44) }
+                .padding(.horizontal, Space.x1)
+            Button { session.step(1) } label: { Label("Next Page", systemImage: "chevron.down") }
                 .disabled(page >= count)
-                .accessibilityLabel(Text("Next Page"))
                 .accessibilityIdentifier("editor.present.next")
-            Divider().frame(height: 24)
+            barRule
             if ExternalDisplay.shared.isShowing {
                 Image(systemName: "tv")
-                    .foregroundStyle(Color.ink)
-                    .frame(width: 32, height: 44)
+                    .font(.body.weight(.medium))
+                    .imageScale(.large)
+                    .foregroundStyle(Color.textSecondary)
+                    .frame(width: 44, height: 44)
                     .accessibilityLabel(Text("Showing on the second screen"))
                     .accessibilityIdentifier("editor.present.screen")
             }
@@ -1254,11 +1268,9 @@ fileprivate struct EditorContent: View {
                     let shows = showsPresenterPanel
                     withAnimation(Motion.adaptive(Motion.standard, reduceMotion: reduceMotion)) { presenterPanel = !shows }
                 } label: {
-                    Image(systemName: "sidebar.trailing")
+                    Label("Notes and Next Page", systemImage: "sidebar.trailing")
                         .symbolVariant(showsPresenterPanel ? .fill : .none)
-                        .frame(width: 44, height: 44)
                 }
-                .accessibilityLabel(Text("Notes and Next Page"))
                 .accessibilityValue(Text(showsPresenterPanel ? "Showing" : "Hidden"))
                 .accessibilityIdentifier("editor.present.notes")
             }
@@ -1269,7 +1281,6 @@ fileprivate struct EditorContent: View {
                     .fill(Color(uiColor: session.laserColor.uiColor))
                     .frame(width: 18, height: 18)
                     .overlay { Circle().strokeBorder(Color.ink.opacity(0.35)) }
-                    .frame(width: 44, height: 44)
             }
             .accessibilityLabel(Text("Laser Colour"))
             .accessibilityValue(Text(session.laserColor.displayName))
@@ -1310,10 +1321,9 @@ fileprivate struct EditorContent: View {
                             .animation(Motion.adaptive(Motion.standard, reduceMotion: reduceMotion), value: seconds)
                     }
                 }
-                .foregroundStyle(Color.onTomato)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(Color.tomato)
+            .buttonStyle(.scribe(.destructive, compact: true, inBar: true))
+            .padding(.horizontal, Space.x1)
             .accessibilityLabel(Text("Stop Recording"))
             .accessibilityValue(Text(Duration.seconds(seconds).formatted(.units(allowed: [.minutes, .seconds], width: .wide))))
             .accessibilityIdentifier("editor.record")
@@ -1555,15 +1565,16 @@ extension EditorContent {
 }
 
 private extension View {
-    /// The capsule that floats over the page: the presenter's controls and the arrange bar.
-    func floatingBar() -> some View {
+    /// The board capsule that floats over the page: the presenter's controls and the arrange bar.
+    func floatingBar(leading: CGFloat = Space.x1, trailing: CGFloat = Space.x2) -> some View {
         fontWeight(.semibold)
-            .padding(.horizontal, Space.x4)
+            .buttonStyle(.barIcon)
+            .menuStyle(.button)
+            .padding(.leading, leading)
+            .padding(.trailing, trailing)
             .padding(.vertical, 2)
             .fixedSize()
-            .background(Color.surface, in: Capsule())
-            .overlay { Capsule().strokeBorder(Color.hairline) }
-            .shadow(color: .black.opacity(0.12), radius: 8, y: 3)
+            .board(in: Capsule())
     }
 }
 
@@ -1614,23 +1625,22 @@ struct NoticeBanner: View {
     let dismiss: () -> Void
 
     var body: some View {
-        HStack(alignment: .top, spacing: Space.x3) {
+        let dismissable = notice.kind != .saveFailed
+        HStack(spacing: Space.x3) {
             Image(systemName: notice.kind == .saveFailed ? "exclamationmark.icloud" : "info.circle")
                 .foregroundStyle(notice.kind == .saveFailed ? Color.tomato : Color.accentColor)
             Text(notice.message).font(.subheadline).foregroundStyle(Color.ink).fixedSize(horizontal: false, vertical: true)
-            if notice.kind != .saveFailed {
-                Button(action: dismiss) { Image(systemName: "xmark").font(.caption.weight(.bold)) }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Color.inkSecondary)
-                    .accessibilityLabel("Dismiss")
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if dismissable {
+                Button(action: dismiss) { Label("Dismiss", systemImage: "xmark").imageScale(.medium) }
+                    .buttonStyle(.barIcon)
             }
         }
-        .padding(.horizontal, Space.x4)
-        .padding(.vertical, Space.x3)
+        .padding(.leading, Space.x4)
+        .padding(.trailing, dismissable ? Space.x1 : Space.x4)
+        .padding(.vertical, dismissable ? Space.x1 : Space.x3)
         .frame(maxWidth: 520, alignment: .leading)
-        .background(Color.surface, in: RoundedRectangle(cornerRadius: Radius.control))
-        .overlay { RoundedRectangle(cornerRadius: Radius.control).strokeBorder(Color.hairline) }
-        .shadow(color: .black.opacity(0.08), radius: 6, y: 2)
+        .board(in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
         .padding(.horizontal, Space.x4)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isStaticText)
@@ -1650,11 +1660,11 @@ struct RecordingList: View {
                 ForEach(Array(recorder.recordings.enumerated()), id: \.element.id) { index, recording in
                     HStack(spacing: Space.x3) {
                         Button { recorder.togglePlayback(recording) } label: {
-                            Image(systemName: recorder.playingID == recording.id ? "stop.circle.fill" : "play.circle.fill").font(.title)
+                            Label(recorder.playingID == recording.id ? "Stop" : "Play",
+                                  systemImage: recorder.playingID == recording.id ? "stop.circle.fill" : "play.circle.fill")
                         }
-                        .buttonStyle(.borderless)
+                        .buttonStyle(.barIcon)
                         .disabled(recorder.isRecording)
-                        .accessibilityLabel(recorder.playingID == recording.id ? "Stop" : "Play")
                         HStack(spacing: Space.x3) {
                             VStack(alignment: .leading, spacing: Space.x1) {
                                 Text("Recording \(index + 1)").font(.body.weight(.medium))
@@ -1667,24 +1677,20 @@ struct RecordingList: View {
                         }
                         .frame(minHeight: 44)
                         .accessibilityElement(children: .combine)
-                        Button { path.append(recording.id) } label: {
-                            Image(systemName: "quote.bubble").symbolVariant(recording.transcriptFile == nil ? .none : .fill)
-                                .font(.title3).frame(width: 44, height: 44)
-                        }
-                        .buttonStyle(.borderless)
-                        .accessibilityLabel(Text("Transcript"))
-                        .accessibilityValue(Text(recorder.transcribing[recording.id] != nil ? "Transcribing" : recording.transcriptFile == nil ? "Not transcribed" : "Transcribed"))
-                        .accessibilityIdentifier("recording.transcript.\(index + 1)")
-                        if let replay {
-                            Button { replay(recording, 0) } label: {
-                                Image(systemName: "pencil.and.scribble").font(.title3).frame(width: 44, height: 44)
+                        HStack(spacing: 0) {
+                            Button { path.append(recording.id) } label: {
+                                Label("Transcript", systemImage: "quote.bubble").symbolVariant(recording.transcriptFile == nil ? .none : .fill)
                             }
-                            .buttonStyle(.borderless)
-                            .disabled(recorder.isRecording)
-                            .accessibilityLabel(Text("Replay with Ink"))
-                            .accessibilityHint(Text("Plays the recording while the ink written during it appears"))
-                            .accessibilityIdentifier("recording.replay.\(index + 1)")
+                            .accessibilityValue(Text(recorder.transcribing[recording.id] != nil ? "Transcribing" : recording.transcriptFile == nil ? "Not transcribed" : "Transcribed"))
+                            .accessibilityIdentifier("recording.transcript.\(index + 1)")
+                            if let replay {
+                                Button { replay(recording, 0) } label: { Label("Replay with Ink", systemImage: "pencil.and.scribble") }
+                                    .disabled(recorder.isRecording)
+                                    .accessibilityHint(Text("Plays the recording while the ink written during it appears"))
+                                    .accessibilityIdentifier("recording.replay.\(index + 1)")
+                            }
                         }
+                        .buttonStyle(.barIcon)
                     }
                     .swipeActions {
                         if !recorder.isReadOnly {

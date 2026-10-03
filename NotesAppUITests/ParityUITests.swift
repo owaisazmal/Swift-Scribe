@@ -28,9 +28,7 @@ final class ParityUITests: XCTestCase {
         let textbook = app.buttons["notebook.Textbook"]
         XCTAssertTrue(textbook.waitForExistence(timeout: 90))
 
-        app.buttons["Search"].firstMatch.tap()
-        let field = app.searchFields.firstMatch
-        XCTAssertTrue(field.waitForExistence(timeout: 5), "library search opens")
+        let field = app.openLibrarySearch()
         field.typeText("Chapter 142")
         let hit = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Textbook, page 142:")).firstMatch
         XCTAssertTrue(hit.waitForExistence(timeout: 20), "a page-level result for page 142")
@@ -46,9 +44,8 @@ final class ParityUITests: XCTestCase {
         app.buttons["Done"].firstMatch.tap()
         app.buttons["editor.back"].tap()
         XCTAssertTrue(textbook.waitForExistence(timeout: 20))
-        field.tap()
-        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
-        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 12))
+        app.openLibrarySearch()
+        XCTAssertFalse(app.buttons["library.search.clear"].exists, "the clear button empties the field")
 
         app.typeKey("n", modifierFlags: [.command, .shift])
         let canvas = app.descendants(matching: .any)["page.canvas.1"]

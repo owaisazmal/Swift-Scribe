@@ -19,6 +19,7 @@ struct InkTextSheet: View {
     @State private var configuration: TranslationSession.Configuration?
     @State private var isTranslating = false
     @State private var failure: String?
+    @FocusState private var editing: Bool
 
     private enum Phase { case reading, ready, nothing, failed }
 
@@ -34,13 +35,16 @@ struct InkTextSheet: View {
                         TextEditor(text: $text)
                             .font(.body)
                             .foregroundStyle(Color.ink)
+                            .tint(Color.accentColor)
                             .scrollContentBackground(.hidden)
-                            .padding(Space.x3)
+                            .padding(Space.x2)
+                            .focused($editing)
                             .disabled(isTranslating)
                             .accessibilityLabel(Text("Handwriting as text"))
                             .accessibilityIdentifier("inktext.editor")
+                            .well(in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous), focused: editing)
+                            .padding([.horizontal, .top], Space.x4)
                         if isTranslating || target != nil { translationNote }
-                        Divider()
                         (dynamicTypeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: Space.x3)) : AnyLayout(HStackLayout(spacing: Space.x3))) {
                             Button {
                                 UIPasteboard.general.string = text
@@ -49,7 +53,7 @@ struct InkTextSheet: View {
                             } label: {
                                 Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
                             }
-                            .buttonStyle(.bordered)
+                            .buttonStyle(.scribe)
                             .accessibilityIdentifier("inktext.copy")
                             Button {
                                 replace(text)
@@ -82,13 +86,18 @@ struct InkTextSheet: View {
             .navigationTitle("Handwriting as Text")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }.buttonStyle(.scribe(.secondary, inBar: true))
+                }
+                .boardBackground()
                 if phase == .ready, !languages.isEmpty {
                     ToolbarItem(placement: .primaryAction) { translateMenu }
+                        .boardBackground()
                 }
             }
         }
         .presentationDetents([.medium, .large])
+        .presentationBackground(Color.surface)
         .task {
             let pieces = ink
             let found = await Task.detached(priority: .userInitiated) { InkText.recognize(pieces) }.value
@@ -130,6 +139,8 @@ struct InkTextSheet: View {
         } label: {
             Label("Translate", systemImage: "translate")
         }
+        .menuStyle(.button)
+        .buttonStyle(.boardIcon)
         .disabled(isTranslating || (original ?? text).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         .accessibilityIdentifier("inktext.translate")
     }
@@ -146,6 +157,7 @@ struct InkTextSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Button("Show Original", action: showOriginal)
+                    .buttonStyle(.scribe(.secondary, compact: true))
                     .accessibilityIdentifier("inktext.original")
             }
         }

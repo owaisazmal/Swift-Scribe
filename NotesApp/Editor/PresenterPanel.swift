@@ -47,8 +47,8 @@ struct PresenterPanel: View {
                         Text("Notes").metaStyle(.footnote).accessibilityAddTraits(.isHeader)
                         Spacer()
                         if !document.isReadOnly {
-                            Button(action: editNotes) { Image(systemName: "square.and.pencil").frame(width: 44, height: 44) }
-                                .accessibilityLabel(Text("Edit Notes"))
+                            Button(action: editNotes) { Label("Edit Notes", systemImage: "square.and.pencil") }
+                                .buttonStyle(.barIcon)
                                 .accessibilityIdentifier("presenter.notes.edit")
                         }
                     }
@@ -175,14 +175,19 @@ struct PresenterNotesSheet: View {
                 .navigationTitle("Notes for Page \(number)")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { dismiss() }.buttonStyle(.scribe(.secondary, inBar: true))
+                    }
+                    .boardBackground()
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Done") {
                             document.setNotes(text, forPage: pageID)
                             dismiss()
                         }
+                        .buttonStyle(.scribe(.primary, inBar: true))
                         .accessibilityIdentifier("presenter.notes.done")
                     }
+                    .boardBackground()
                 }
         }
         .presentationDetents([.medium, .large])

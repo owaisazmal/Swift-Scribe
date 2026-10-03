@@ -49,6 +49,9 @@ struct ShelfView: View {
     @State private var errorMessage: String?
     @State private var shelfWidth: CGFloat?
     @State private var showsBarTitle = false
+    @FocusState private var searchFocused: Bool
+    @State private var barRoom = CGFloat.infinity
+    @State private var actionsWidth: CGFloat = 0
 
     private var folder: FolderRecord? {
         if case .folder(let id) = scope { return folders.first { $0.id == id } }
@@ -125,11 +128,25 @@ struct ShelfView: View {
         }
         .background(Color.paper)
         .overlay { if visible.isEmpty, !searchPending { emptyState } }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if !searchInBar {
+                searchField
+                    .padding(.horizontal, Space.x8)
+                    .padding(.bottom, Space.x2)
+                    .background(Color.paper)
+            }
+        }
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            let frame = proxy.frame(in: .global)
+            return frame.width - (frame.minX > 1 ? 0 : 130)
+        } action: { barRoom = $0 }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarTitleDisplayMode(.inline)
-        .searchable(text: $searchText, isPresented: $isSearching, prompt: Text("Search"))
-        .background(SearchActivator(isRequested: $isSearching, isCovered: isCovered))
+        .barGround(.paper)
+        .background(SearchActivator(isSearching: searchFocused, isCovered: isCovered) { searchFocused = true })
+        .onChange(of: isSearching) { _, requested in if requested, !searchFocused { searchFocused = true } }
+        .onChange(of: searchFocused) { _, focused in isSearching = focused }
         .toolbar { toolbar(visible) }
         .toolbar { if isSelecting { selectionBar(visible) } }
         .fileImporter(isPresented: $importingPDF, allowedContentTypes: [.pdf], allowsMultipleSelection: true) { result in
@@ -378,29 +395,46 @@ struct ShelfView: View {
         ToolbarItemGroup(placement: .bottomBar) {
             if scope == .trash {
                 Button("Restore") { changes.restore(selected(visible), in: store, undoManager: undoManager); endSelection() }
+                    .buttonStyle(.scribe(.secondary, inBar: true))
                     .disabled(selection.isEmpty)
                 Spacer()
-                Button("Delete", role: .destructive) { changes.requestPermanentDelete(selected(visible).map(\.id)) }.disabled(selection.isEmpty)
-            } else {
-                Button { changes.setFavorite(true, for: selected(visible), in: store, undoManager: undoManager); endSelection() } label: {
-                    Label("Favourite", systemImage: "star")
+                BarGroup {
+                    Button(role: .destructive) { changes.requestPermanentDelete(selected(visible).map(\.id)) } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
                 }
                 .disabled(selection.isEmpty)
-                Menu {
-                    Button("Not on a shelf") { move(selected(visible), to: nil); endSelection() }
-                    ForEach(folders) { folder in Button(tree.path(of: folder.id)) { move(selected(visible), to: folder); endSelection() } }
-                } label: { Label("Move", systemImage: "folder") }
-                    .disabled(selection.isEmpty)
+            } else {
+                BarGroup {
+                    Button { changes.setFavorite(true, for: selected(visible), in: store, undoManager: undoManager); endSelection() } label: {
+                        Label("Favourite", systemImage: "star")
+                    }
+                    Menu {
+                        Button("Not on a shelf") { move(selected(visible), to: nil); endSelection() }
+                        ForEach(folders) { folder in Button(tree.path(of: folder.id)) { move(selected(visible), to: folder); endSelection() } }
+                    } label: { Label("Move", systemImage: "folder") }
+                }
+                .disabled(selection.isEmpty)
                 Spacer()
-                Button(role: .destructive) { changes.moveToTrash(selected(visible), in: store, undoManager: undoManager); endSelection() } label: {
-                    Label("Delete", systemImage: "trash")
+                BarGroup {
+                    Button(role: .destructive) { changes.moveToTrash(selected(visible), in: store, undoManager: undoManager); endSelection() } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
                 }
                 .disabled(selection.isEmpty)
             }
         }
+        .boardBackground()
     }
 
     // MARK: Toolbar and menus
+
+    private var searchField: some View {
+        ScribeSearchField("Search", text: $searchText, capsTextSize: searchInBar, identifier: "library.search", focus: $searchFocused)
+    }
+
+    /// A bar without room for the search field would drop it into the overflow menu, so there it sits under the bar.
+    private var searchInBar: Bool { barRoom >= actionsWidth + 308 && !dynamicTypeSize.isAccessibilitySize }
 
     @ToolbarContentBuilder
     private func toolbar(_ visible: [NotebookRecord]) -> some ToolbarContent {
@@ -409,47 +443,60 @@ struct ShelfView: View {
             Text(title)
                 .font(.headline)
                 .foregroundStyle(Color.ink)
+                .lineLimit(1)
+                .fixedSize()
                 .opacity(shows ? 1 : 0)
                 .accessibilityHidden(!shows)
                 .animation(Motion.adaptive(Motion.standard, reduceMotion: reduceMotion), value: shows)
         }
-        ToolbarItemGroup(placement: .primaryAction) {
+        ToolbarItem(placement: .primaryAction) {
             if isSelecting {
                 Button("Done") { endSelection() }
+                    .buttonStyle(.scribe(.primary, inBar: true))
                     .accessibilityLabel(selection.isEmpty ? String(localized: "Done") : String(localized: "\(selection.count) selected, done"))
             } else {
-                if scope == .trash {
-                    Button("Empty", role: .destructive) { confirmingEmptyTrash = true }.disabled(visible.isEmpty)
-                } else {
-                    Menu {
-                        Picker("Sort By", selection: $sort) {
-                            ForEach(LibrarySortOrder.allCases) { Text($0.displayName).tag($0) }
+                BarGroup {
+                    if scope == .trash {
+                        Button("Empty") { confirmingEmptyTrash = true }.disabled(visible.isEmpty)
+                    } else {
+                        Menu {
+                            Picker("Sort By", selection: $sort) {
+                                ForEach(LibrarySortOrder.allCases) { Text($0.displayName).tag($0) }
+                            }
+                            Picker("Group By", selection: $grouping) {
+                                ForEach(LibraryGrouping.allCases) { Text($0.displayName).tag($0) }
+                            }
+                        } label: { Label("Sort", systemImage: "arrow.up.arrow.down") }
+                        Menu {
+                            Button { onCreate() } label: { Label("New Notebook", systemImage: "book.closed") }
+                            Button { onQuickNote() } label: { Label("Quick Note", systemImage: "square.and.pencil") }
+                            Button { importingPDF = true } label: { Label("Import PDF…", systemImage: "doc.richtext") }
+                            if DocumentScan.isAvailable {
+                                Button(action: startScan) { Label("Scan Documents…", systemImage: "doc.viewfinder") }
+                            }
+                        } label: {
+                            Label("New", systemImage: "plus")
+                        } primaryAction: {
+                            onCreate()
                         }
-                        Picker("Group By", selection: $grouping) {
-                            ForEach(LibraryGrouping.allCases) { Text($0.displayName).tag($0) }
-                        }
-                    } label: { Label("Sort", systemImage: "arrow.up.arrow.down") }
-                    Menu {
-                        Button { onCreate() } label: { Label("New Notebook", systemImage: "book.closed") }
-                        Button { onQuickNote() } label: { Label("Quick Note", systemImage: "square.and.pencil") }
-                        Button { importingPDF = true } label: { Label("Import PDF…", systemImage: "doc.richtext") }
-                        if DocumentScan.isAvailable {
-                            Button(action: startScan) { Label("Scan Documents…", systemImage: "doc.viewfinder") }
-                        }
-                    } label: {
-                        Label("New", systemImage: "plus")
-                    } primaryAction: {
-                        onCreate()
                     }
+                    Button("Select") { isSelecting = true }.disabled(visible.isEmpty)
                 }
-                Button("Select") { isSelecting = true }.disabled(visible.isEmpty)
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { actionsWidth = $0 }
             }
+        }
+        .boardBackground()
+        if searchInBar {
+            ToolbarItem(placement: .primaryAction) { searchField.frame(width: 260) }
+                .boardBackground()
         }
         if isSelecting {
             ToolbarItem(placement: .status) {
                 Text("\(selection.count) selected")
                     .font(.subheadline.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(Color.ink)
             }
+            .boardBackground()
         }
     }
 
@@ -565,15 +612,15 @@ struct ShelfView: View {
         } else if case .folder = scope, let name = folder?.name {
             EmptyShelf(title: String(localized: "Nothing on \(name) yet."),
                        message: String(localized: "Drag notebooks onto \(name) in the sidebar, or start one here.")) {
-                Button("New Notebook", action: onCreate).prominentButton()
+                Button("New Notebook", action: onCreate).buttonStyle(.scribe(.primary))
             } illustration: {
                 ShelfIllustration(cloth: nil)
             }
         } else {
             EmptyShelf(title: String(localized: "Your shelf is ready."),
                        message: String(localized: "Create a notebook to start writing, or import a PDF to annotate.")) {
-                Button("New Notebook", action: onCreate).prominentButton()
-                Button("Import PDF") { importingPDF = true }.buttonStyle(.bordered)
+                Button("New Notebook", action: onCreate).buttonStyle(.scribe(.primary))
+                Button("Import PDF") { importingPDF = true }.buttonStyle(.scribe)
             } illustration: {
                 ShelfIllustration()
             }
@@ -690,35 +737,32 @@ struct EmptyShelf<Actions: View, Illustration: View>: View {
     }
 }
 
-/// Opens the navigation bar's search on ⌘F or when asked. On iPadOS 18+ the toolbar search is a button until
-/// activated, SwiftUI's isPresented doesn't expand it, and the toolbar swallows ⌘F, so this view holds first
-/// responder while the library is in front, claims ⌘F with priority, and activates the underlying search controller.
+/// Holds first responder while the library is in front, so ⌘F reaches the search field and ⌘Z the library's undo.
 private struct SearchActivator: UIViewRepresentable {
-    @Binding var isRequested: Bool
+    let isSearching: Bool
     let isCovered: Bool
+    let onFind: () -> Void
     @Environment(\.undoManager) private var undoManager
 
     func makeUIView(context: Context) -> ActivatorView { ActivatorView() }
 
     /// Acts only on changes, so ordinary library updates never move first responder.
     func updateUIView(_ view: ActivatorView, context: Context) {
-        view.onFind = { isRequested = true; view.activate() }
+        view.onFind = onFind
         view.libraryUndoManager = undoManager
         if isCovered != view.wasCovered {
             view.wasCovered = isCovered
             view.isCovered = isCovered
             DispatchQueue.main.async { if isCovered { view.resignFirstResponder() } else { view.reclaimFirstResponder() } }
         }
-        guard isRequested != view.wasRequested else { return }
-        view.wasRequested = isRequested
-        DispatchQueue.main.async {
-            if isRequested { view.activate() } else { view.reclaimFirstResponder() }
-        }
+        guard isSearching != view.wasSearching else { return }
+        view.wasSearching = isSearching
+        if !isSearching { DispatchQueue.main.async { view.reclaimFirstResponder() } }
     }
 
     final class ActivatorView: UIView {
         var onFind: (() -> Void)?
-        var wasRequested = false
+        var wasSearching = false
         var wasCovered = false
         var isCovered = false
         weak var libraryUndoManager: UndoManager?
@@ -761,41 +805,28 @@ private struct SearchActivator: UIViewRepresentable {
         }
 
         @objc private func textDidEndEditing(_ note: Notification) {
-            guard note.object as? UISearchTextField === searchController()?.searchBar.searchTextField else { return }
+            guard (note.object as? UIView)?.window === window else { return }
             DispatchQueue.main.async { self.reclaimFirstResponder() }
         }
 
-        func activate() {
-            guard !isCovered, let search = searchController() else { return }
-            search.isActive = true
-            search.searchBar.becomeFirstResponder()
-        }
-
-        /// Takes ⌘F back once search closes or loses focus, unless the user has gone straight back into the field.
+        /// Takes ⌘F back once a field stops editing, unless the user has gone straight into another one.
         func reclaimFirstResponder() {
-            guard !isCovered, window != nil, searchController()?.searchBar.searchTextField.isFirstResponder != true else { return }
+            guard !isCovered, let window else { return }
+            if let field = UIResponder.current as? UIView, field is UITextInput, field.window === window { return }
             becomeFirstResponder()
         }
-
-        fileprivate func searchController() -> UISearchController? {
-            var responder: UIResponder? = self
-            while let current = responder {
-                if let controller = current as? UIViewController, let search = Self.searchController(near: controller) { return search }
-                responder = current.next
-            }
-            return nil
-        }
-
-        private static func searchController(near controller: UIViewController) -> UISearchController? {
-            var candidate: UIViewController? = controller
-            while let current = candidate {
-                if let search = current.navigationItem.searchController { return search }
-                if let navigation = current as? UINavigationController, let search = navigation.topViewController?.navigationItem.searchController {
-                    return search
-                }
-                candidate = current.parent
-            }
-            return nil
-        }
     }
+}
+
+private extension UIResponder {
+    private static weak var found: UIResponder?
+
+    /// Whatever holds first responder in the app right now.
+    static var current: UIResponder? {
+        found = nil
+        UIApplication.shared.sendAction(#selector(scribeCaptureFirstResponder), to: nil, from: nil, for: nil)
+        return found
+    }
+
+    @objc private func scribeCaptureFirstResponder() { UIResponder.found = self }
 }
