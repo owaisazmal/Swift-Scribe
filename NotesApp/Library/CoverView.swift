@@ -138,6 +138,7 @@ extension NotebookRecord {
                      String(localized: "edited \(modifiedAt.formatted(.relative(presentation: .named)))")]
         if isFavorite { parts.append(String(localized: "favourite")) }
         if let folder { parts.append(String(localized: "in \(folder.name)")) }
+        if !tags.isEmpty { parts.append(String(localized: "tagged \(tags.formatted(.list(type: .and)))")) }
         if isLocked { parts.append(String(localized: "locked")) }
         if isReadOnly { parts.append(String(localized: "read-only")) }
         if issueCount > 0 { parts.append(String(localized: "has files that couldn't be read")) }

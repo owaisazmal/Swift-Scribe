@@ -7,6 +7,8 @@ struct PageHit: Identifiable, Hashable, Sendable {
     let snippet: String
     /// Set when the match is in what was said in a recording: which recording, counting from one.
     var recording: Int?
+    /// Set when the page is listed for its tags, not for a match.
+    var tags: [String] = []
     var id: String { "\(notebookID.uuidString)-\(page.id.uuidString)-\(recording ?? 0)" }
 
     /// "Page 3", or "Recording 2" for a match in a transcript.
@@ -20,7 +22,8 @@ struct PageHit: Identifiable, Hashable, Sendable {
 
     /// What VoiceOver reads for the hit: where it is, then the words round the match.
     func label(in notebook: String) -> String {
-        recording.map { String(localized: "\(notebook), recording \($0): \(snippet)") } ?? String(localized: "\(notebook), page \(index + 1): \(snippet)")
+        if !tags.isEmpty { return String(localized: "\(notebook), page \(index + 1), tagged \(tags.formatted(.list(type: .and)))") }
+        return recording.map { String(localized: "\(notebook), recording \($0): \(snippet)") } ?? String(localized: "\(notebook), page \(index + 1): \(snippet)")
     }
 }
 

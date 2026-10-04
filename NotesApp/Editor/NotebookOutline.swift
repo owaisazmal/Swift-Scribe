@@ -26,6 +26,11 @@ extension NotebookDocument {
         updatePage(pageID, actionName: actionName) { $0.items = items }
     }
 
+    /// Whether any page is a page of an imported PDF, whose text can be selected.
+    var hasPDFPages: Bool {
+        pages.contains { if case .pdf = $0.background { true } else { false } }
+    }
+
     func setBookmark(_ name: String?, forPage pageID: UUID) {
         let name = name?.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let index = index(of: pageID), pages[index].bookmark != name else { return }
@@ -70,7 +75,7 @@ enum PDFOutlineReader {
     }
 }
 
-/// The navigator's second tab: the pages you bookmarked, then an imported PDF's own contents.
+/// The navigator's second tab: the pages you bookmarked, the pages you tagged, then an imported PDF's own contents.
 struct NotebookOutline: View {
     let session: EditorSession
     let open: (Int) -> Void
@@ -84,6 +89,10 @@ struct NotebookOutline: View {
         document.pages.enumerated().filter { $0.element.bookmark != nil }.map { (index: $0.offset, page: $0.element) }
     }
 
+    private var tagged: [(index: Int, page: NotebookPage)] {
+        document.pages.enumerated().filter { !$0.element.tags.isEmpty }.map { (index: $0.offset, page: $0.element) }
+    }
+
     private var pdfFiles: [String] {
         var seen = Set<String>()
         return document.pages.compactMap { page in
@@ -93,15 +102,15 @@ struct NotebookOutline: View {
     }
 
     var body: some View {
-        let bookmarks = bookmarks
+        let bookmarks = bookmarks, tagged = tagged
         Group {
-            if bookmarks.isEmpty, contents.isEmpty {
+            if bookmarks.isEmpty, tagged.isEmpty, contents.isEmpty {
                 ScrollView {
                     ContentUnavailableView {
                         Label { Text("No Bookmarks Yet") } icon: { Image(systemName: "bookmark").foregroundStyle(Color.textSecondary) }
                             .foregroundStyle(Color.ink)
                     } description: {
-                        Text("Tap the small ribbon beside the page number to bookmark a page. Bookmarks and a PDF's table of contents are listed here.")
+                        Text("Tap the small ribbon beside the page number to bookmark a page. Bookmarks, tagged pages and a PDF's table of contents are listed here.")
                             .foregroundStyle(Color.textSecondary)
                     }
                 }
@@ -115,6 +124,7 @@ struct NotebookOutline: View {
                             Text("Bookmarks").foregroundStyle(Color.textSecondary)
                         }
                     }
+                    if !tagged.isEmpty { TaggedPagesSection(pages: tagged, open: open) }
                     if !contents.isEmpty {
                         Section {
                             ForEach(contents) { entry in contentsRow(entry) }

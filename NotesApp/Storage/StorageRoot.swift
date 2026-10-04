@@ -8,6 +8,7 @@ struct StorageRoot: Sendable, Hashable {
     var foldersFile: URL { library.appending(path: "folders.json") }
     var indexStore: URL { url.appending(path: "LibraryIndex.store") }
     var activityFile: URL { library.appending(path: "activity.json") }
+    var smartShelvesFile: URL { library.appending(path: "smart-shelves.json") }
     var deleting: URL { url.appending(path: "Deleting", directoryHint: .isDirectory) }
     var stickers: URL { url.appending(path: "Stickers", directoryHint: .isDirectory) }
 

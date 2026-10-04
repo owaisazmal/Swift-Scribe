@@ -167,10 +167,7 @@ enum LibraryIndexSchemaV3: VersionedSchema {
     }
 }
 
-/// The library index: a SwiftData cache of what's in the notebook manifests and `folders.json`,
-/// for fast sorting, filtering and search. It can always be rebuilt from those files.
-/// Search text has its own table, so the shelf's queries never read it. Folders name the folder they sit inside,
-/// and a notebook says whether it is locked.
+/// The fourth index schema, kept so a store written by it can be migrated. Its notebooks had no tags.
 enum LibraryIndexSchemaV4: VersionedSchema {
     static let versionIdentifier = Schema.Version(4, 0, 0)
     static var models: [any PersistentModel.Type] { [NotebookRecord.self, FolderRecord.self, NotebookSearchText.self] }
@@ -230,21 +227,91 @@ enum LibraryIndexSchemaV4: VersionedSchema {
     }
 }
 
-typealias NotebookRecord = LibraryIndexSchemaV4.NotebookRecord
-typealias FolderRecord = LibraryIndexSchemaV4.FolderRecord
-typealias NotebookSearchText = LibraryIndexSchemaV4.NotebookSearchText
+/// The library index: a SwiftData cache of what's in the notebook manifests and `folders.json`,
+/// for fast sorting, filtering and search. It can always be rebuilt from those files.
+/// Search text has its own table, so the shelf's queries never read it. Folders name the folder they sit inside,
+/// and a notebook says whether it is locked and which tags it and its pages carry.
+enum LibraryIndexSchemaV5: VersionedSchema {
+    static let versionIdentifier = Schema.Version(5, 0, 0)
+    static var models: [any PersistentModel.Type] { [NotebookRecord.self, FolderRecord.self, NotebookSearchText.self] }
+
+    @Model
+    final class NotebookRecord {
+        @Attribute(.unique) var id: UUID = UUID()
+        var title: String = ""
+        var createdAt: Date = Date()
+        var modifiedAt: Date = Date()
+        var lastOpenedAt: Date?
+        var pageCount: Int = 0
+        var currentPage: Int = 0
+        var isFavorite: Bool = false
+        var deletedAt: Date?
+        var folder: FolderRecord?
+        var coverStyleRaw: String = CoverStyle.cloth.rawValue
+        var clothRaw: String = ClothColor.slate.rawValue
+        var inksRaw: String = "teal,blue"
+        var coverSeed: Int = 0
+        var firstPageID: UUID?
+        var firstPageInkHash: String?
+        var firstPageThumbKey: String?
+        var firstPageIsPDF: Bool = false
+        var isReadOnly: Bool = false
+        var issueCount: Int = 0
+        var indexedAt: Date = Date.distantPast
+        var isLocked: Bool = false
+        /// The notebook's tags, one to a line.
+        var tagsRaw: String = ""
+        /// Every tag on any of its pages, one to a line.
+        var pageTagsRaw: String = ""
+
+        init(id: UUID) { self.id = id }
+    }
+
+    @Model
+    final class FolderRecord {
+        @Attribute(.unique) var id: UUID = UUID()
+        var name: String = ""
+        var clothRaw: String = ClothColor.slate.rawValue
+        var createdAt: Date = Date()
+        var sortIndex: Int = 0
+        var parentID: UUID?
+        @Relationship(deleteRule: .nullify, inverse: \LibraryIndexSchemaV5.NotebookRecord.folder)
+        var notebooks: [NotebookRecord]? = []
+
+        init(id: UUID) { self.id = id }
+    }
+
+    /// Everything recognised, typed or read from PDFs in one notebook. Deliberately not a relationship of the record.
+    @Model
+    final class NotebookSearchText {
+        @Attribute(.unique) var notebookID: UUID = UUID()
+        var text: String = ""
+
+        init(notebookID: UUID, text: String) {
+            self.notebookID = notebookID
+            self.text = text
+        }
+    }
+}
+
+typealias NotebookRecord = LibraryIndexSchemaV5.NotebookRecord
+typealias FolderRecord = LibraryIndexSchemaV5.FolderRecord
+typealias NotebookSearchText = LibraryIndexSchemaV5.NotebookSearchText
 
 /// V1 to V2 drops the record's search text and adds the empty table; the next refresh reads the text back from the packages.
 /// V2 to V3 gives folders a parent, which the same refresh fills in from `folders.json`.
 /// V3 to V4 adds the lock, which starts off: the first refresh afterwards reads every manifest for it.
+/// V4 to V5 adds the tags, which start empty and are read by that same first refresh.
 enum LibraryIndexMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] {
-        [LibraryIndexSchemaV1.self, LibraryIndexSchemaV2.self, LibraryIndexSchemaV3.self, LibraryIndexSchemaV4.self]
+        [LibraryIndexSchemaV1.self, LibraryIndexSchemaV2.self, LibraryIndexSchemaV3.self, LibraryIndexSchemaV4.self,
+         LibraryIndexSchemaV5.self]
     }
     static var stages: [MigrationStage] {
         [.lightweight(fromVersion: LibraryIndexSchemaV1.self, toVersion: LibraryIndexSchemaV2.self),
          .lightweight(fromVersion: LibraryIndexSchemaV2.self, toVersion: LibraryIndexSchemaV3.self),
-         .lightweight(fromVersion: LibraryIndexSchemaV3.self, toVersion: LibraryIndexSchemaV4.self)]
+         .lightweight(fromVersion: LibraryIndexSchemaV3.self, toVersion: LibraryIndexSchemaV4.self),
+         .lightweight(fromVersion: LibraryIndexSchemaV4.self, toVersion: LibraryIndexSchemaV5.self)]
     }
 }
 
@@ -252,6 +319,8 @@ extension NotebookRecord {
     var isTrashed: Bool { deletedAt != nil }
     var coverStyle: CoverStyle { CoverStyle(rawValue: coverStyleRaw) ?? .cloth }
     var cloth: ClothColor { ClothColor(rawValue: clothRaw) ?? .slate }
+    var tags: [String] { Tags.split(tagsRaw) }
+    var pageTags: [String] { Tags.split(pageTagsRaw) }
 
     var cover: CoverSpec {
         CoverSpec(styleRaw: coverStyleRaw, clothRaw: clothRaw, inksRaw: inksRaw.split(separator: ",").map(String.init),
@@ -278,6 +347,8 @@ extension NotebookRecord {
         set(\.isFavorite, manifest.library.isFavorite)
         set(\.deletedAt, manifest.library.deletedAt)
         set(\.isLocked, manifest.library.isLocked)
+        set(\.tagsRaw, Tags.joined(manifest.library.tags))
+        set(\.pageTagsRaw, Tags.joined(manifest.pageTags))
         set(\.coverStyleRaw, manifest.cover.styleRaw)
         set(\.clothRaw, manifest.cover.clothRaw)
         set(\.inksRaw, manifest.cover.inksRaw.joined(separator: ","))
@@ -316,11 +387,11 @@ extension FolderTree {
 @MainActor
 enum LibraryIndex {
     private static let log = Logger(subsystem: "com.owais.NotesApp", category: "index")
-    static let schemaNumber = 4
+    static let schemaNumber = 5
 
     /// Opens the index. A store that can't be opened is set aside (never deleted) and a fresh one is rebuilt
     /// from the manifests; if even that fails, the app runs on an in-memory index for this launch.
-    static var schema: Schema { Schema(versionedSchema: LibraryIndexSchemaV4.self) }
+    static var schema: Schema { Schema(versionedSchema: LibraryIndexSchemaV5.self) }
 
     static func makeContainer(root: StorageRoot) -> (container: ModelContainer, recovered: Bool) {
         let schema = schema
@@ -423,9 +494,12 @@ enum LibraryIndex {
         return true
     }
 
-    /// The notebooks whose title or text contains `query`. Only IDs are read, so a library full of PDF text stays on disk.
+    /// The notebooks whose title, tags or text contains `query`. Only IDs are read, so a library full of PDF text stays on disk.
     nonisolated static func notebookIDs(matching query: String, in context: ModelContext) -> Set<UUID> {
-        var titles = FetchDescriptor<NotebookRecord>(predicate: #Predicate { $0.title.localizedStandardContains(query) })
+        let tag = Tags.normalized(query) ?? query
+        var titles = FetchDescriptor<NotebookRecord>(predicate: #Predicate {
+            $0.title.localizedStandardContains(query) || $0.tagsRaw.localizedStandardContains(tag) || $0.pageTagsRaw.localizedStandardContains(tag)
+        })
         titles.propertiesToFetch = [\.id]
         var texts = FetchDescriptor<NotebookSearchText>(predicate: #Predicate { $0.text.localizedStandardContains(query) })
         texts.propertiesToFetch = [\.notebookID]

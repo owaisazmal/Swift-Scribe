@@ -86,6 +86,7 @@ final class AppModel {
         let indexSchema = UserDefaults.standard.integer(forKey: SettingsKey.indexSchema)
         await LibraryIndex.refresh(root: root, context: container.mainContext, full: indexWasRecovered || indexSchema < LibraryIndex.schemaNumber)
         if indexSchema != LibraryIndex.schemaNumber { UserDefaults.standard.set(LibraryIndex.schemaNumber, forKey: SettingsKey.indexSchema) }
+        await library.loadSmartShelves()
         await activity.load()
         await flashcards.load()
         library.purgeExpiredTrash()

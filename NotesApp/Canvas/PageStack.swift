@@ -104,6 +104,17 @@ final class PageCanvasView: PKCanvasView {
     }
 }
 
+/// A picker's items can't be given a colour or a width, so a saved tool goes in through the setter that takes
+/// a whole tool. iPadOS 18 deprecated it in favour of the items; reaching it through a protocol keeps the build quiet.
+private protocol ToolSetting {
+    func set(_ tool: PKTool, on picker: PKToolPicker)
+}
+
+private struct PickerToolSetter: ToolSetting {
+    @available(iOS, deprecated: 18.0)
+    func set(_ tool: PKTool, on picker: PKToolPicker) { picker.selectedTool = tool }
+}
+
 /// Stays first responder so one tool picker serves every page, and routes ⌘Z and the picker's undo to the document.
 final class ToolPickerAnchor: UIView {
     weak var undoProxy: UndoManager?
@@ -339,9 +350,17 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     private var isFinding = false
     private var findRects: [UUID: [CGRect]] = [:]
     private var findCurrent: FindMatch?
-    /// Nothing on the page can be changed by hand while it is presented or replayed, while ink is being selected,
-    /// or while it is being searched.
-    private var isLocked: Bool { isPresenting || replay != nil || inkLasso != nil || isFinding }
+    /// Selecting a PDF page's own text: the overlay that takes the drag, where the drag began and what is selected.
+    private var textOverlay: TextSelectOverlay?
+    private var textAnchor: (index: Int, point: CGPoint)?
+    private var textSelection: (pageID: UUID, selection: TextSelection)?
+    private var textRequest = 0
+    private let pdfText = PDFTextReader()
+    private lazy var textPan = UIPanGestureRecognizer(target: self, action: #selector(textPanned))
+    private lazy var textTap = UITapGestureRecognizer(target: self, action: #selector(textTapped))
+    /// Nothing on the page can be changed by hand while it is presented or replayed, while ink or text is being
+    /// selected, or while it is being searched.
+    private var isLocked: Bool { isPresenting || replay != nil || inkLasso != nil || isFinding || textOverlay != nil }
     /// The zoom window: what it covers, the strip it is written in, and the outline on the page of what it shows.
     private var zoomWindow: ZoomWindow?
     private var zoomPanel: ZoomWindowPanel?
@@ -442,13 +461,16 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
             scrollView.addGestureRecognizer(recognizer)
         }
         strokeHold.onTouchDown = { [weak self] in self?.session.onTouchDown?() }
-        lassoPan.maximumNumberOfTouches = 1
-        lassoPan.allowedTouchTypes = Self.scrollTouchTypes + [NSNumber(value: UITouch.TouchType.pencil.rawValue)]
+        for pan in [lassoPan, textPan] {
+            pan.maximumNumberOfTouches = 1
+            pan.allowedTouchTypes = Self.scrollTouchTypes + [NSNumber(value: UITouch.TouchType.pencil.rawValue)]
+        }
         toolPicker.addObserver(self)
         toolPicker.colorUserInterfaceStyle = .light
         toolPicker.stateAutosaveName = "SwiftScribe.ToolPicker"
         toolPicker.showsDrawingPolicyControls = false
         toolMemory.select(toolPicker.selectedToolItemIdentifier, isEraser: isEraser(toolPicker.selectedToolItemIdentifier))
+        reportTool()
         applyDrawingPolicy(session.drawingInput.policy)
         registerForTraitChanges([UITraitUserInterfaceStyle.self, UITraitAccessibilityContrast.self]) { (self: Self, _) in
             self.updatePageEdges()
@@ -619,6 +641,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         }
         showSelection()
         inkLasso?.scale = bakedScale
+        textOverlay?.scale = bakedScale
         layoutZoomTarget()
         updateInsets()
         isBaking = false
@@ -818,6 +841,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         position(slot, at: index)
         contentView.addSubview(slot)
         if let inkLasso { contentView.bringSubviewToFront(inkLasso) }
+        if let textOverlay { contentView.bringSubviewToFront(textOverlay) }
         if let zoomTarget { contentView.bringSubviewToFront(zoomTarget) }
         slots[page.id] = slot
         if page.isBoard, !isSolo {
@@ -1004,8 +1028,13 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         if pencilGesture(on: canvas, pageID: id, before: before, rest: rest) { return }
         document.canvasDidChangeInk(id, to: canvas.drawing)
         mirrorInk(from: canvas, pageID: id)
+        let straighten = { [weak self, weak canvas] in
+            guard let self, let canvas, canvas !== zoomCanvas else { return }
+            straightenLastStroke(on: canvas, pageID: id, before: before, rest: rest)
+        }
+        let readingText = snapHighlighter(on: canvas, pageID: id, before: before, otherwise: straighten)
         if canvas === zoomCanvas { return zoomStrokeEnded(canvas, before: before) }
-        straightenLastStroke(on: canvas, pageID: id, before: before, rest: rest)
+        if !readingText { straighten() }
     }
 
     /// Circle and hold to select, and scribble to erase. Neither stroke reaches the document: the loop leaves nothing
@@ -1044,12 +1073,38 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     }
 
     /// Draw and hold: a stroke that ended with the pen at rest is redrawn as the line, circle or figure it looks like.
-    /// The tidied stroke is an undo step of its own, so Undo gives the hand-drawn one back. For that it has to wait
-    /// until the stroke's own undo group has closed, which happens at the end of this pass of the run loop.
     private func straightenLastStroke(on canvas: PageCanvasView, pageID: UUID, before: PKDrawing?, rest: TimeInterval?) {
         guard let rest, rest >= ShapeSnap.holdDuration, ShapeSnap.isEnabled, canvas.tool is PKInkingTool, !canvas.isRulerActive,
               let before, canvas.drawing.strokes.count == before.strokes.count + 1, let drawn = canvas.drawing.strokes.last,
               let snapped = ShapeSnap.snapped(drawn) else { return }
+        replaceLastStroke(drawn, with: snapped.stroke, on: canvas, pageID: pageID, actionName: String(localized: "Straighten Shape"),
+                          announcement: String(localized: "Straightened into a \(snapped.shape.displayName)"))
+    }
+
+    /// A highlighter stroke drawn along a line of a PDF page's own text is laid over that line: straight, and as tall
+    /// as the line. The text is read off the main thread. Returns whether it is being read; `otherwise` runs if there
+    /// turns out to be no text under the stroke.
+    private func snapHighlighter(on canvas: PageCanvasView, pageID: UUID, before: PKDrawing?, otherwise: @escaping () -> Void) -> Bool {
+        guard PDFText.snapsHighlighter, (canvas.tool as? PKInkingTool)?.inkType == .marker, !canvas.isRulerActive,
+              let index = index(of: pageID), case .pdf(let file, let pdfIndex) = pages[index].background,
+              let before, canvas.drawing.strokes.count == before.strokes.count + 1, let drawn = canvas.drawing.strokes.last else { return false }
+        let points = PencilGestures.points(of: drawn)
+        guard PDFText.runsAlongALine(points) else { return false }
+        let url = document.package.assetURL(file), size = pages[index].size
+        Task { [weak self, weak canvas] in
+            guard let self else { return }
+            let line = await pdfText.line(under: points, file: url, index: pdfIndex, pageSize: size)
+            guard let canvas, let line else { return otherwise() }
+            replaceLastStroke(drawn, with: TextHighlight.stroke(over: line, ink: drawn.ink, replacing: drawn), on: canvas, pageID: pageID,
+                              actionName: String(localized: "Snap Highlighter"), announcement: String(localized: "Highlight laid over the text"))
+        }
+        return true
+    }
+
+    /// Puts a tidied stroke in place of the one just drawn, as an undo step of its own, so Undo gives the hand-drawn
+    /// one back. For that it has to wait until the stroke's own undo group has closed, which happens at the end of
+    /// this pass of the run loop. Nothing is done if the page has been written on since.
+    private func replaceLastStroke(_ drawn: PKStroke, with tidied: PKStroke, on canvas: PageCanvasView, pageID: UUID, actionName: String, announcement: String) {
         let count = canvas.drawing.strokes.count, stamp = drawn.path.creationDate
         func apply(tries: Int) {
             guard canvas.pageID == pageID, canvas.drawing.strokes.count == count, canvas.drawing.strokes.last?.path.creationDate == stamp else { return }
@@ -1057,16 +1112,16 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
                 return DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) { apply(tries: tries - 1) }
             }
             var strokes = canvas.drawing.strokes
-            strokes[count - 1] = snapped.stroke
+            strokes[count - 1] = tidied
             let drawing = PKDrawing(strokes: strokes)
             isApplyingDrawing = true
             canvas.drawing = drawing
             isApplyingDrawing = false
             document.canvasDidChangeInk(pageID, to: drawing)
             mirrorInk(from: canvas, pageID: pageID)
-            document.undoManager.setActionName(String(localized: "Straighten Shape"))
+            document.undoManager.setActionName(actionName)
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            AccessibilityNotification.Announcement(String(localized: "Straightened into a \(snapped.shape.displayName)")).post()
+            AccessibilityNotification.Announcement(announcement).post()
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) { apply(tries: 5) }
     }
@@ -1074,6 +1129,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     /// Writing anywhere puts a selected picture down.
     func canvasViewDidBeginUsingTool(_ canvasView: PKCanvasView) {
         if session.selection != nil { select(nil) }
+        reportTool()
         guard canvasView === zoomCanvas else { return }
         zoomAdvance?.cancel()
         session.onTouchDown?()
@@ -1113,6 +1169,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         let renamed = titles != linkTitles
         linkTitles = titles
         guard updatedKeys.elementsEqual(currentKeys, by: Self.sameSlot) else {
+            if textSelection != nil { setTextSelection(nil) }
             relayout(updated, changed: Self.changedIDs(updatedKeys, currentKeys))
             refreshItems(all: renamed)
             refreshZoomWindow()
@@ -1249,7 +1306,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
 
     func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
         guard gestureRecognizer === tapeTap else { return true }
-        return replay == nil && inkLasso == nil && !isOnSelection(gestureRecognizer)
+        return replay == nil && inkLasso == nil && textOverlay == nil && !isOnSelection(gestureRecognizer)
             && item(at: gestureRecognizer.location(in: scrollView), tapeOnly: true) != nil
     }
 
@@ -1270,6 +1327,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         guard !isOnSelection(gesture), !isFinding else { return }
         if replay != nil { return seekReplay(to: gesture.location(in: scrollView)) }
         if inkLasso != nil { return setInkSelection([:]) }
+        if textOverlay != nil { return }
         let hit = isPresenting || !fingersDraw ? item(at: gesture.location(in: scrollView)) : nil
         if let hit, item(hit)?.tape != nil { return }
         if let hit, let link = item(hit)?.link { return session.follow(link, from: hit.pageID) }
@@ -1433,7 +1491,14 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
 
     override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
         if action == #selector(paste(_:)) { return acceptsPictures && !toolPickerSuppressed && UIPasteboard.general.hasImages }
+        if action == #selector(copy(_:)) { return textSelection != nil && !toolPickerSuppressed }
         return super.canPerformAction(action, withSender: sender)
+    }
+
+    override func copy(_ sender: Any?) {
+        guard let text = textSelection?.selection.text else { return }
+        UIPasteboard.general.string = text
+        AccessibilityNotification.Announcement(String(localized: "Copied")).post()
     }
 
     override func paste(_ sender: Any?) {
@@ -1685,7 +1750,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     private func updateScrollTouches() {
         let fingersDraw = switch drawingPolicy {
         case _ where isPresenting: fingersPoint
-        case _ where inkLasso != nil: true
+        case _ where inkLasso != nil || textOverlay != nil: true
         case _ where document.isReadOnly || replay != nil || isFinding: false
         case .anyInput: true
         case .pencilOnly: false
@@ -1890,6 +1955,122 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         document.updateItems(onPage: page.id, actionName: action) { $0.append(item) }
         setInkSelection([:])
         return ItemSelection(pageID: page.id, itemID: item.id)
+    }
+
+    // MARK: PDF text
+
+    /// Puts an overlay over the pages that takes the touches: one finger or the Pencil selects, two fingers still scroll.
+    func setSelectingText(_ selecting: Bool) {
+        guard selecting != (textOverlay != nil), isViewLoaded else { return }
+        if selecting {
+            select(nil)
+            let overlay = TextSelectOverlay(frame: contentView.bounds)
+            overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            overlay.scale = bakedScale
+            overlay.addGestureRecognizer(textPan)
+            overlay.addGestureRecognizer(textTap)
+            contentView.addSubview(overlay)
+            if let zoomTarget { contentView.bringSubviewToFront(zoomTarget) }
+            textOverlay = overlay
+        } else {
+            textOverlay?.removeFromSuperview()
+            textOverlay = nil
+            textAnchor = nil
+            textRequest += 1
+            setTextSelection(nil)
+        }
+        for canvas in canvases.values where canvas.isLoaded { setDrawingEnabled(!document.isReadOnly && !isLocked, canvas) }
+        setToolPickerVisible(session.isToolPickerVisible)
+        updateScrollTouches()
+    }
+
+    /// The PDF page under a point of the stack, and the point on that page.
+    private func pdfPage(at point: CGPoint) -> (index: Int, point: CGPoint)? {
+        let index = layout.pageIndex(atY: point.y)
+        guard layout.isLaidOut(index, in: pages), layout.frames[index].contains(point), case .pdf = pages[index].background else { return nil }
+        return (index, CGPoint(x: point.x - layout.frames[index].minX, y: point.y - layout.frames[index].minY))
+    }
+
+    /// A drag selects from the letter it began on to the letter it has reached, the way text is selected anywhere.
+    @objc private func textPanned(_ gesture: UIPanGestureRecognizer) {
+        guard textOverlay != nil, bakedScale > 0 else { return }
+        let point = stackPoint(gesture)
+        switch gesture.state {
+        case .began:
+            let down = textOverlay?.touchDown.map { CGPoint(x: $0.x / bakedScale, y: $0.y / bakedScale) }
+            setTextSelection(nil)
+            textAnchor = pdfPage(at: down ?? point)
+            fallthrough
+        case .changed, .ended:
+            guard let anchor = textAnchor, layout.isLaidOut(anchor.index, in: pages) else { return }
+            let frame = layout.frames[anchor.index]
+            let reached = CGPoint(x: min(max(point.x - frame.minX, 0), frame.width), y: min(max(point.y - frame.minY, 0), frame.height))
+            requestText(.range(from: anchor.point, to: reached), onPage: anchor.index, announces: gesture.state == .ended)
+            if gesture.state == .ended { textAnchor = nil }
+        default:
+            textAnchor = nil
+        }
+    }
+
+    /// A tap selects the word under it; a tap anywhere else lets the selection go.
+    @objc private func textTapped(_ gesture: UITapGestureRecognizer) {
+        guard textOverlay != nil, bakedScale > 0 else { return }
+        guard let hit = pdfPage(at: stackPoint(gesture)) else { return setTextSelection(nil) }
+        requestText(.word(at: hit.point), onPage: hit.index, announces: true)
+    }
+
+    /// Every word on the page being read.
+    func selectAllText() {
+        let index = pendingPage ?? currentPage
+        guard textOverlay != nil, pages.indices.contains(index) else { return }
+        requestText(.everything, onPage: index, announces: true)
+    }
+
+    /// Reads the text off the main thread. Only the latest answer is shown, so a drag never waits on an earlier one.
+    private func requestText(_ request: PDFTextReader.Request, onPage index: Int, announces: Bool) {
+        textRequest += 1
+        guard pages.indices.contains(index), case .pdf(let file, let pdfIndex) = pages[index].background else {
+            setTextSelection(nil)
+            if announces { AccessibilityNotification.Announcement(String(localized: "This page has no text to select")).post() }
+            return
+        }
+        let token = textRequest, page = pages[index], url = document.package.assetURL(file)
+        Task { [weak self] in
+            guard let self else { return }
+            let found = await pdfText.select(request, file: url, index: pdfIndex, pageSize: page.size)
+            guard token == textRequest, textOverlay != nil else { return }
+            setTextSelection(found.map { (page.id, $0) })
+            guard announces else { return }
+            let words = found?.text.split(whereSeparator: \.isWhitespace).count ?? 0
+            AccessibilityNotification.Announcement(words == 0 ? String(localized: "This page has no text to select") : String(localized: "\(words) words selected")).post()
+        }
+    }
+
+    private func setTextSelection(_ selection: (pageID: UUID, selection: TextSelection)?) {
+        textSelection = selection
+        var rects: [CGRect] = []
+        if let selection, let index = index(of: selection.pageID), layout.isLaidOut(index, in: pages) {
+            let frame = layout.frames[index]
+            rects = selection.selection.lines.map { $0.offsetBy(dx: frame.minX, dy: frame.minY) }
+        }
+        textOverlay?.show(rects)
+        let text = selection?.selection.text
+        if session.selectedText != text { session.selectedText = text }
+    }
+
+    /// Lays a highlighter stroke over each line of the selected text, as one undo step. They are ink like any other:
+    /// the eraser takes them off.
+    func highlightSelectedText(_ color: HighlightColor) {
+        guard let selected = textSelection, !document.isReadOnly else { return }
+        setTextSelection(nil)
+        let ink = PKInk(.marker, color: color.uiColor), document = document
+        let strokes = selected.selection.lines.map { TextHighlight.stroke(over: $0, ink: ink) }
+        document.perform {
+            let drawing = await document.ink(selected.pageID)
+            document.updateInk([selected.pageID: PKDrawing(strokes: drawing.strokes + strokes)], actionName: String(localized: "Highlight Text"))
+        }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        AccessibilityNotification.Announcement(String(localized: "Text highlighted")).post()
     }
 
     // MARK: Find in the notebook
@@ -2399,6 +2580,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         if let restored = toolMemory.pickerChanged(to: tool, isEraser: isEraser(tool), at: CACurrentMediaTime()) {
             DispatchQueue.main.async { [weak self] in self?.selectTool(restored) }
         }
+        reportTool()
         updateScrollTouches()
     }
 
@@ -2454,7 +2636,36 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         toolMemory.select(identifier, isEraser: isEraser(identifier))
         toolPicker.selectedToolItemIdentifier = identifier
         for canvas in allCanvases + pool { syncTool(canvas) }
+        reportTool()
         updateScrollTouches()
+    }
+
+    // MARK: Favourite tools
+
+    /// The picker takes a saved tool, and with it every canvas, the ones waiting to be reused as well.
+    func useTool(_ preset: ToolPreset) {
+        guard let tool = preset.tool, !document.isReadOnly else { return }
+        (PickerToolSetter() as ToolSetting).set(tool, on: toolPicker)
+        // Should the picker ever stop taking a tool whole, its own item of that kind is still chosen.
+        if (toolPicker.selectedToolItem as? PKToolPickerInkingItem)?.inkingTool.inkType != tool.inkType,
+           let item = toolPicker.toolItems.first(where: { ($0 as? PKToolPickerInkingItem)?.inkingTool.inkType == tool.inkType }) {
+            toolPicker.selectedToolItemIdentifier = item.identifier
+        }
+        toolMemory.select(toolPicker.selectedToolItemIdentifier, isEraser: false)
+        for canvas in allCanvases + pool { syncTool(canvas) }
+        reportTool()
+        updateScrollTouches()
+        AccessibilityNotification.Announcement(preset.name).post()
+    }
+
+    /// Tells the chrome which pen, pencil or marker the picker has now.
+    private func reportTool() {
+        let tool = (toolPicker.selectedToolItem as? PKToolPickerInkingItem).flatMap { ToolPreset($0.inkingTool) }
+        switch (tool, session.currentTool) {
+        case (nil, nil): return
+        case let (new?, old?) where new.isSameTool(as: old): return
+        default: session.currentTool = tool
+        }
     }
 
     func toolPickerFramesObscuredDidChange(_ toolPicker: PKToolPicker) {

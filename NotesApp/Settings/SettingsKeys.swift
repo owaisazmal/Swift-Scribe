@@ -44,4 +44,8 @@ enum SettingsKey {
     static let indexSchema = "libraryIndexSchema"
     static let journalAgenda = "journalAgenda"
     static let spotlight = "showsInSpotlight"
+    static let toolPresets = "toolPresets"
+    static let snapsHighlighter = "snapsHighlighter"
+    static let highlightColor = "highlightColor"
+    static let showsToolTray = "showsToolTray"
 }

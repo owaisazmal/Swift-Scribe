@@ -12,6 +12,7 @@ struct ScribeSettingsView: View {
     @AppStorage(SettingsKey.dailyJournalID) private var journalID = ""
     @AppStorage(SettingsKey.showsOnThisDay) private var showsOnThisDay = true
     @AppStorage(SettingsKey.snapsShapes) private var snapsShapes = true
+    @AppStorage(SettingsKey.snapsHighlighter) private var snapsHighlighter = true
     @AppStorage(SettingsKey.scribbleErases) private var scribbleErases = true
     @AppStorage(SettingsKey.circleSelects) private var circleSelects = true
     @AppStorage(SettingsKey.pencilDoubleTap) private var pencilDoubleTap: PencilAction = .system
@@ -51,6 +52,7 @@ struct ScribeSettingsView: View {
 
                 Section {
                     Toggle("Straighten Shapes", isOn: $snapsShapes)
+                    Toggle("Snap Highlighter to PDF Text", isOn: $snapsHighlighter)
                     Toggle("Circle and Hold to Select", isOn: $circleSelects)
                         .accessibilityIdentifier("settings.pencil.circle")
                     Toggle("Scribble to Erase", isOn: $scribbleErases)
@@ -66,7 +68,7 @@ struct ScribeSettingsView: View {
                 } header: {
                     SettingsNote("Apple Pencil")
                 } footer: {
-                    SettingsNote("Draw a line, circle, rectangle or triangle and hold still before lifting to straighten it, or draw a loop round ink and hold still to select it. Scribble back and forth over ink with a pen to erase it; Undo brings it back. For Double-Tap and Squeeze, “System Setting” follows Settings › Apple Pencil.")
+                    SettingsNote("Draw a line, circle, rectangle or triangle and hold still before lifting to straighten it, or draw a loop round ink and hold still to select it. Scribble back and forth over ink with a pen to erase it; Undo brings it back. A highlighter drawn along a line of a PDF's text is laid straight over that line. For Double-Tap and Squeeze, “System Setting” follows Settings › Apple Pencil.")
                 }
                 .listRowBackground(Color.surface)
 

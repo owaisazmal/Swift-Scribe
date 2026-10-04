@@ -27,6 +27,7 @@ struct PageNavigator: View {
     @State private var barRoom = CGFloat.infinity
     @State private var tabsWidth: CGFloat = 0
     @State private var doneWidth: CGFloat = 0
+    @State private var tagging: TagTarget?
 
     enum Tab { case pages, outline }
 
@@ -114,6 +115,7 @@ struct PageNavigator: View {
             } message: {
                 Text("You can undo this.")
             }
+            .sheet(item: $tagging) { target in EditorTagSheet(document: document, target: target) }
         }
     }
 
@@ -190,7 +192,8 @@ struct PageNavigator: View {
             if targeted { dropTarget = page.id } else if dropTarget == page.id { dropTarget = nil }
         }
         .accessibilityLabel(isCurrent ? Text("Page \(index + 1) of \(document.pages.count), current") : Text("Page \(index + 1) of \(document.pages.count)"))
-        .accessibilityValue(Text([page.isBoard ? String(localized: "Whiteboard") : nil, page.bookmark == nil ? nil : String(localized: "Bookmarked")]
+        .accessibilityValue(Text([page.isBoard ? String(localized: "Whiteboard") : nil, page.bookmark == nil ? nil : String(localized: "Bookmarked"),
+                                  page.tags.isEmpty ? nil : String(localized: "tagged \(page.tags.formatted(.list(type: .and)))")]
             .compactMap { $0 }.joined(separator: ", ")))
         .accessibilityHint(Text("Opens this page"))
         .accessibilityActions {
@@ -260,6 +263,7 @@ struct PageNavigator: View {
         } else {
             Button { document.setBookmark(nil, forPage: page.id) } label: { Label("Remove Bookmark", systemImage: "bookmark.slash") }
         }
+        Button { tagging = .page(page.id) } label: { Label("Tags…", systemImage: "tag") }
         if index > 0 {
             Button { move(page.id, to: index - 1) } label: { Label("Move Earlier", systemImage: "arrow.backward") }
         }
@@ -327,6 +331,7 @@ struct PageThumbnailCell: View {
                     .foregroundStyle(Color.ink)
                 if isCurrent { Text("Current").metaStyle(.subheadline) }
                 Text(paperName).font(.subheadline).foregroundStyle(Color.textSecondary)
+                if !page.tags.isEmpty { Text(Tags.line(page.tags)).font(.subheadline).foregroundStyle(Color.textSecondary) }
             }
             Spacer(minLength: 0)
         }
@@ -347,6 +352,7 @@ struct PageThumbnailCell: View {
         .overlay { if isCurrent { StitchedSelection() } }
         .overlay(alignment: .topTrailing) { if isCurrent { ribbon } }
         .overlay(alignment: .topLeading) { if page.bookmark != nil { bookmarkFlag } }
+        .overlay(alignment: .bottomLeading) { if !page.tags.isEmpty { TagMark().padding(6) } }
         .padding(4)
     }
 

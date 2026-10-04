@@ -173,7 +173,8 @@ final class EditorModesUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["page.canvas.1"].waitForExistence(timeout: 20))
         app.buttons["Add"].firstMatch.tap()
         app.buttons["Picture on This Page…"].firstMatch.tap()
-        let photo = app.scrollViews.images.firstMatch
+        // The favourite tools are images in a scroll view too: the picker's are the ones called photos.
+        let photo = app.scrollViews.images.matching(NSPredicate(format: "label CONTAINS[c] %@", "photo")).firstMatch
         try XCTSkipUnless(photo.waitForExistence(timeout: 15), "this simulator's photo library is empty")
         photo.tap()
         let picture = app.images["Picture"]
@@ -513,7 +514,9 @@ final class EditorModesUITests: XCTestCase {
         XCTAssertTrue(settings.waitForExistence(timeout: 10))
         settings.tap()
         let backUp = app.buttons["settings.backup.create"]
-        for _ in 0..<6 where !backUp.exists || !backUp.isHittable { app.swipeUp() }
+        // Far enough up that the row a finished backup adds under it is on screen too.
+        let foot = app.windows.firstMatch.frame.maxY - 160
+        for _ in 0..<6 where !backUp.exists || !backUp.isHittable || backUp.frame.maxY > foot { app.swipeUp() }
         XCTAssertTrue(backUp.waitForExistence(timeout: 5))
         attach(app, "settings-backup")
         backUp.tap()

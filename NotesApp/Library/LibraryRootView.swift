@@ -120,7 +120,6 @@ struct LibraryRootView: View {
             }
         }
         .onChange(of: open) {
-            restoredNotebook = $1?.id.uuidString ?? ""
             if $1 == nil {
                 window.beside = nil
                 window.active = nil
@@ -128,6 +127,8 @@ struct LibraryRootView: View {
             }
             rememberWindow()
         }
+        .onChange(of: window.selected) { rememberWindow() }
+        .onChange(of: window.tabs.map(\.id)) { rememberWindow() }
         .onChange(of: window.beside?.id) {
             restoredBeside = open == nil ? "" : $1?.uuidString ?? ""
             rememberWindow()
@@ -143,6 +144,9 @@ struct LibraryRootView: View {
             if let action = AppAction(url: url) { Task { await perform(action) } }
         }
     }
+
+    /// The notebook on show in the editor's first pane: the tab on show, when there are tabs.
+    private var shownID: UUID? { open == nil ? nil : window.selected ?? open?.id }
 
     /// Before iPadOS 26 the system's own button does this.
     private var hidesSidebar: Bool {
@@ -187,13 +191,17 @@ struct LibraryRootView: View {
                 id = notebook
                 page = linked
             }
-            if let current = open, current.id != id {
-                NotificationCenter.default.post(name: .scribeCloseEditor, object: current.id)
+            if let current = shownID, current != id, window.beside?.id != id {
+                // With tabs open the notebook gets a tab; a notebook on its own makes way for it.
+                if window.tabs.count > 1 { return window.show(OpenNotebook(id: id, pageID: page)) }
+                window.closing = .library
+                NotificationCenter.default.post(name: .scribeCloseEditor, object: current)
                 for _ in 0..<100 where open != nil { try? await Task.sleep(for: .milliseconds(100)) }
                 guard open == nil else { return }
                 try? await Task.sleep(for: .milliseconds(500))
             }
-            if open?.id == id {
+            if open != nil {
+                if window.beside?.id == id { window.active = id }
                 if let page { NotificationCenter.default.post(name: .scribeShowPage, object: id, userInfo: ["page": page]) }
             } else {
                 openNotebook(id, pageID: page)
@@ -222,8 +230,9 @@ struct LibraryRootView: View {
     }
 
     private func rememberWindow() {
+        restoredNotebook = shownID?.uuidString ?? ""
         guard let sceneID else { return }
-        WindowMemory.remember(open?.id, beside: window.beside?.id, in: sceneID)
+        WindowMemory.remember(shownID, beside: window.beside?.id, tabs: window.tabs.count > 1 ? window.tabs.map(\.id) : [], in: sceneID)
     }
 
     /// Skipped once if the last restore crashed.
@@ -238,7 +247,8 @@ struct LibraryRootView: View {
             WindowMemory.remember(nil, beside: nil, in: sceneID)
             return
         }
-        let remembered = WindowMemory.remembered(in: sceneID) ?? (UUID(uuidString: restoredNotebook), UUID(uuidString: restoredBeside))
+        let remembered = WindowMemory.remembered(in: sceneID) ?? (UUID(uuidString: restoredNotebook), UUID(uuidString: restoredBeside), [])
+        window.restore(remembered.tabs.filter { store.record($0).map { !$0.isTrashed } ?? false }.map { OpenNotebook(id: $0) })
         guard let id = remembered.notebook, let record = store.record(id), !record.isTrashed else { return }
         let beside = remembered.beside.flatMap(store.record)
         defaults.set(true, forKey: flag)
@@ -278,19 +288,26 @@ struct LibraryRootView: View {
         guard open == nil else { return }
         if window.linkReturn?.destination != id { window.linkReturn = nil }
         if DocumentRegistry.shared.activateExistingEditor(for: id, from: sceneID) {
+            NotificationCenter.default.post(name: .scribeSelectTab, object: id)
             if let pageID { NotificationCenter.default.post(name: .scribeShowPage, object: id, userInfo: ["page": pageID]) }
             return
         }
+        let notebook = OpenNotebook(id: id, pageID: pageID, zoomSource: zoomSource)
         // A locked notebook asks before it opens; the editor asks again if it is reached some other way.
         guard let record = store.record(id), record.isLocked, !NotebookLock.shared.isUnlocked(id), NotebookLock.shared.isAvailable else {
-            open = OpenNotebook(id: id, pageID: pageID, zoomSource: zoomSource)
-            return
+            return show(notebook)
         }
         let title = record.title.isEmpty ? String(localized: "Untitled") : record.title
         Task {
             guard await NotebookLock.shared.unlock(id, title: title), open == nil else { return }
-            open = OpenNotebook(id: id, pageID: pageID, zoomSource: zoomSource)
+            show(notebook)
         }
+    }
+
+    /// Opens the editor on a notebook. Tabs left open the last time take it in among them.
+    private func show(_ notebook: OpenNotebook) {
+        window.show(notebook)
+        open = notebook
     }
 }
 
@@ -323,13 +340,16 @@ enum WindowMemory {
         set { UserDefaults.standard.set(newValue, forKey: key) }
     }
 
-    static func remember(_ notebook: UUID?, beside: UUID?, in scene: String) {
-        all[scene] = [notebook?.uuidString ?? "", notebook == nil ? "" : beside?.uuidString ?? ""]
+    /// The notebook on show, the one beside it, then the tabs in their order when there are several.
+    static func remember(_ notebook: UUID?, beside: UUID?, tabs: [UUID] = [], in scene: String) {
+        all[scene] = [notebook?.uuidString ?? "", notebook == nil ? "" : beside?.uuidString ?? ""] + tabs.map(\.uuidString)
     }
 
     /// Nil when the window has nothing kept here yet; a notebook of nil when it had none open.
-    static func remembered(in scene: String) -> (notebook: UUID?, beside: UUID?)? {
-        all[scene].map { (UUID(uuidString: $0.first ?? ""), UUID(uuidString: $0.last ?? "")) }
+    static func remembered(in scene: String) -> (notebook: UUID?, beside: UUID?, tabs: [UUID])? {
+        all[scene].map { kept in
+            (UUID(uuidString: kept.first ?? ""), UUID(uuidString: kept.dropFirst().first ?? ""), kept.dropFirst(2).compactMap(UUID.init(uuidString:)))
+        }
     }
 
     /// Lets go of windows iPadOS no longer keeps.

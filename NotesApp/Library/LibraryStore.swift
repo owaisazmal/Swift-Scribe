@@ -28,9 +28,12 @@ final class LibraryStore {
     /// Bumped only when something search matches on changes (titles, recognised text, notebooks added), so an
     /// active search isn't redone on every autosave.
     private(set) var searchVersion = 0
+    /// The saved filters in `smart-shelves.json`, in the order they were made.
+    private(set) var smartShelves: [SmartShelf] = []
     @ObservationIgnored private let log = Logger(subsystem: "com.owais.NotesApp", category: "library")
     @ObservationIgnored private var changesInFlight: [UUID: [UUID: @Sendable (inout NotebookManifest) -> Void]] = [:]
     @ObservationIgnored private var folderWrite: Task<Void, Never>?
+    @ObservationIgnored private var smartShelfWrite: Task<Void, Never>?
     /// Called with the notebooks a permanent delete actually removed.
     @ObservationIgnored var onPermanentlyDeleted: (([UUID]) -> Void)?
     /// Called after every change to the index made on this device, so a sync can follow it.
@@ -201,6 +204,12 @@ final class LibraryStore {
         searchVersion &+= 1
     }
 
+    func setTags(_ tags: [String], for records: [NotebookRecord]) {
+        let tags = Tags.merged(tags), raw = Tags.joined(tags)
+        changeLibraryState(records, index: { $0.tagsRaw = raw }) { $0.tags = tags }
+        searchVersion &+= 1
+    }
+
     func moveToTrash(_ records: [NotebookRecord]) {
         let now = Date.now
         changeLibraryState(records, index: { $0.deletedAt = now }) { $0.deletedAt = now }
@@ -270,11 +279,12 @@ final class LibraryStore {
 
     /// Read-modify-write of a closed notebook's manifest. A document that starts opening meanwhile gets the
     /// change applied again (see `reapplyChangesInFlight`); if the write fails, the index is re-read from the file.
-    private func update(_ id: UUID, _ change: @escaping @Sendable (inout NotebookManifest) -> Void) {
+    @discardableResult
+    func update(_ id: UUID, _ change: @escaping @Sendable (inout NotebookManifest) -> Void) -> Task<Void, Never> {
         let package = NotebookPackage(root: root, id: id)
         let token = UUID()
         changesInFlight[id, default: [:]][token] = change
-        Task {
+        return Task {
             do {
                 _ = try await package.updateManifest(change)
             } catch {
@@ -405,6 +415,45 @@ final class LibraryStore {
         }
     }
 
+    // MARK: Smart shelves
+
+    /// Reads the saved filters. Called at launch, and after a sync or a restore changed the library on disk.
+    func loadSmartShelves() async {
+        await smartShelfWrite?.value
+        let root = root
+        smartShelves = await Task.detached(priority: .userInitiated) { SmartShelfFile.read(root).shelves }.value
+    }
+
+    /// Replaces the saved filters. Writes are chained so they land in order, and each keeps what the file holds
+    /// that this version can't read.
+    func saveSmartShelves(_ shelves: [SmartShelf]) {
+        guard shelves != smartShelves else { return }
+        smartShelves = shelves
+        let root = root, previous = smartShelfWrite
+        smartShelfWrite = Task { [weak self] in
+            await previous?.value
+            let failure = await Task.detached(priority: .utility) { () -> String? in
+                var file = SmartShelfFile.read(root)
+                file.shelves = shelves
+                do { try file.write(root) } catch { return error.localizedDescription }
+                return nil
+            }.value
+            if let failure { self?.lastError = String(localized: "Smart shelves couldn't be saved: \(failure)") }
+        }
+    }
+
+    /// A tag was renamed or removed across the library: searches are redone now, and a tag shelf lists its pages
+    /// again once the closed notebooks' files have caught up.
+    func tagsChanged(awaiting writes: [Task<Void, Never>]) {
+        searchVersion &+= 1
+        saveIndex()
+        guard !writes.isEmpty else { return }
+        Task {
+            for write in writes { await write.value }
+            indexVersion &+= 1
+        }
+    }
+
     // MARK: Index
 
     /// Mirrors a manifest into the index, saving only when something the library shows changed.
@@ -415,9 +464,9 @@ final class LibraryStore {
             context.insert(new)
             return new
         }()
-        let oldTitle = record.title
+        let oldTitle = record.title, oldTags = [record.tagsRaw, record.pageTagsRaw]
         var changed = record.apply(manifest, issues: record.issueCount) || existing == nil
-        if existing == nil || record.title != oldTitle { searchVersion &+= 1 }
+        if existing == nil || record.title != oldTitle || [record.tagsRaw, record.pageTagsRaw] != oldTags { searchVersion &+= 1 }
         let folderID = manifest.library.folderID
         if record.folder?.id != folderID {
             record.folder = folderID.flatMap { id in try? context.fetch(FetchDescriptor<FolderRecord>(predicate: #Predicate { $0.id == id })).first }
@@ -510,6 +559,7 @@ extension LibraryStore {
     func makeBackup() async throws -> URL {
         for document in DocumentRegistry.shared.openDocuments { await document.flush() }
         await folderWrite?.value
+        await smartShelfWrite?.value
         let root = root, journal = dailyJournal?.id
         return try await Task.detached(priority: .userInitiated) { try LibraryBackup.create(root: root, journal: journal) }.value
     }
@@ -518,6 +568,7 @@ extension LibraryStore {
     func reloadFromDisk() async {
         await folderWrite?.value
         await LibraryIndex.refresh(root: root, context: context, full: true)
+        await loadSmartShelves()
         searchVersion &+= 1
         indexVersion &+= 1
     }
@@ -525,11 +576,13 @@ extension LibraryStore {
     /// Adds a backup's notebooks, folders and stickers to the library, then brings the index up to date.
     func restoreBackup(from url: URL) async throws -> LibraryBackup.Summary {
         await folderWrite?.value
+        await smartShelfWrite?.value
         let root = root, keepsHistory = UserDefaults.standard.object(forKey: SettingsKey.keepsWritingHistory) as? Bool ?? true
         let summary = try await Task.detached(priority: .userInitiated) {
             try await LibraryBackup.restore(from: url, into: root, keepsHistory: keepsHistory)
         }.value
         await LibraryIndex.refresh(root: root, context: context)
+        await loadSmartShelves()
         searchVersion &+= 1
         indexVersion &+= 1
         if dailyJournal == nil, let journal = summary.journal, record(journal) != nil {

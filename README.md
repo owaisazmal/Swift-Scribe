@@ -24,6 +24,8 @@ Swift Scribe is built entirely on Apple frameworks (SwiftUI, PencilKit, PDFKit, 
 - Hardware keyboard: arrows, space and Page Up/Down to scroll, ⌘↑/⌘↓ for the first and last page, ⌘N for a new page, ⇧⌘P for the page navigator, ⌘F to find in the notebook, and ⌘Z to undo library changes too
 - Choose to draw with Apple Pencil only, finger and pencil, or follow the system setting
 - Focus mode (⌃⌘F) puts the toolbar away and leaves the page and your tools
+- Favourite tools: a small tray beside the page keeps up to eight saved pens, pencils and highlighters, each with its colour and width. Tap one to write with it; the plus at its foot saves the tool you are using, and touch and hold replaces, moves or removes one. ⋯ › Favourite Tools puts the tray away
+- Notebook tabs: choose Open Another Notebook in a Tab from a notebook's title menu and a tab bar appears, with a plus for more. Each tab keeps its notebook open, undo history and all, while you look at another; ⇧⌘] and ⇧⌘[ step along the bar and ⌘W closes a tab. Your tabs are still there after a visit to the library and the next time the app opens
 - Two notebooks in one window: choose Open Another Notebook Beside from a notebook's title menu and write in both, side by side in landscape or one above the other in portrait, with a divider you can drag. Each keeps its own undo, and the tool you choose is the tool in both
 
 **Presenting**
@@ -45,6 +47,8 @@ Swift Scribe is built entirely on Apple frameworks (SwiftUI, PencilKit, PDFKit, 
 
 **PDFs & images**
 - Import PDFs as new notebooks, or insert them into an existing one, and annotate them
+- Select a PDF's own text (⋯ › Select PDF Text): drag across the words, tap a word, or take the whole page, then copy it (⌘C) or highlight it in yellow, green, pink or blue. A highlight is ink, so the eraser takes it off and one undo removes it
+- A highlighter that snaps: draw the highlighter roughly along a line of a PDF's text and it is laid straight over that line, as tall as the line and no wider than the letters you passed over. Undo gives your own stroke back; Settings › Apple Pencil turns it off
 - Insert photos as pages
 - Scan documents (+ › Scan Documents in a notebook, or the library's New menu for a notebook of its own): the camera finds the paper, straightens and crops it, and each sheet becomes a page you can write on. What is printed on a scan or a photo page is read on the device, so search finds it
 - Pictures on a page: add from Photos, drop from another app, or paste (⌘V), then move, resize, rotate, layer or delete them
@@ -79,6 +83,7 @@ Swift Scribe is built entirely on Apple frameworks (SwiftUI, PencilKit, PDFKit, 
 - A daily journal: Today's page (⌘T) is printed with the date, "On this day" brings back the page from a month or a year ago, and the app reopens the notebook you left open. With Settings › Daily Journal › Print Today's Events on, each new day's page starts with that day's events from your calendar
 - Locked notebooks: touch and hold a notebook and choose Lock, and it asks for Face ID, Touch ID or the iPad's passcode every time it is opened. Its cover is blurred under a padlock, what is written in it is left out of search, Spotlight, the widgets and On This Day, and it is covered again whenever the app leaves the screen. A lock keeps a notebook closed in the app; it does not encrypt its files
 - Folders with spine colours, and folders inside folders: drag notebooks onto folders in the sidebar, reorder folders, fold a folder's own folders away. A folder shows what is in it and in the folders inside it
+- Tags and smart shelves: tag a notebook (its title menu, or touch and hold it in the library and choose Tags) or a single page (⋯ › Tag Page), and the tag gets a shelf in the sidebar with the notebooks that carry it and, under them, the tagged pages, which open at that page. A smart shelf is a saved filter: everything tagged with any, or all, of the tags you choose. Rename a tag, or take it off everything, from the sidebar; search finds notebooks by their tags too. A backup carries your smart shelves; iCloud sync carries the tags inside each notebook but not the smart shelves
 - Favorites, sorting (last opened, modified, created, title), duplicate, rename
 - Recently Deleted with 30-day auto-purge
 - iCloud sync between your iPads (Settings › iCloud, off by default): each notebook is copied whole, a notebook changed on two devices keeps both versions, and a delete never beats newer writing. **Experimental:** the sync logic is tested with a folder standing in for iCloud, but it has not yet run against real iCloud, and it needs a build with the iCloud capability (see Getting started)
@@ -169,6 +174,7 @@ Contributions toward any of these are very welcome:
 - [ ] Try the study guide on an iPad with Apple Intelligence: how good its summaries and questions are from real handwriting, and how long a long notebook takes
 - [ ] Try the Pencil gestures with a real Pencil: double-tap and squeeze (and whether the tool picker also reacts), and how readily a scribble or a loop is recognised in real handwriting
 - [ ] Try whiteboards on a real iPad with a Pencil: writing at 5× and far from the middle of the board, panning and pinching while the tools are showing, and how a board with a lot of ink on it feels. Also still to run on a board at all: the time-lapse export, finding handwritten words, and presenting to a second screen
+- [ ] Try tabs, PDF text and the favourite tools on a real iPad: selecting text and the snapping highlighter with a Pencil, PDFs with columns or scanned pages, the tab shortcuts on a hardware keyboard, and a long session with many tabs open
 - [ ] A ruler that spans pages (PencilKit's ruler belongs to one canvas, and each page has its own)
 - [ ] Native-speaker review of the Spanish, French and German translations, and more languages
 

@@ -72,6 +72,15 @@ final class LibraryChangeCenter {
                 })
     }
 
+    /// Undo gives the notebook the tags it had.
+    func setTags(_ tags: [String], for record: NotebookRecord, in store: LibraryStore, undoManager: UndoManager?) {
+        let tags = Tags.merged(tags), previous = record.tags
+        guard tags != previous else { return }
+        perform([record], in: store, undoManager: undoManager, action: String(localized: "Change Tags"), symbol: "tag",
+                message: { String(localized: "Changed the tags of “\($0[0].title)”") },
+                apply: { store.setTags(tags, for: $0) }, inverse: { store.setTags(previous, for: $0) })
+    }
+
     /// Undo returns each notebook to the shelf it was on, or off the shelves if that shelf has since been deleted.
     func move(_ records: [NotebookRecord], to folder: FolderRecord?, in store: LibraryStore, undoManager: UndoManager?) {
         let previous = Dictionary(records.map { ($0.id, $0.folder?.id) }, uniquingKeysWith: { first, _ in first })

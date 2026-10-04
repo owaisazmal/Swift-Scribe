@@ -4,6 +4,10 @@ import SwiftData
 enum LibraryScope: Hashable {
     case all, favorites, trash
     case folder(UUID)
+    /// Everything carrying one tag.
+    case tag(String)
+    /// A saved filter, by its ID.
+    case smart(UUID)
 }
 
 enum LibrarySortOrder: String, CaseIterable, Identifiable {
@@ -64,6 +68,10 @@ struct LibrarySidebar: View {
     @State private var creatingFolder = false
     @State private var creatingInside: FolderRecord?
     @State private var folderName = ""
+    @State private var shelfDraft: SmartShelfDraft?
+    @State private var renamingTag: String?
+    @State private var removingTag: String?
+    @State private var tagName = ""
     @AppStorage("sidebar.collapsedFolders") private var collapsedRaw = ""
 
     private var collapsed: Set<UUID> { Set(collapsedRaw.split(separator: ",").compactMap { UUID(uuidString: String($0)) }) }
@@ -86,7 +94,7 @@ struct LibrarySidebar: View {
     }
 
     var body: some View {
-        let counts = counts
+        let counts = counts, tags = Tags.counts(notebooks)
         let tree = FolderTree(folders: folders)
         let byID = Dictionary(folders.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         let rows = tree.rows(collapsed: collapsed).compactMap { row in byID[row.id].map { (row: row, folder: $0) } }
@@ -119,6 +127,39 @@ struct LibrarySidebar: View {
             } header: {
                 Text("Shelves").metaStyle(.footnote)
             }
+            // Tags appear once something is tagged; a shelf saved earlier stays reachable after its tags have gone.
+            if !tags.isEmpty || !store.smartShelves.isEmpty {
+                Section {
+                    ForEach(store.smartShelves) { shelf in
+                        smartRow(shelf)
+                            .tag(LibraryScope.smart(shelf.id))
+                            .contextMenu { smartMenu(shelf, tags: tags) }
+                    }
+                    if !tags.isEmpty {
+                        Button { shelfDraft = SmartShelfDraft(tags: tags.map(\.name)) } label: {
+                            if dynamicTypeSize.isAccessibilitySize {
+                                Text("New Smart Shelf")
+                            } else {
+                                Label("New Smart Shelf", systemImage: "plus.rectangle.on.rectangle")
+                            }
+                        }
+                        .accessibilityIdentifier("sidebar.newSmartShelf")
+                    }
+                } header: {
+                    Text("Smart shelves").metaStyle(.footnote)
+                }
+            }
+            if !tags.isEmpty {
+                Section {
+                    ForEach(tags) { tag in
+                        tagRow(tag)
+                            .tag(LibraryScope.tag(tag.name))
+                            .contextMenu { tagMenu(tag) }
+                    }
+                } header: {
+                    Text("Tags").metaStyle(.footnote)
+                }
+            }
         }
         .scrollContentBackground(.hidden)
         .background(Color.surface)
@@ -150,6 +191,63 @@ struct LibrarySidebar: View {
             Button("Cancel", role: .cancel) {}
             Button("Save") { if let editingFolder { store.renameFolder(editingFolder, to: folderName) } }
         }
+        .alert("Rename Tag", isPresented: Binding(get: { renamingTag != nil }, set: { if !$0 { renamingTag = nil } })) {
+            TextField("Name", text: $tagName)
+            Button("Cancel", role: .cancel) {}
+            Button("Save") {
+                if let old = renamingTag, let name = store.renameTag(old, to: tagName), scope == .tag(old) { scope = .tag(name) }
+            }
+        } message: {
+            Text("Every notebook and page carrying it takes the new name.")
+        }
+        .alert(removingTag.map { String(localized: "Remove “\($0)” from every notebook and page?") } ?? "",
+               isPresented: Binding(get: { removingTag != nil }, set: { if !$0 { removingTag = nil } })) {
+            Button("Cancel", role: .cancel) {}
+            Button("Remove Tag", role: .destructive) {
+                guard let tag = removingTag else { return }
+                if scope == .tag(tag) { scope = .all }
+                store.renameTag(tag, to: nil)
+            }
+        } message: {
+            Text("This can't be undone.")
+        }
+        .sheet(item: $shelfDraft) { draft in
+            SmartShelfEditor(draft: draft) { name, tags, match in
+                if let shelf = draft.shelf {
+                    store.updateSmartShelf(shelf.id, name: name, tags: tags, match: match)
+                } else if let made = store.createSmartShelf(name: name, tags: tags, match: match) {
+                    scope = .smart(made.id)
+                }
+            }
+        }
+    }
+
+    private func tagRow(_ tag: TagCount) -> some View {
+        row(tag.name, icon: "tag", count: tag.count)
+            .accessibilityLabel(String(localized: "\(tag.name), tag, \(tag.count) notebooks"))
+            .accessibilityIdentifier("tag.\(tag.name)")
+    }
+
+    private func smartRow(_ shelf: SmartShelf) -> some View {
+        row(shelf.name, icon: "line.3.horizontal.decrease.circle", count: nil)
+            .accessibilityLabel(String(localized: "\(shelf.name), smart shelf"))
+            .accessibilityValue(Text(shelf.tags.formatted(.list(type: shelf.match == .all ? .and : .or))))
+            .accessibilityIdentifier("smart.\(shelf.name)")
+    }
+
+    @ViewBuilder
+    private func tagMenu(_ tag: TagCount) -> some View {
+        Button { tagName = tag.name; renamingTag = tag.name } label: { Label("Rename Tag…", systemImage: "pencil") }
+        Button(role: .destructive) { removingTag = tag.name } label: { Label("Remove Tag from Everything", systemImage: "tag.slash") }
+    }
+
+    @ViewBuilder
+    private func smartMenu(_ shelf: SmartShelf, tags: [TagCount]) -> some View {
+        Button { shelfDraft = SmartShelfDraft(shelf: shelf, tags: tags.map(\.name)) } label: { Label("Edit…", systemImage: "pencil") }
+        Button(role: .destructive) {
+            if scope == .smart(shelf.id) { scope = .all }
+            store.deleteSmartShelf(shelf.id)
+        } label: { Label("Delete", systemImage: "trash") }
     }
 
     private func row(_ title: String, icon: String, count: Int?, bounces: Int = 0) -> some View {

@@ -84,7 +84,7 @@ final class NotebookDocument {
     /// Called after any change to the page list or a page's appearance, including undo and redo.
     @ObservationIgnored var onStructureChange: (() -> Void)?
     /// Called after a save that changed what the library shows while the notebook is open (title, pages,
-    /// cover, favourite, trash, folder). Ink-only saves skip it; closing the editor indexes everything.
+    /// cover, favourite, trash, folder, tags). Ink-only saves skip it; closing the editor indexes everything.
     @ObservationIgnored var onSaved: ((NotebookManifest) -> Void)?
     /// Called after a save that wrote ink, with the pages left holding ink and when they were written.
     @ObservationIgnored var onInkSaved: (([UUID], Date) -> Void)?
@@ -136,6 +136,8 @@ final class NotebookDocument {
         let deletedAt: Date?
         let folderID: UUID?
         let firstPage: String?
+        let tags: [String]
+        let pageTags: [String]
 
         init(_ manifest: NotebookManifest) {
             title = manifest.title
@@ -145,6 +147,11 @@ final class NotebookDocument {
             deletedAt = manifest.library.deletedAt
             folderID = manifest.library.folderID
             firstPage = manifest.pages.first.map { "\($0.id.uuidString)-\($0.appearanceKey)" }
+            tags = manifest.library.tags
+            pageTags = manifest.pages.compactMap { page in
+                let tags = page.tags
+                return tags.isEmpty ? nil : "\(page.id.uuidString) \(Tags.joined(tags))"
+            }
         }
     }
 

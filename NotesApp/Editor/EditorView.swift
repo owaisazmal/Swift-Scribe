@@ -31,6 +31,10 @@ protocol EditorCanvasControlling: AnyObject {
     func setFinding(_ finding: Bool)
     func showFind(_ matches: [FindMatch], current: FindMatch?)
     func setZoomWindow(_ open: Bool)
+    func useTool(_ preset: ToolPreset)
+    func setSelectingText(_ selecting: Bool)
+    func selectAllText()
+    func highlightSelectedText(_ color: HighlightColor)
 }
 
 struct ItemSelection: Equatable {
@@ -42,8 +46,9 @@ enum PageFit { case width, page }
 
 /// Focus hides the chrome and leaves the tools; presenting hides both and turns the Pencil into a laser pointer;
 /// replaying plays a recording while the ink written during it appears as it was written; selecting picks ink out
-/// across pages to move, copy or delete; finding looks for words and marks them on the pages.
-enum EditorMode: Equatable { case writing, focus, presenting, replaying, selecting, finding }
+/// across pages to move, copy or delete; finding looks for words and marks them on the pages; selecting text picks
+/// out a PDF page's own words to copy or highlight.
+enum EditorMode: Equatable { case writing, focus, presenting, replaying, selecting, finding, selectingText }
 
 @MainActor
 @Observable
@@ -60,6 +65,10 @@ final class EditorSession {
     var isEditingText = false
     /// The whiteboard that is open on its own, if one is. The canvas owns it; it's mirrored here for the chrome.
     var openBoard: UUID?
+    /// The pen, pencil or marker the picker has, for the favourite tools; nil while it has the eraser or the lasso.
+    var currentTool: ToolPreset?
+    /// The words selected on a PDF page, while its text is being selected. The canvas owns the selection.
+    var selectedText: String?
     /// The page a link was followed from, while the page it opened is still showing.
     private(set) var linkReturn: UUID?
     private(set) var mode = EditorMode.writing
@@ -125,8 +134,10 @@ final class EditorSession {
     func enter(_ newMode: EditorMode) {
         guard newMode != mode, newMode != .replaying || replay != nil else { return }
         guard newMode != .selecting || !document.isReadOnly else { return }
+        guard newMode != .selectingText || document.hasPDFPages else { return }
         if mode == .replaying { stopReplay() }
         if mode == .selecting { canvas?.setSelectingInk(false) }
+        if mode == .selectingText { canvas?.setSelectingText(false) }
         if mode == .finding {
             finder.clear()
             canvas?.setFinding(false)
@@ -136,6 +147,7 @@ final class EditorSession {
         canvas?.setPresenting(newMode == .presenting)
         if newMode == .selecting { canvas?.setSelectingInk(true) }
         if newMode == .finding { canvas?.setFinding(true) }
+        if newMode == .selectingText { canvas?.setSelectingText(true) }
     }
 
     /// Circle and hold: starts selecting with the ink inside `outline`, given in the page stack's points, already caught.
@@ -521,7 +533,10 @@ fileprivate struct EditorContent: View {
     @State private var cardDraft: CardDraft?
     @State private var studyGuide: StudyGuideRequest?
     @State private var showingBoardGuide = false
+    @State private var tagging: TagTarget?
     @AppStorage(SettingsKey.whiteboardTipSeen) private var boardTipSeen = false
+    @AppStorage(SettingsKey.showsToolTray) private var showsToolTray = true
+    @State private var highlightColor = HighlightColor.last
     @State private var findText = ""
     @FocusState private var findFocused: Bool
     @ScaledMetric(relativeTo: .body) private var findWidth: CGFloat = 260
@@ -552,6 +567,11 @@ fileprivate struct EditorContent: View {
     private var isNarrow: Bool { paneWidth < 620 }
     private var isCompact: Bool { sizeClass == .compact || isNarrow }
 
+    /// The favourite tools stand beside the page while it can be written on, where there is room for them.
+    private var showsTools: Bool {
+        showsToolTray && !isCompact && !document.isReadOnly && (session.mode == .writing || session.mode == .focus)
+    }
+
     /// With two notebooks in the window, keyboard shortcuts go to the one last touched.
     private var isActivePane: Bool { pane == .single || window?.active == nil || window?.active == document.id }
 
@@ -569,6 +589,11 @@ fileprivate struct EditorContent: View {
     private var layout: some View {
         NavigationStack {
             HStack(spacing: 0) {
+                if showsTools {
+                    ToolTray(session: session)
+                        .frame(maxHeight: .infinity, alignment: .top)
+                        .transition(.move(edge: .leading).combined(with: .opacity))
+                }
                 pageStack
                 if showsPresenterPanel {
                     PresenterPanel(session: session, since: presentingSince) {
@@ -601,7 +626,7 @@ fileprivate struct EditorContent: View {
                 Group {
                     Button("Page After Current") { session.addPage(after: session.currentPage) }
                         .keyboardShortcut(shortcut("n", always: true))
-                        .disabled(document.isReadOnly || session.mode == .replaying || session.mode == .selecting || session.mode == .finding)
+                        .disabled(document.isReadOnly || [.replaying, .selecting, .finding, .selectingText].contains(session.mode))
                     Button("Find in Notebook") { enter(.finding) }
                         .keyboardShortcut(shortcut("f"))
                     if session.mode == .finding {
@@ -623,7 +648,7 @@ fileprivate struct EditorContent: View {
                 switch session.mode {
                 case .writing: ribbons
                 case .focus: focusExit
-                case .presenting, .replaying, .selecting, .finding: EmptyView()
+                case .presenting, .replaying, .selecting, .finding, .selectingText: EmptyView()
                 }
             }
             .overlay(alignment: .top) { banners }
@@ -632,6 +657,8 @@ fileprivate struct EditorContent: View {
                     inkBar
                 } else if session.mode == .finding {
                     findBar
+                } else if session.mode == .selectingText {
+                    textBar
                 } else if session.selection != nil, session.mode != .presenting {
                     arrangeBar
                 } else {
@@ -668,7 +695,7 @@ fileprivate struct EditorContent: View {
             }
         }
         .sheet(isPresented: $pickingBeside) {
-            BesidePicker(current: document.id) { id in
+            BesidePicker(current: document.id, exclude: Set(window?.tabs.map(\.id) ?? [])) { id in
                 window?.beside = OpenNotebook(id: id)
                 window?.active = id
             }
@@ -765,9 +792,12 @@ fileprivate struct EditorContent: View {
             session.onTouchDown = { if pane != .single, window?.active != document.id { window?.active = document.id } }
             session.isActivePane = { pane == .single || window?.active.map { $0 == document.id } ?? (pane != .secondary) }
             session.recorder.onTranscriptChange = { refreshSearchText() }
+            // A notebook coming back from behind the tab bar still has its undo history.
+            session.refreshUndoState()
             refreshNotebookTitles()
         }
         .onChange(of: window?.active) { if pane != .single, window?.active == document.id { session.canvas?.paneBecameActive() } }
+        .onChange(of: session.mode, initial: true) { if pane != .secondary { window?.hidesChrome = session.mode != .writing } }
         .onChange(of: store.indexVersion) { refreshNotebookTitles() }
         .onReceive(NotificationCenter.default.publisher(for: .NSUndoManagerDidCloseUndoGroup)) { _ in session.refreshUndoState() }
         .onReceive(NotificationCenter.default.publisher(for: .NSUndoManagerDidUndoChange)) { _ in session.refreshUndoState() }
@@ -789,6 +819,7 @@ fileprivate struct EditorContent: View {
         .sheet(item: $studyGuide) { request in
             StudyGuideSheet(session: session, request: request)
         }
+        .sheet(item: $tagging) { target in EditorTagSheet(document: document, target: target) }
     }
 
     private func makeCardFromInk() {
@@ -814,7 +845,7 @@ fileprivate struct EditorContent: View {
     private var isPresentingModal: Bool {
         showingPages || showingBoardGuide || showingRecordings || showingRecordingsSheet || pickingBeside || export != nil || importingPDF || showingPhotoPicker || renaming || goToPage || paperMode != nil
             || editingCover != nil || namingBookmark != nil || showingStickers || pickingLink || renamingLink || editingNotes != nil || readingInk != nil
-            || isCovered || scanning || showingDeck || cardDraft != nil || studyGuide != nil
+            || isCovered || scanning || showingDeck || cardDraft != nil || studyGuide != nil || (pane != .secondary && window?.pickingTab == true) || tagging != nil
     }
 
     private func enter(_ mode: EditorMode) {
@@ -833,6 +864,7 @@ fileprivate struct EditorContent: View {
         case .finding:
             findText = ""
             announce(String(localized: "Find in notebook. Type what to look for."))
+        case .selectingText: announce(String(localized: "Selecting text. Drag across the words of a PDF page."))
         }
     }
 
@@ -863,12 +895,14 @@ fileprivate struct EditorContent: View {
                 session.canvas?.select(nil)
                 session.recorder.shutdown()
                 if window?.linkReturn?.destination == document.id { window?.linkReturn = nil }
+                if pane != .secondary { window?.closing = .library }
                 close()
             } label: {
                 if pane == .secondary { Label("Close", systemImage: "xmark") } else { Label("Library", systemImage: "chevron.backward") }
             }
             .buttonStyle(.boardIcon)
-            .keyboardShortcut(shortcut("w", always: true))
+            // With tabs open, ⌘W closes the tab on show; the tab bar has it.
+            .keyboardShortcut(pane != .secondary && (window?.tabs.count ?? 0) > 1 ? nil : shortcut("w", always: true))
             .accessibilityIdentifier(pane == .secondary ? "editor.close.pane" : "editor.back")
         }
         .boardBackground()
@@ -938,6 +972,7 @@ fileprivate struct EditorContent: View {
                 Button { editingCover = store.record(document.id) } label: { Label("Change Cover…", systemImage: "book.closed") }
                 let locked = document.manifest.library.isLocked
                 Button { toggleLock() } label: { Label(locked ? "Remove Lock…" : "Lock…", systemImage: locked ? "lock.open" : "lock") }
+                Button { tagging = .notebook } label: { Label("Tags…", systemImage: "tag") }
             }
             Menu {
                 Button { export = ExportJob(document: document) } label: { Label("Notebook as a PDF…", systemImage: "doc.richtext") }
@@ -950,14 +985,17 @@ fileprivate struct EditorContent: View {
                     .disabled(document.loadedInk(page.id)?.strokes.isEmpty ?? (page.inkHash == nil))
                 }
             } label: { Label("Export", systemImage: "square.and.arrow.up") }
-            if let window, pane == .single, !isNarrow, sizeClass != .compact {
+            if let window, pane != .secondary {
                 Divider()
-                Button { pickingBeside = true } label: { Label("Open Another Notebook Beside…", systemImage: "rectangle.split.2x1") }
-                    .disabled(window.beside != nil)
-            } else if pane == .primary, let beside = window?.beside {
-                Divider()
-                Button { NotificationCenter.default.post(name: .scribeCloseEditor, object: beside.id) } label: {
-                    Label("Close the Other Notebook", systemImage: "rectangle")
+                Button { window.pickingTab = true } label: { Label("Open Another Notebook in a Tab…", systemImage: "plus.rectangle.on.rectangle") }
+                    .disabled(window.tabs.count >= EditorWindow.tabLimit)
+                if pane == .single, !isNarrow, sizeClass != .compact {
+                    Button { pickingBeside = true } label: { Label("Open Another Notebook Beside…", systemImage: "rectangle.split.2x1") }
+                        .disabled(window.beside != nil)
+                } else if pane == .primary, let beside = window.beside {
+                    Button { NotificationCenter.default.post(name: .scribeCloseEditor, object: beside.id) } label: {
+                        Label("Close the Other Notebook", systemImage: "rectangle")
+                    }
                 }
             }
         } label: {
@@ -1267,6 +1305,63 @@ fileprivate struct EditorContent: View {
         .onAppear { findFocused = true }
     }
 
+    /// While a PDF page's text is being selected: what to do, then what can be done with the words that are selected.
+    private var textBar: some View {
+        let text = session.selectedText
+        let says = text == nil && !(isCompact || dynamicTypeSize.isAccessibilitySize)
+        return HStack(spacing: 0) {
+            if says {
+                Text("Drag across the words of a PDF page")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color.ink)
+                    .lineLimit(1)
+                    .padding(.trailing, Space.x2)
+                    .accessibilityIdentifier("editor.text.status")
+            }
+            arrangeButton("Select All on This Page", "text.justify.leading") { session.canvas?.selectAllText() }
+                .accessibilityIdentifier("editor.text.all")
+            if let text {
+                arrangeButton("Copy", "doc.on.doc") {
+                    UIPasteboard.general.string = text
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                    announce(String(localized: "Copied"))
+                }
+                .accessibilityValue(Text("\(text.split(whereSeparator: \.isWhitespace).count) words"))
+                .accessibilityIdentifier("editor.text.copy")
+                if !document.isReadOnly {
+                    arrangeButton("Highlight", "highlighter") { session.canvas?.highlightSelectedText(highlightColor) }
+                        .accessibilityValue(Text(highlightColor.displayName))
+                        .accessibilityIdentifier("editor.text.highlight")
+                    Menu {
+                        Picker("Highlight Colour", selection: Binding(get: { highlightColor }, set: { highlightColor = $0; HighlightColor.last = $0 })) {
+                            ForEach(HighlightColor.allCases) { Text($0.displayName).tag($0) }
+                        }
+                    } label: {
+                        Label {
+                            Text("Highlight Colour")
+                        } icon: {
+                            Circle()
+                                .fill(Color(uiColor: highlightColor.uiColor))
+                                .frame(width: 18, height: 18)
+                                .overlay { Circle().strokeBorder(Color.ink.opacity(0.35)) }
+                        }
+                    }
+                    .accessibilityValue(Text(highlightColor.displayName))
+                    .accessibilityIdentifier("editor.text.colour")
+                }
+            }
+            barRule
+            barDone { enter(.writing) }
+                .accessibilityIdentifier("editor.text.done")
+        }
+        .floatingBar(leading: says ? Space.x5 : Space.x1)
+        .padding(.top, Space.x2)
+        .transition(.move(edge: .top).combined(with: .opacity))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(Text("Select Text"))
+        .accessibilityIdentifier("editor.text.bar")
+    }
+
     /// After a link was followed: the way back to the page it was on, or to the notebook it was in.
     @ViewBuilder
     private var returnBar: some View {
@@ -1517,6 +1612,7 @@ fileprivate struct EditorContent: View {
                 } else {
                     Button(action: toggleBookmark) { Label("Bookmark Page", systemImage: "bookmark") }
                 }
+                if let current { Button { tagging = .page(current.id) } label: { Label("Tag Page…", systemImage: "tag") } }
                 Button { Task { await session.duplicatePage(at: session.currentPage) } } label: {
                     Label("Duplicate Page", systemImage: "plus.square.on.square")
                 }
@@ -1539,6 +1635,9 @@ fileprivate struct EditorContent: View {
                 Button { session.coverAllTapes() } label: { Label("Put All Tape Back", systemImage: "eye.slash") }
             }
             Button { enter(.finding) } label: { Label("Find in Notebook…", systemImage: "magnifyingglass") }
+            if document.hasPDFPages {
+                Button { enter(.selectingText) } label: { Label("Select PDF Text", systemImage: "text.cursor") }
+            }
             if !document.isReadOnly {
                 Button { session.setZoomWindow(!session.isZoomWindowOpen) } label: {
                     Label(session.isZoomWindowOpen ? "Close Zoom Window" : "Zoom Window", systemImage: "plus.magnifyingglass")
@@ -1554,6 +1653,11 @@ fileprivate struct EditorContent: View {
                 Button { editingNotes = NotesTarget(id: current.id) } label: { Label("Presenter Notes…", systemImage: "note.text") }
             }
             Divider()
+            if !isCompact, !document.isReadOnly {
+                Toggle(isOn: $showsToolTray.animation(Motion.adaptive(Motion.standard, reduceMotion: reduceMotion))) {
+                    Label("Favourite Tools", systemImage: "star.square")
+                }
+            }
             Picker(selection: $session.drawingInput) {
                 ForEach(DrawingInput.allCases) { Text($0.displayName).tag($0) }
             } label: { Label("Draw With", systemImage: "hand.draw") }

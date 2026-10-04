@@ -36,6 +36,8 @@ struct ShelfView: View {
     @State private var matches: Set<UUID>?
     @State private var pageHits: [UUID: [PageHit]] = [:]
     @State private var hitsQuery = ""
+    @State private var tagPages: [UUID: [PageHit]] = [:]
+    @State private var tagging: NotebookRecord?
     @State private var searchPending = false
     @State private var export: ExportJob?
     @State private var editingCover: NotebookRecord?
@@ -64,6 +66,17 @@ struct ShelfView: View {
         case .favorites: String(localized: "Favourites")
         case .trash: String(localized: "Recently deleted")
         case .folder: folder?.name ?? String(localized: "Folder")
+        case .tag(let name): name
+        case .smart(let id): store.smartShelves.first { $0.id == id }?.name ?? String(localized: "Smart Shelf")
+        }
+    }
+
+    /// What a tag shelf or a smart shelf looks for. A smart shelf that has been deleted looks for nothing.
+    private var rule: TagRule? {
+        switch scope {
+        case .tag(let name): TagRule(tags: [name])
+        case .smart(let id): store.smartShelves.first { $0.id == id }?.rule ?? TagRule(tags: [])
+        case .all, .favorites, .trash, .folder: nil
         }
     }
 
@@ -72,12 +85,14 @@ struct ShelfView: View {
     /// A folder shows what is in it and in the folders inside it.
     private var visible: [NotebookRecord] {
         let inside: Set<UUID> = if case .folder(let id) = scope { tree.subtree(id) } else { [] }
+        let rule = rule
         let scoped = records.filter { record in
             switch scope {
             case .all: !record.isTrashed
             case .favorites: !record.isTrashed && record.isFavorite
             case .trash: record.isTrashed
             case .folder: !record.isTrashed && record.folder.map { inside.contains($0.id) } ?? false
+            case .tag, .smart: !record.isTrashed && rule?.matches(notebook: record.tags) == true
             }
         }
         let searched = matches.map { found in scoped.filter { found.contains($0.id) } } ?? scoped
@@ -104,9 +119,12 @@ struct ShelfView: View {
             LibraryIndex.notebookIDs(matching: query, in: ModelContext(container))
         }.value
         guard !Task.isCancelled else { return }
-        // What is written in a locked notebook isn't searched: only its title can match.
+        // What is written in a locked notebook isn't searched: only its title and its own tags can match.
         let locked = records.filter(\.isLocked)
-        let hidden = Set(locked.filter { !$0.title.localizedStandardContains(query) }.map(\.id))
+        let tag = Tags.normalized(query) ?? query
+        let hidden = Set(locked.filter { record in
+            !record.title.localizedStandardContains(query) && !record.tags.contains { $0.localizedStandardContains(tag) }
+        }.map(\.id))
         matches = found.subtracting(hidden)
         guard scope != .trash else { pageHits = [:]; return }
         let closed = Set(locked.map(\.id))
@@ -115,6 +133,28 @@ struct ShelfView: View {
         guard !Task.isCancelled else { return }
         withAnimation(Motion.adaptive(Motion.standard, reduceMotion: reduceMotion)) { pageHits = hits }
         hitsQuery = query
+    }
+
+    /// The tagged pages under a tag shelf. Manifests are read off the main thread, an open notebook's pages come from
+    /// its document, and a locked notebook's pages are never listed.
+    private func loadTagPages() async {
+        guard let rule, !rule.tags.isEmpty else {
+            if !tagPages.isEmpty { tagPages = [:] }
+            return
+        }
+        let sources = records.filter { record in !record.isTrashed && !record.isLocked && rule.tags.contains { Tags.contains(record.pageTags, $0) } }
+            .sorted(by: sort)
+            .map { TagPages.Source(id: $0.id, tags: $0.tags, pages: DocumentRegistry.shared.document(for: $0.id)?.pages) }
+        let hits = await TagPages.hits(for: rule, in: sources, root: store.root)
+        guard !Task.isCancelled, hits != tagPages else { return }
+        withAnimation(Motion.adaptive(Motion.standard, reduceMotion: reduceMotion)) { tagPages = hits }
+    }
+
+    /// Tagged pages show under their notebooks, but not while searching.
+    private var showsTagPages: Bool { rule != nil && searchText.isEmpty && !tagPages.isEmpty }
+
+    private var tagPagesKey: String {
+        "\(scope)|\(store.indexVersion)|" + (rule.map { "\($0.match.rawValue)|\(Tags.joined($0.tags))" } ?? "")
     }
 
     var body: some View {
@@ -127,7 +167,7 @@ struct ShelfView: View {
             }
         }
         .background(Color.paper)
-        .overlay { if visible.isEmpty, !searchPending { emptyState } }
+        .overlay { if visible.isEmpty, !showsTagPages, !searchPending { emptyState } }
         .safeAreaInset(edge: .top, spacing: 0) {
             if !searchInBar {
                 searchField
@@ -173,10 +213,19 @@ struct ShelfView: View {
         } message: {
             Text(errorMessage ?? store.lastError ?? "")
         }
-        .onChange(of: scope) { _, _ in endSelection() }
+        .onChange(of: scope) { _, _ in
+            endSelection()
+            tagPages = [:]
+        }
         .task(id: "\(store.searchVersion)|\(records.count)|\(scope)|\(searchText)") { await runSearch() }
+        .task(id: tagPagesKey) { await loadTagPages() }
         .sheet(item: $export) { job in ExportSheet(job: job) }
         .sheet(item: $editingCover) { record in CoverEditorView(record: record) }
+        .sheet(item: $tagging) { record in
+            TagSheet(subject: record.title.isEmpty ? String(localized: "Untitled") : record.title, initial: record.tags) { tags in
+                changes.setTags(tags, for: record, in: store, undoManager: undoManager)
+            }
+        }
         .alert(permanentDeleteTitle, isPresented: Binding(get: { !changes.pendingPermanentDelete.isEmpty },
                                                           set: { if !$0 { changes.pendingPermanentDelete = [] } })) {
             Button("Cancel", role: .cancel) {}
@@ -224,6 +273,11 @@ struct ShelfView: View {
                         }
                     }
                 }
+                if showsTagPages {
+                    PageHitsSection(records: taggedNotebooks, hits: tagPages, query: "", zoomNamespace: zoomNamespace, onOpen: onOpenZoomed)
+                        .padding(.top, Space.x2)
+                        .transition(.opacity)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { shelfWidth = $0 }
@@ -241,9 +295,20 @@ struct ShelfView: View {
             .max { ($0.lastOpenedAt ?? .distantPast) < ($1.lastOpenedAt ?? .distantPast) }
     }
 
+    /// The notebooks whose pages a tag shelf lists, whether or not they are on the shelf themselves.
+    private var taggedNotebooks: [NotebookRecord] { records.filter { tagPages[$0.id] != nil }.sorted(by: sort) }
+
+    /// A view that mixes shelves says which shelf a notebook is on.
+    private var showsFolder: Bool {
+        switch scope {
+        case .all, .favorites, .tag, .smart: true
+        case .trash, .folder: false
+        }
+    }
+
     private func item(_ record: NotebookRecord, width: CGFloat) -> some View {
         NotebookCoverItem(record: record, width: width, isSelecting: isSelecting, isSelected: selection.contains(record.id),
-                          zoomNamespace: zoomNamespace, showsFolder: scope == .all || scope == .favorites) {
+                          zoomNamespace: zoomNamespace, showsFolder: showsFolder) {
             if isSelecting { toggle(record) } else if !record.isTrashed { onOpen(record) }
         }
         .contextMenu { if !isSelecting { menu(for: record) } }
@@ -297,32 +362,41 @@ struct ShelfView: View {
                 .draggable(NotebookReference(id: record.id))
                 .listRowBackground(Color.surface)
             }
-            if !searchText.isEmpty, !pageHits.isEmpty, scope != .trash {
-                Section {
-                    ForEach(visible.flatMap { record in (pageHits[record.id] ?? []).map { (record, $0) } }, id: \.1.id) { record, hit in
-                        Button { onOpenPage(record, hit.page.id) } label: {
-                            VStack(alignment: .leading, spacing: Space.x1) {
-                                Text(hit.title(in: record.title)).font(.headline).foregroundStyle(Color.ink)
-                                Text(PageSearch.highlighted(hit.snippet, query: hitsQuery)).font(.subheadline).foregroundStyle(Color.textSecondary)
-                            }
-                        }
-                        .accessibilityLabel(Text(hit.label(in: record.title)))
-                        .accessibilityHint(Text("Opens the notebook at this page"))
-                        .listRowBackground(Color.surface)
-                    }
-                } header: {
-                    Text("Pages").metaStyle(.footnote)
-                }
-            }
+            if !searchText.isEmpty, !pageHits.isEmpty, scope != .trash { pageRows(visible, hits: pageHits, query: hitsQuery) }
+            if showsTagPages { pageRows(taggedNotebooks, hits: tagPages, query: "") }
         }
         .scrollContentBackground(.hidden)
+    }
+
+    private func pageRows(_ records: [NotebookRecord], hits: [UUID: [PageHit]], query: String) -> some View {
+        Section {
+            ForEach(records.flatMap { record in (hits[record.id] ?? []).map { (record, $0) } }, id: \.1.id) { record, hit in
+                Button { onOpenPage(record, hit.page.id) } label: {
+                    VStack(alignment: .leading, spacing: Space.x1) {
+                        Text(hit.title(in: record.title)).font(.headline).foregroundStyle(Color.ink)
+                        Text(PageSearch.highlighted(hit.snippet, query: query)).font(.subheadline).foregroundStyle(Color.textSecondary)
+                    }
+                }
+                .accessibilityLabel(Text(hit.label(in: record.title)))
+                .accessibilityHint(Text("Opens the notebook at this page"))
+                .listRowBackground(Color.surface)
+            }
+        } header: {
+            Text("Pages").metaStyle(.footnote)
+        }
     }
 
     private func subtitle(_ visible: [NotebookRecord]) -> String {
         if isSelecting { return String(localized: "Select notebooks to move, favourite or delete") }
         if scope == .trash { return String(localized: "Deleted notebooks stay here for 30 days") }
-        let count = visible.count, pageCount = visible.reduce(0) { $0 + $1.pageCount }
+        let count = visible.count
         let notebooks = String(localized: "\(count) notebooks")
+        // On a tag shelf the pages counted are the tagged ones it lists, not every page of its notebooks.
+        if rule != nil {
+            let tagged = tagPages.values.reduce(0) { $0 + $1.count }
+            return tagged == 0 ? "\(notebooks) · \(sort.summary)" : "\(notebooks) · \(String(localized: "\(tagged) pages")) · \(sort.summary)"
+        }
+        let pageCount = visible.reduce(0) { $0 + $1.pageCount }
         let pages = String(localized: "\(pageCount) pages")
         return "\(notebooks) · \(pages) · \(sort.summary)"
     }
@@ -537,6 +611,7 @@ struct ShelfView: View {
                 Task { do { try await store.duplicate(record) } catch { errorMessage = error.localizedDescription } }
             } label: { Label("Duplicate", systemImage: "plus.square.on.square") }
             Button { changeCover(record) } label: { Label("Change Cover…", systemImage: "book.closed") }
+            Button { tagging = record } label: { Label("Tags…", systemImage: "tag") }
             Button { startExport(record, as: .pdf) } label: { Label("Export as PDF", systemImage: "square.and.arrow.up") }
             Button { startExport(record, as: .images) } label: { Label("Export as Images", systemImage: "photo.on.rectangle") }
             Toggle(isOn: Binding(get: { journalID == record.id.uuidString }, set: { journalID = $0 ? record.id.uuidString : "" })) {
@@ -610,6 +685,14 @@ struct ShelfView: View {
         } else if scope == .favorites {
             EmptyShelf(title: String(localized: "No favourites yet"), message: String(localized: "Touch and hold a notebook, then choose Favourite."),
                        illustration: { RibbonIllustration() })
+        } else if case .tag(let name) = scope {
+            EmptyShelf(title: String(localized: "Nothing tagged “\(name)”."),
+                       message: String(localized: "Tag a notebook or a page with it and it stands here."),
+                       illustration: { ShelfIllustration(cloth: nil) })
+        } else if case .smart = scope {
+            EmptyShelf(title: String(localized: "Nothing on this shelf yet."),
+                       message: String(localized: "Notebooks and pages stand here once their tags match the shelf's."),
+                       illustration: { ShelfIllustration(cloth: nil) })
         } else if case .folder = scope, let name = folder?.name {
             EmptyShelf(title: String(localized: "Nothing on \(name) yet."),
                        message: String(localized: "Drag notebooks onto \(name) in the sidebar, or start one here.")) {

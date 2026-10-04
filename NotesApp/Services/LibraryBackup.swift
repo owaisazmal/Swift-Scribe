@@ -7,8 +7,8 @@ extension UTType {
     static let scribeBackup = UTType(exportedAs: "com.owais.swiftscribe.backup")
 }
 
-/// The whole library as one file: every notebook package, the folders, the writing history and your own stickers,
-/// in an Apple Archive. Thumbnails are left out; they are made again when needed.
+/// The whole library as one file: every notebook package, the folders, the smart shelves, the writing history and
+/// your own stickers, in an Apple Archive. Thumbnails are left out; they are made again when needed.
 enum LibraryBackup {
     static let fileExtension = "scribebackup"
     static let infoFile = "backup.json"
@@ -24,10 +24,11 @@ enum LibraryBackup {
         var unreadable = 0
         var folders = 0
         var stickers = 0
+        var smartShelves = 0
         /// The notebook the backup's library used as its daily journal, if it was restored under its own ID.
         var journal: UUID?
 
-        var isEmpty: Bool { added + copies + folders + stickers == 0 }
+        var isEmpty: Bool { added + copies + folders + stickers + smartShelves == 0 }
     }
 
     enum Failure: LocalizedError {
@@ -165,6 +166,15 @@ enum LibraryBackup {
             summary.folders = incoming.count
         }
 
+        var shelves = SmartShelfFile.read(root)
+        let saved = Set(shelves.shelves.map(\.id))
+        let filters = SmartShelfFile.read(backup).shelves.filter { !saved.contains($0.id) }
+        if !filters.isEmpty {
+            shelves.shelves += filters
+            try shelves.write(root)
+            summary.smartShelves = filters.count
+        }
+
         for file in (try? fileManager.contentsOfDirectory(at: backup.stickers, includingPropertiesForKeys: nil)) ?? [] {
             let target = root.stickers.appending(path: file.lastPathComponent)
             guard !fileManager.fileExists(atPath: target.path(percentEncoded: false)) else { continue }
@@ -199,6 +209,7 @@ extension LibraryBackup.Summary {
         if unchanged > 0 { parts.append(String(localized: "\(unchanged) notebooks were already here.")) }
         if folders > 0 { parts.append(String(localized: "\(folders) folders were added.")) }
         if stickers > 0 { parts.append(String(localized: "\(stickers) stickers were added.")) }
+        if smartShelves > 0 { parts.append(String(localized: "\(smartShelves) smart shelves were added.")) }
         if unreadable > 0 { parts.append(String(localized: "\(unreadable) notebooks in the backup couldn't be read and were left out.")) }
         return parts.isEmpty ? String(localized: "The backup had nothing in it.") : parts.joined(separator: " ")
     }
