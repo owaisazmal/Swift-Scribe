@@ -184,7 +184,7 @@ final class ParityTests: XCTestCase {
         let document = try await NotebookDocument.open(manifest.id, root: root)
         let controller = PageStackController(session: EditorSession(document: document))
         XCTAssertFalse(controller.keyCommands?.isEmpty ?? true)
-        controller.setToolPickerSuppressed(true)
+        controller.setModalShowing(true)
         XCTAssertEqual(controller.keyCommands?.count, 0, "arrows and space belong to the sheet, not the page behind it")
     }
 
@@ -210,7 +210,8 @@ final class ParityTests: XCTestCase {
         window.makeKeyAndVisible()
         addTeardownBlock { @MainActor in window.isHidden = true }
         controller.view.layoutIfNeeded()
-        controller.setToolPickerVisible(false)
+        session.showsTools = false
+        controller.toolTrayDidChange()
         session.go(to: 1, animated: false)
 
         func a5OnScreen() throws -> CGRect {
@@ -234,6 +235,14 @@ final class ParityTests: XCTestCase {
         XCTAssertTrue(abs(whole.height - (readable.height - 2 * PageStackLayout.margin * whole.height / PageSize.a5.points.height)) < 1
                       || abs(whole.width - wide.width) < 1, "Fit Page is limited by the height or the width")
         XCTAssertEqual(session.currentPage, 1)
+
+        session.showsTools = true
+        controller.toolTrayDidChange()
+        controller.fit(.page)
+        XCTAssertLessThanOrEqual(try a5OnScreen().maxY, controller.view.bounds.maxY - ToolTray.height - ToolTray.gap + 1,
+                                 "with the tools out, the whole page is above the tray")
+        session.showsTools = false
+        controller.toolTrayDidChange()
 
         let wideManifest = try await makeNotebook(root, pages: [.template(.blank, color: .white, size: .letter), .template(.blank, color: .white, size: .widescreen),
                                                                 .template(.blank, color: .white, size: .letter), .template(.blank, color: .white, size: .letter)])

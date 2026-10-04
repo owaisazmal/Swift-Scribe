@@ -21,8 +21,6 @@ final class PencilGestureUITests: XCTestCase {
         notebook.tap()
         let canvas = app.descendants(matching: .any)["page.canvas.1"]
         XCTAssertTrue(canvas.waitForExistence(timeout: 20))
-        // The picker keeps the tool another test left it with, and a highlighter never erases: take up a pen.
-        app.buttons["editor.tools.1"].tap()
         let undo = app.buttons["editor.undo"]
         func draw(_ from: CGVector, _ to: CGVector, hold: TimeInterval = 0.05) {
             canvas.coordinate(withNormalizedOffset: from).press(forDuration: 0.05, thenDragTo: canvas.coordinate(withNormalizedOffset: to), withVelocity: 400, thenHoldForDuration: hold)

@@ -143,33 +143,8 @@ final class PencilGestureTests: XCTestCase {
         XCTAssertNil(PencilGestures.outline(of: pen(along([CGPoint(x: 120, y: 150), CGPoint(x: 280, y: 250)])), roundInkIn: drawing), "a straight stroke is no loop")
     }
 
-    func testTheToolIsPutBackWhenThePickerSwitchesOnATapMeantForSomethingElse() {
-        var memory = PencilToolMemory()
-        memory.select("pen", isEraser: false)
-        XCTAssertNil(memory.pickerChanged(to: "marker", isEraser: false, at: 1), "a tool chosen by hand is kept")
-        XCTAssertEqual(memory.current, "marker")
-        XCTAssertEqual(memory.previous, "pen")
-
-        XCTAssertNil(memory.tapped(at: 10), "nothing switched before the tap")
-        XCTAssertEqual(memory.pickerChanged(to: "eraser", isEraser: true, at: 10.1), "marker", "the picker switched just after it: put the marker back")
-        XCTAssertEqual(memory.current, "marker")
-        XCTAssertNil(memory.pickerChanged(to: "marker", isEraser: false, at: 10.15), "putting it back is no change")
-        XCTAssertNil(memory.pickerChanged(to: "eraser", isEraser: true, at: 10.2), "and one tap undoes one switch")
-        XCTAssertNil(memory.pickerChanged(to: "marker", isEraser: false, at: 12))
-
-        XCTAssertNil(memory.pickerChanged(to: "eraser", isEraser: true, at: 20))
-        XCTAssertEqual(memory.tapped(at: 20.2), "marker", "the picker switched just before the tap")
-        XCTAssertEqual(memory.current, "marker")
-        XCTAssertEqual(memory.previous, "eraser", "and what came before the marker is as it was")
-
-        XCTAssertNil(memory.pickerChanged(to: "pen", isEraser: false, at: 30))
-        XCTAssertNil(memory.tapped(at: 31), "a switch a second ago was the user's own")
-        XCTAssertNil(memory.pickerChanged(to: "pencil", isEraser: false, at: 32), "and so is one a second after")
-        XCTAssertEqual(memory.current, "pencil")
-    }
-
     func testTheEraserSwitchGoesBackToTheToolBeforeIt() {
-        var memory = PencilToolMemory()
+        var memory = PencilToolMemory<String>()
         XCTAssertEqual(memory.eraserSwitch(eraser: "eraser"), "eraser")
         memory.select("pen", isEraser: false)
         memory.select("pencil", isEraser: false)

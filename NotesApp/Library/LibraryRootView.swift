@@ -123,7 +123,6 @@ struct LibraryRootView: View {
             if $1 == nil {
                 window.beside = nil
                 window.active = nil
-                window.toolPicker = nil
             }
             rememberWindow()
         }

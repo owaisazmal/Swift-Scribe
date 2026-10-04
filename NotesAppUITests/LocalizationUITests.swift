@@ -36,7 +36,8 @@ final class LocalizationUITests: XCTestCase {
         app.buttons["editor.title"].tap()
         sleep(1)
         attach(app, "\(tag)-title-menu")
-        app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.8)).tap()
+        // Beside the menu and above where a keyboard would be: a simulator left with a keyboard attached shows one for the menu.
+        app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: 0.5)).tap()
         app.buttons["editor.back"].tap()
 
         let gear = app.buttons[settings].firstMatch

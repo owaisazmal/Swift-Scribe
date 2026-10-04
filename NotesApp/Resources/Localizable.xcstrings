@@ -904,46 +904,24 @@
         }
       }
     },
-    "%@ removed from your favourite tools" : {
+    "%@ removed from the tools" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ aus deinen Lieblingswerkzeugen entfernt"
+            "value" : "%@ aus den Werkzeugen entfernt"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ quitado de tus herramientas favoritas"
+            "value" : "%@ se ha quitado de las herramientas"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ retiré de vos outils favoris"
-          }
-        }
-      }
-    },
-    "%@ saved to your favourite tools" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ in deinen Lieblingswerkzeugen gesichert"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ guardado en tus herramientas favoritas"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ enregistré dans vos outils favoris"
+            "value" : "%@ retiré des outils"
           }
         }
       }
@@ -5040,6 +5018,50 @@
         }
       }
     },
+    "Adds a pen like the one in hand, in another colour" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fügt einen Stift wie den in der Hand hinzu, in einer anderen Farbe"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añade un bolígrafo como el que tienes en la mano, en otro color"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajoute un stylo comme celui que vous tenez, dans une autre couleur"
+          }
+        }
+      }
+    },
+    "Adds a pen like the one in hand, in another colour." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fügt einen Stift wie den in der Hand hinzu, in einer anderen Farbe."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añade un bolígrafo como el que tienes en la mano, en otro color."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajoute un stylo comme celui que vous tenez, dans une autre couleur."
+          }
+        }
+      }
+    },
     "Adds this sticker to the page" : {
       "localizations" : {
         "de" : {
@@ -5436,6 +5458,28 @@
         }
       }
     },
+    "At the Bottom" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abajo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En bas"
+          }
+        }
+      }
+    },
     "At the Top" : {
       "localizations" : {
         "de" : {
@@ -5454,6 +5498,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "En haut"
+          }
+        }
+      }
+    },
+    "At the top while a whiteboard is open. It holds the three below, and this guide." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oben, solange ein Whiteboard geöffnet ist. Enthält die drei unten und diese Hilfe."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arriba mientras hay una pizarra abierta. Contiene los tres de abajo y esta guía."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En haut tant qu’un tableau blanc est ouvert. Il contient les trois ci-dessous et ce guide."
           }
         }
       }
@@ -6235,6 +6301,50 @@
         }
       }
     },
+    "Change Pen" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stift ändern"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cambiar bolígrafo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modifier le stylo"
+          }
+        }
+      }
+    },
+    "Change Pen…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stift ändern …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cambiar bolígrafo…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modifier le stylo…"
+          }
+        }
+      }
+    },
     "Change Tags" : {
       "localizations" : {
         "de" : {
@@ -6451,6 +6561,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Choisir le papier…"
+          }
+        }
+      }
+    },
+    "Chooses the shortcuts that stand beside the tools, like Picture and Text Box." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wählt die Kurzbefehle neben den Werkzeugen aus, etwa Bild und Textfeld."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elige los atajos que acompañan a las herramientas, como Imagen y Cuadro de texto."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisit les raccourcis placés à côté des outils, comme Image et Zone de texte."
           }
         }
       }
@@ -7413,6 +7545,50 @@
         }
       }
     },
+    "Custom Colour" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eigene Farbe"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Color personalizado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couleur personnalisée"
+          }
+        }
+      }
+    },
+    "Customise Tools" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Werkzeuge anpassen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personalizar herramientas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personnaliser les outils"
+          }
+        }
+      }
+    },
     "Cutting out the sticker" : {
       "localizations" : {
         "de" : {
@@ -8369,6 +8545,28 @@
         }
       }
     },
+    "Draw round ink, then drag it somewhere else." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tinte umkreisen und dann an eine andere Stelle ziehen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dibuja alrededor de la tinta y arrástrala a otro lugar."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entourez l’encre, puis faites-la glisser ailleurs."
+          }
+        }
+      }
+    },
     "Draw With" : {
       "localizations" : {
         "de" : {
@@ -8739,6 +8937,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ingénierie"
+          }
+        }
+      }
+    },
+    "Eraser" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Radierer"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Goma"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gomme"
           }
         }
       }
@@ -9234,28 +9454,6 @@
         }
       }
     },
-    "Favourite Tools" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lieblingswerkzeuge"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Herramientas favoritas"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Outils favoris"
-          }
-        }
-      }
-    },
     "Favourites" : {
       "localizations" : {
         "de" : {
@@ -9472,6 +9670,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Adapter à la largeur"
+          }
+        }
+      }
+    },
+    "Fits the whiteboard, shows the pages and opens the guide" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Passt das Whiteboard ein, zeigt die Seiten und öffnet die Hilfe"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajusta la pizarra, muestra las páginas y abre la guía"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajuste le tableau blanc, affiche les pages et ouvre le guide"
           }
         }
       }
@@ -10042,28 +10262,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aller à la page"
-          }
-        }
-      }
-    },
-    "Goes back to writing size" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kehrt zur Schreibgröße zurück"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vuelve al tamaño de escritura"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Revient à la taille d’écriture"
           }
         }
       }
@@ -11276,28 +11474,6 @@
         }
       }
     },
-    "Keeps the tool you are using among your favourite tools" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Behält das Werkzeug, das du gerade benutzt, bei deinen Lieblingswerkzeugen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Guarda la herramienta que estás usando entre tus herramientas favoritas"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Garde l’outil que vous utilisez parmi vos outils favoris"
-          }
-        }
-      }
-    },
     "Key Points" : {
       "localizations" : {
         "de" : {
@@ -11316,6 +11492,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Points clés"
+          }
+        }
+      }
+    },
+    "Kind" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Art"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tipo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Type"
           }
         }
       }
@@ -11448,6 +11646,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Couleur du laser"
+          }
+        }
+      }
+    },
+    "Lasso" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lasso"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lazo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lasso"
           }
         }
       }
@@ -11804,6 +12024,72 @@
         }
       }
     },
+    "Light Blue" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hellblau"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Azul claro"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bleu clair"
+          }
+        }
+      }
+    },
+    "Light Green" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hellgrün"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verde claro"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vert clair"
+          }
+        }
+      }
+    },
+    "Light Pink" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hellrosa"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rosa claro"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rose clair"
+          }
+        }
+      }
+    },
     "line" : {
       "localizations" : {
         "de" : {
@@ -11822,6 +12108,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ligne"
+          }
+        }
+      }
+    },
+    "Link" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Link"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enlace"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lien"
           }
         }
       }
@@ -13382,6 +13690,28 @@
         }
       }
     },
+    "New Pen" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neuer Stift"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nuevo bolígrafo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouveau stylo"
+          }
+        }
+      }
+    },
     "New Quick Note" : {
       "localizations" : {
         "de" : {
@@ -14620,28 +14950,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "OK"
-          }
-        }
-      }
-    },
-    "On the Whiteboard" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Auf dem Whiteboard"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "En la pizarra"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sur le tableau blanc"
           }
         }
       }
@@ -15936,6 +16244,28 @@
         }
       }
     },
+    "Part of a Stroke" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Teil eines Strichs"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parte de un trazo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Partie d’un trait"
+          }
+        }
+      }
+    },
     "Pause" : {
       "localizations" : {
         "de" : {
@@ -16086,6 +16416,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Calligraphie"
+          }
+        }
+      }
+    },
+    "Pens" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stifte"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bolígrafos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stylos"
           }
         }
       }
@@ -18008,28 +18360,6 @@
         }
       }
     },
-    "Replace with Current Tool" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Durch aktuelles Werkzeug ersetzen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reemplazar por la herramienta actual"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Remplacer par l’outil actuel"
-          }
-        }
-      }
-    },
     "Replay" : {
       "localizations" : {
         "de" : {
@@ -18512,6 +18842,28 @@
         }
       }
     },
+    "Ruler" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lineal"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Regla"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Règle"
+          }
+        }
+      }
+    },
     "Sage" : {
       "localizations" : {
         "de" : {
@@ -18574,28 +18926,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Enregistrer %lld comme cartes"
-          }
-        }
-      }
-    },
-    "Save Current Tool" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aktuelles Werkzeug sichern"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Guardar la herramienta actual"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Enregistrer l’outil actuel"
           }
         }
       }
@@ -19260,6 +19590,28 @@
         }
       }
     },
+    "Shortcuts in the Tray" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kurzbefehle in der Ablage"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atajos en la bandeja"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Raccourcis dans le plumier"
+          }
+        }
+      }
+    },
     "Show" : {
       "localizations" : {
         "de" : {
@@ -19502,28 +19854,6 @@
         }
       }
     },
-    "Shows every page of the notebook" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Zeigt alle Seiten des Notizbuchs"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Muestra todas las páginas del cuaderno"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Affiche toutes les pages du carnet"
-          }
-        }
-      }
-    },
     "Shows every page. Touch and hold it to go to a page by its number." : {
       "localizations" : {
         "de" : {
@@ -19568,24 +19898,24 @@
         }
       }
     },
-    "Shows or hides the pens, the eraser and the lasso." : {
+    "Shows or hides the tray of tools at the bottom." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Blendet Stifte, Radierer und Lasso ein oder aus."
+            "value" : "Blendet die Werkzeugablage unten ein oder aus."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Muestra u oculta los bolígrafos, la goma y el lazo."
+            "value" : "Muestra u oculta la bandeja de herramientas de abajo."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Affiche ou masque les stylos, la gomme et le lasso."
+            "value" : "Affiche ou masque le plumier d’outils en bas."
           }
         }
       }
@@ -19740,6 +20070,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ciel"
+          }
+        }
+      }
+    },
+    "Sky Blue" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Himmelblau"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Azul cielo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bleu ciel"
           }
         }
       }
@@ -21416,6 +21768,28 @@
         }
       }
     },
+    "Takes whole strokes, or part of one. Tap it again to choose." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entfernt ganze Striche oder einen Teil davon. Zum Auswählen erneut tippen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Borra trazos enteros o parte de uno. Tócala otra vez para elegir."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Efface des traits entiers ou une partie d’un trait. Touchez-la à nouveau pour choisir."
+          }
+        }
+      }
+    },
     "Tap a line to hear it, with the ink you wrote as it was said." : {
       "localizations" : {
         "de" : {
@@ -21434,6 +21808,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Touchez une ligne pour l’écouter, avec l’encre que vous avez écrite à ce moment-là."
+          }
+        }
+      }
+    },
+    "Tap a pen to write with it. Tap it again to change its kind, colour and width." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tippe auf einen Stift, um damit zu schreiben. Tippe erneut, um Art, Farbe und Stärke zu ändern."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toca un bolígrafo para escribir con él. Tócalo otra vez para cambiar su tipo, color y grosor."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Touchez un stylo pour écrire avec. Touchez-le à nouveau pour changer son type, sa couleur et son épaisseur."
           }
         }
       }
@@ -22364,6 +22760,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "La bande de la semaine et le calendrier repartent de zéro. Vos carnets et vos pages ne sont pas modifiés."
+          }
+        }
+      }
+    },
+    "The Whiteboard Button" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Whiteboard-Taste"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El botón Pizarra"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le bouton Tableau blanc"
           }
         }
       }
@@ -24606,6 +25024,28 @@
         }
       }
     },
+    "Whole Strokes" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ganze Striche"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trazos enteros"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Traits entiers"
+          }
+        }
+      }
+    },
     "Wide Ruled" : {
       "localizations" : {
         "de" : {
@@ -24646,6 +25086,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Écran large"
+          }
+        }
+      }
+    },
+    "Width" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stärke"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grosor"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Épaisseur"
           }
         }
       }
@@ -25404,28 +25866,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Fenêtre de zoom, page %lld"
-          }
-        }
-      }
-    },
-    "Zooms out until everything on the whiteboard is in view" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Zoomt heraus, bis alles auf dem Whiteboard zu sehen ist"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Se aleja hasta que se ve todo lo que hay en la pizarra"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Prend du recul jusqu’à ce que tout le contenu du tableau blanc soit visible"
           }
         }
       }

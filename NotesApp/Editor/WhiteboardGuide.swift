@@ -60,7 +60,9 @@ struct WhiteboardGuide: View {
     }
 
     private var board: [Entry] {
-        [Entry(symbol: "arrow.up.left.and.arrow.down.right", title: String(localized: "Show Everything"),
+        [Entry(symbol: "scribble.variable", title: String(localized: "Whiteboard"),
+               detail: String(localized: "At the top while a whiteboard is open. It holds the three below, and this guide.")),
+         Entry(symbol: "arrow.up.left.and.arrow.down.right", title: String(localized: "Show Everything"),
                detail: String(localized: "Steps back until everything on the whiteboard is in view.")),
          Entry(symbol: "1.magnifyingglass", title: String(localized: "Actual Size"),
                detail: String(localized: "Returns to writing size, where you are looking.")),
@@ -80,13 +82,26 @@ struct WhiteboardGuide: View {
          Entry(symbol: "waveform", title: String(localized: "Recordings"),
                detail: String(localized: "What has been recorded in this notebook.")),
          Entry(symbol: "pencil.tip.crop.circle", title: String(localized: "Tools"),
-               detail: String(localized: "Shows or hides the pens, the eraser and the lasso.")),
+               detail: String(localized: "Shows or hides the tray of tools at the bottom.")),
          Entry(symbol: "ellipsis.circle", title: String(localized: "More"),
                detail: String(localized: "Change the paper, find words, make flashcards, present, and choose what draws.")),
          Entry(symbol: "bookmark", title: String(localized: "Bookmark"),
                detail: String(localized: "Marks this page so it is easy to come back to.")),
          Entry(symbol: "number", title: String(localized: "Page Number"),
                detail: String(localized: "Shows every page. Touch and hold it to go to a page by its number."))]
+    }
+
+    private var tray: [Entry] {
+        [Entry(symbol: "pencil.tip", title: String(localized: "Pens"),
+               detail: String(localized: "Tap a pen to write with it. Tap it again to change its kind, colour and width.")),
+         Entry(symbol: "plus", title: String(localized: "New Pen"),
+               detail: String(localized: "Adds a pen like the one in hand, in another colour.")),
+         Entry(symbol: "eraser", title: String(localized: "Eraser"),
+               detail: String(localized: "Takes whole strokes, or part of one. Tap it again to choose.")),
+         Entry(symbol: "lasso", title: String(localized: "Lasso"),
+               detail: String(localized: "Draw round ink, then drag it somewhere else.")),
+         Entry(symbol: "slider.horizontal.3", title: String(localized: "Customise Tools"),
+               detail: String(localized: "Chooses the shortcuts that stand beside the tools, like Picture and Text Box."))]
     }
 
     var body: some View {
@@ -112,8 +127,9 @@ struct WhiteboardGuide: View {
                         .foregroundStyle(Color.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                     section("Moving Around", moving)
-                    section("On the Whiteboard", board)
+                    section("The Whiteboard Button", board)
                     section("At the Top", top)
+                    section("At the Bottom", tray)
                 }
                 .padding(.horizontal, Space.x5)
                 .padding(.top, Space.x2)

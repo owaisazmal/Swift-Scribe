@@ -2,7 +2,7 @@ import UIKit
 import PencilKit
 import Observation
 
-/// A pen, pencil or marker kept for later: its kind, its colour and its width.
+/// A pen, pencil or marker in the tool tray: its kind, its colour and its width.
 struct ToolPreset: Codable, Hashable, Identifiable, Sendable {
     var id = UUID()
     /// PencilKit's own name for the kind of ink, so a kind this build doesn't know is kept and left out.
@@ -18,18 +18,25 @@ struct ToolPreset: Codable, Hashable, Identifiable, Sendable {
         self.width = width
     }
 
-    /// The tool as it is now in the picker or on a canvas; nil for the eraser, the lasso and the ruler.
+    /// A tool as it is on a canvas; nil for the eraser and the lasso.
     init?(_ tool: PKTool) {
         guard let inking = tool as? PKInkingTool else { return nil }
+        self.init(ink: inking.inkType, color: Self.bytes(of: inking.color), width: inking.width)
+    }
+
+    /// A colour as it is on light paper, a byte each for red, green, blue and alpha.
+    static func bytes(of color: UIColor) -> UInt32 {
         var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
-        inking.color.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light)).getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        color.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light)).getRed(&red, green: &green, blue: &blue, alpha: &alpha)
         func byte(_ value: CGFloat) -> UInt32 { UInt32((min(max(value, 0), 1) * 255).rounded()) }
-        self.init(ink: inking.inkType, color: byte(red) << 24 | byte(green) << 16 | byte(blue) << 8 | byte(alpha), width: inking.width)
+        return byte(red) << 24 | byte(green) << 16 | byte(blue) << 8 | byte(alpha)
     }
 
     var inkType: PKInkingTool.InkType? { PKInkingTool.InkType(rawValue: ink) }
 
-    var uiColor: UIColor {
+    var uiColor: UIColor { Self.uiColor(color) }
+
+    static func uiColor(_ color: UInt32) -> UIColor {
         UIColor(red: CGFloat(color >> 24 & 0xFF) / 255, green: CGFloat(color >> 16 & 0xFF) / 255,
                 blue: CGFloat(color >> 8 & 0xFF) / 255, alpha: CGFloat(color & 0xFF) / 255)
     }
@@ -51,8 +58,12 @@ struct ToolPreset: Codable, Hashable, Identifiable, Sendable {
         ink == other.ink && color == other.color && abs(width - other.width) < 0.15
     }
 
-    var kindName: String {
-        switch inkType {
+    var kindName: String { inkType.map(Self.name(of:)) ?? String(localized: "Pen") }
+
+    var symbol: String { inkType.map(Self.symbol(of:)) ?? "pencil.tip" }
+
+    static func name(of ink: PKInkingTool.InkType) -> String {
+        switch ink {
         case .pen: String(localized: "Pen")
         case .pencil: String(localized: "Pencil")
         case .marker: String(localized: "Highlighter")
@@ -64,8 +75,8 @@ struct ToolPreset: Codable, Hashable, Identifiable, Sendable {
         }
     }
 
-    var symbol: String {
-        switch inkType {
+    static func symbol(of ink: PKInkingTool.InkType) -> String {
+        switch ink {
         case .pen: "pencil.tip"
         case .pencil: "pencil"
         case .marker: "highlighter"
@@ -76,10 +87,49 @@ struct ToolPreset: Codable, Hashable, Identifiable, Sendable {
         }
     }
 
+    /// The kinds of ink a pen can be given, in the order they are offered.
+    static var kinds: [PKInkingTool.InkType] {
+        var kinds: [PKInkingTool.InkType] = [.pen, .monoline, .fountainPen, .pencil, .marker, .crayon, .watercolor]
+        if #available(iOS 26, *) { kinds.insert(.reed, at: 3) }
+        return kinds
+    }
+
+    /// The app's inks, and four tints for the highlighter.
+    static let inks: [UInt32] = [0x1B22_30FF, 0x6E73_7CFF, 0x7A52_30FF, 0xC945_2FFF, 0xE07A_1FFF, 0xE8B0_23FF,
+                                 0x2F8F_4EFF, 0x1F8A_8AFF, 0x2747_B8FF, 0x3D8F_D9FF, 0x7A3E_9DFF, 0xD957_8CFF]
+    static let tints: [UInt32] = [0xFFD4_26FF, 0x7ED9_8BFF, 0xFF8F_B8FF, 0x7CC4_FFFF]
+
+    /// The colours offered for a kind of ink: the highlighter's own tints come first for it, and last for the rest.
+    static func palette(for ink: PKInkingTool.InkType?) -> [UInt32] {
+        ink == .marker ? tints + inks : inks + tints
+    }
+
+    /// Where a width at `fraction` of the way lies for a kind of ink. The thin end has most of the travel, where
+    /// writing is done.
+    static func width(at fraction: Double, of ink: PKInkingTool.InkType) -> Double {
+        let range = ink.validWidthRange, clamped = min(max(fraction, 0), 1)
+        return range.lowerBound + (range.upperBound - range.lowerBound) * clamped * clamped
+    }
+
+    /// The reverse of `width(at:of:)`.
+    var widthTravel: Double { widthFraction.squareRoot() }
+
     /// The colour in a word, for VoiceOver and the Large Content Viewer.
-    var colorName: String {
+    var colorName: String { Self.colorName(color) }
+
+    /// The palette's colours that share a hue with another have names of their own; the rest are named by hue.
+    static func colorName(_ color: UInt32) -> String {
+        switch color {
+        case 0xE8B0_23FF: return String(localized: "Mustard")
+        case 0x3D8F_D9FF: return String(localized: "Sky Blue")
+        case 0x7A3E_9DFF: return String(localized: "Plum")
+        case 0x7ED9_8BFF: return String(localized: "Light Green")
+        case 0xFF8F_B8FF: return String(localized: "Light Pink")
+        case 0x7CC4_FFFF: return String(localized: "Light Blue")
+        default: break
+        }
         var hue: CGFloat = 0, saturation: CGFloat = 0, brightness: CGFloat = 0, alpha: CGFloat = 0
-        uiColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
+        uiColor(color).getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
         if brightness < 0.2 { return String(localized: "Black") }
         if saturation < 0.12 { return brightness > 0.9 ? String(localized: "White") : String(localized: "Grey") }
         switch hue * 360 {
@@ -98,11 +148,10 @@ struct ToolPreset: Codable, Hashable, Identifiable, Sendable {
     var name: String { String(localized: "\(kindName), \(colorName)") }
 }
 
-/// The favourite tools, the same in every notebook and window. Kept in the app's settings.
+/// The pens in the tool tray, the same in every notebook and window. Kept in the app's settings.
 @MainActor
 @Observable
 final class ToolShelf {
-    static let shared = ToolShelf()
     static let limit = 8
 
     /// A new shelf starts with the app's own inks.
@@ -137,10 +186,14 @@ final class ToolShelf {
         return true
     }
 
-    func replace(_ id: UUID, with tool: ToolPreset) {
-        guard let index = presets.firstIndex(where: { $0.id == id }), !holds(tool) else { return }
-        presets[index] = tool
-        presets[index].id = id
+    /// Gives a pen another kind, colour or width, where it stands.
+    func change(_ id: UUID, _ change: (inout ToolPreset) -> Void) {
+        guard let index = presets.firstIndex(where: { $0.id == id }) else { return }
+        var changed = presets[index]
+        change(&changed)
+        changed.id = id
+        guard changed != presets[index], changed.inkType != nil else { return }
+        presets[index] = changed
         save()
     }
 
@@ -149,7 +202,7 @@ final class ToolShelf {
         save()
     }
 
-    /// One place up or down among the tools that are shown.
+    /// One place along among the tools that are shown.
     func move(_ id: UUID, by step: Int) {
         let shown = usable
         guard let from = shown.firstIndex(where: { $0.id == id }), shown.indices.contains(from + step),
@@ -159,8 +212,218 @@ final class ToolShelf {
         save()
     }
 
+    /// A tray needs something to write with: a shelf left with nothing usable gets the starters back.
+    func restock() {
+        guard usable.isEmpty else { return }
+        presets += Self.starters.map { ToolPreset(ink: $0.inkType ?? .pen, color: $0.color, width: $0.width) }
+        save()
+    }
+
     private func save() {
         guard let defaults, let data = try? JSONEncoder().encode(presets) else { return }
         defaults.set(data, forKey: SettingsKey.toolPresets)
+    }
+}
+
+/// What is in hand: one of the pens on the shelf, the eraser or the lasso.
+enum ToolChoice: Codable, Hashable, Sendable {
+    case pen(UUID), eraser, lasso
+}
+
+/// The eraser takes whole strokes at a touch, or only the ink it passes over, as wide as it is set.
+struct Eraser: Codable, Hashable, Sendable {
+    enum Kind: String, Codable, CaseIterable, Identifiable, Sendable {
+        case strokes, part
+        var id: String { rawValue }
+
+        var displayName: String {
+            switch self {
+            case .strokes: String(localized: "Whole Strokes")
+            case .part: String(localized: "Part of a Stroke")
+            }
+        }
+    }
+
+    var kind = Kind.strokes
+    var width = Double(PKEraserTool.EraserType.fixedWidthBitmap.defaultWidth)
+
+    static var widths: ClosedRange<Double> {
+        let range = PKEraserTool.EraserType.fixedWidthBitmap.validWidthRange
+        return Double(range.lowerBound)...Double(range.upperBound)
+    }
+
+    var tool: PKEraserTool {
+        switch kind {
+        case .strokes: PKEraserTool(.vector)
+        case .part: PKEraserTool(.fixedWidthBitmap, width: min(max(width, Self.widths.lowerBound), Self.widths.upperBound))
+        }
+    }
+}
+
+/// Something from the Add menu or the page's helpers that can be kept in the tray, beside the tools.
+enum ToolExtra: String, Codable, CaseIterable, Identifiable, Sendable {
+    case picture, text, sticker, link, tape, ruler, zoomWindow
+    var id: String { rawValue }
+
+    static let starters: [ToolExtra] = [.picture, .text]
+
+    var title: String {
+        switch self {
+        case .picture: String(localized: "Picture")
+        case .text: String(localized: "Text Box")
+        case .sticker: String(localized: "Sticker")
+        case .link: String(localized: "Link")
+        case .tape: String(localized: "Study Tape")
+        case .ruler: String(localized: "Ruler")
+        case .zoomWindow: String(localized: "Zoom Window")
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .picture: "photo"
+        case .text: "character.textbox"
+        case .sticker: "seal"
+        case .link: "link"
+        case .tape: "rectangle.dashed"
+        case .ruler: "ruler"
+        case .zoomWindow: "plus.magnifyingglass"
+        }
+    }
+}
+
+/// The tools at the foot of the editor, the same in every notebook and window: the pens on the shelf, the eraser
+/// and the lasso, which of them is in hand, and the shortcuts kept beside them.
+@MainActor
+@Observable
+final class Toolbox {
+    static let shared = Toolbox()
+    /// Posted when the tool in hand or the ruler changes, so every open page takes it.
+    static let didChange = Notification.Name("scribe.toolbox.changed")
+
+    private struct Saved: Codable {
+        var choice: ToolChoice?
+        var eraser: Eraser?
+        var extras: [String]?
+    }
+
+    let shelf: ToolShelf
+    private(set) var choice: ToolChoice
+    private(set) var eraser: Eraser
+    /// The shortcuts in the tray. They stand in the order `ToolExtra` lists them.
+    private(set) var extras: Set<ToolExtra>
+    var isRulerActive = false {
+        didSet { if isRulerActive != oldValue { post() } }
+    }
+    @ObservationIgnored private var memory = PencilToolMemory<ToolChoice>()
+    /// The pen that was last in hand, for a new pen to be like while the eraser or the lasso is.
+    @ObservationIgnored private var lastPen: UUID?
+    @ObservationIgnored private let defaults: UserDefaults?
+
+    /// Without `defaults` the toolbox lasts as long as the app does.
+    init(defaults: UserDefaults? = .standard) {
+        var store = defaults
+        #if DEBUG
+        if LaunchOptions.arguments.contains("-freshToolPresets") { store = nil }
+        #endif
+        self.defaults = store
+        shelf = ToolShelf(defaults: store)
+        shelf.restock()
+        let saved = store?.data(forKey: SettingsKey.toolbox).flatMap { try? JSONDecoder().decode(Saved.self, from: $0) }
+        eraser = saved?.eraser ?? Eraser()
+        extras = saved?.extras.map { Set($0.compactMap(ToolExtra.init(rawValue:))) } ?? Set(ToolExtra.starters)
+        let pens = shelf.usable
+        switch saved?.choice {
+        case .pen(let id)? where pens.contains { $0.id == id }: choice = .pen(id)
+        case .eraser?: choice = .eraser
+        case .lasso?: choice = .lasso
+        default: choice = pens.first.map { .pen($0.id) } ?? .eraser
+        }
+        memory.select(choice, isEraser: choice == .eraser)
+    }
+
+    /// The pen in hand; nil while it is the eraser or the lasso.
+    var pen: ToolPreset? {
+        guard case .pen(let id) = choice else { return nil }
+        return shelf.usable.first { $0.id == id }
+    }
+
+    /// The tool in hand, as a canvas takes it.
+    var tool: PKTool {
+        switch choice {
+        case .pen: pen?.tool ?? PKInkingTool(.pen)
+        case .eraser: eraser.tool
+        case .lasso: PKLassoTool()
+        }
+    }
+
+    func take(_ new: ToolChoice) {
+        if case .pen(let id) = new, !shelf.usable.contains(where: { $0.id == id }) { return }
+        guard new != choice else { return }
+        if case .pen(let id) = choice { lastPen = id }
+        memory.select(new, isEraser: new == .eraser)
+        choice = new
+        save()
+        post()
+    }
+
+    func changePen(_ id: UUID, _ change: (inout ToolPreset) -> Void) {
+        shelf.change(id, change)
+        if choice == .pen(id) { post() }
+    }
+
+    /// A new pen like the one in hand, or the one last in hand, in the first of its colours the shelf doesn't have
+    /// yet. It is taken up.
+    @discardableResult
+    func addPen() -> UUID? {
+        let pens = shelf.usable
+        guard let like = pen ?? pens.first(where: { $0.id == lastPen }) ?? pens.first, let ink = like.inkType else { return nil }
+        let taken = Set(shelf.usable.filter { $0.ink == like.ink }.map(\.color))
+        guard let color = ToolPreset.palette(for: ink).first(where: { !taken.contains($0) }) else { return nil }
+        let new = ToolPreset(ink: ink, color: color, width: like.width)
+        guard shelf.add(new) else { return nil }
+        take(.pen(new.id))
+        return new.id
+    }
+
+    /// Takes a pen off the shelf, unless it is the last one. If it was in hand, the pen beside it is taken up.
+    func removePen(_ id: UUID) {
+        let pens = shelf.usable
+        guard pens.count > 1, let index = pens.firstIndex(where: { $0.id == id }) else { return }
+        if choice == .pen(id) { take(.pen(pens[index == 0 ? 1 : index - 1].id)) }
+        shelf.remove(id)
+    }
+
+    func setEraser(_ new: Eraser) {
+        guard new != eraser else { return }
+        eraser = new
+        save()
+        if choice == .eraser { post() }
+    }
+
+    func setExtra(_ extra: ToolExtra, shown: Bool) {
+        guard extras.contains(extra) != shown else { return }
+        if shown { extras.insert(extra) } else { extras.remove(extra) }
+        save()
+    }
+
+    /// The Pencil's eraser switch: to the eraser, or from it back to what was in hand before.
+    func switchEraser() {
+        if let tool = memory.eraserSwitch(eraser: .eraser) { take(tool) }
+    }
+
+    /// The Pencil's switch to the tool that was in hand before this one.
+    func switchPrevious() {
+        if let tool = memory.previous { take(tool) }
+    }
+
+    private func post() {
+        NotificationCenter.default.post(name: Self.didChange, object: self)
+    }
+
+    private func save() {
+        let saved = Saved(choice: choice, eraser: eraser, extras: ToolExtra.allCases.filter(extras.contains).map(\.rawValue))
+        guard let defaults, let data = try? JSONEncoder().encode(saved) else { return }
+        defaults.set(data, forKey: SettingsKey.toolbox)
     }
 }

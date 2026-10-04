@@ -47,5 +47,5 @@ enum SettingsKey {
     static let toolPresets = "toolPresets"
     static let snapsHighlighter = "snapsHighlighter"
     static let highlightColor = "highlightColor"
-    static let showsToolTray = "showsToolTray"
+    static let toolbox = "toolbox"
 }

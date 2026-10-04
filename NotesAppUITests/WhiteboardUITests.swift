@@ -51,13 +51,17 @@ final class WhiteboardUITests: XCTestCase {
         app.buttons["editor.board.guide.done"].tap()
         app.buttons["editor.board.tip.done"].tap()
         XCTAssertTrue(app.buttons["editor.board.tip.done"].waitForNonExistence(timeout: 5), "the tip is put away for good")
-        XCTAssertEqual(app.buttons["editor.board.everything"].label, "Show Everything")
+        // The board's own controls are behind one button in the bar, and nothing stands over the board.
+        let menu = app.buttons["editor.board.menu"]
+        XCTAssertEqual(menu.label, "Whiteboard")
+        XCTAssertLessThanOrEqual(menu.frame.maxY, board.frame.minY, "the button is in the bar, above the board")
+        XCTAssertFalse(app.buttons["editor.board.everything"].exists)
 
         draw(on: board, from: CGVector(dx: 0.3, dy: 0.3), to: CGVector(dx: 0.6, dy: 0.32))
         draw(on: board, from: CGVector(dx: 0.3, dy: 0.4), to: CGVector(dx: 0.6, dy: 0.5))
         XCTAssertEqual(strokeCount(board), 2)
         attach(app, "board-written")
-        try audit(app, [.contrast, .elementDetection, .hitRegion, .sufficientElementDescription], screen: "whiteboard", bar: app.otherElements["editor.board.bar"])
+        try audit(app, [.contrast, .elementDetection, .hitRegion, .sufficientElementDescription], screen: "whiteboard", bar: app.otherElements["editor.tools.tray"])
 
         // Zoomed out, a corner of the screen is far from where the board was first written on.
         board.pinch(withScale: 0.3, velocity: -1)
@@ -66,13 +70,21 @@ final class WhiteboardUITests: XCTestCase {
         XCTAssertEqual(strokeCount(board), 4, "there is room to write wherever the board is moved to")
         attach(app, "board-zoomed-out")
 
-        app.buttons["More"].firstMatch.tap()
-        XCTAssertTrue(app.buttons["Show Everything"].firstMatch.waitForExistence(timeout: 5), "a board is fitted by what is on it")
-        XCTAssertTrue(app.buttons["Actual Size"].firstMatch.exists)
-        app.buttons["Show Everything"].firstMatch.tap()
+        menu.tap()
+        XCTAssertTrue(app.buttons["editor.board.everything"].waitForExistence(timeout: 5), "a board is fitted by what is on it")
+        XCTAssertEqual(app.buttons["editor.board.everything"].label, "Show Everything")
+        XCTAssertTrue(app.buttons["editor.board.pages"].exists)
+        XCTAssertTrue(app.buttons["editor.board.guide"].exists)
+        attach(app, "board-menu")
         app.buttons["editor.board.actual"].tap()
+        menu.tap()
         app.buttons["editor.board.everything"].tap()
         attach(app, "board-everything")
+        app.buttons["More"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["Find in Notebook…"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["Show Everything"].exists, "with its own button in the bar, the board's controls aren't in More as well")
+        app.buttons["Find in Notebook…"].firstMatch.tap()
+        app.buttons["editor.find.done"].tap()
 
         // An ordinary page after it: the pages are a stack again and the board is a card in it.
         app.buttons["Add"].firstMatch.tap()

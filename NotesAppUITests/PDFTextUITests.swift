@@ -79,7 +79,7 @@ final class PDFTextUITests: XCTestCase {
         app.buttons["editor.undo"].tap()
         wait(for: [expectation(for: NSPredicate(format: "value == 'Empty'"), evaluatedWith: canvas)], timeout: 5)
 
-        // The yellow highlighter from the favourite tools, drawn roughly along a line, is laid over that line as a
+        // The highlighter from the tool tray, drawn roughly along a line, is laid over that line as a
         // second undo step: the first undo gives the hand-drawn stroke back, the second takes it away.
         app.buttons["editor.tools.4"].tap()
         drag(on: canvas, from: line(9, x: 80), to: line(9, x: 200))
@@ -99,7 +99,5 @@ final class PDFTextUITests: XCTestCase {
         sleep(2)
         app.buttons["editor.undo"].tap()
         wait(for: [expectation(for: NSPredicate(format: "value == 'Empty'"), evaluatedWith: canvas)], timeout: 5)
-        // The picker remembers its tool between launches: leave it with a pen for whatever runs next.
-        app.buttons["editor.tools.1"].tap()
     }
 }

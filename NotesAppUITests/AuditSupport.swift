@@ -1,7 +1,7 @@
 import XCTest
 
 extension XCTestCase {
-    /// Logs, without failing, issues the app can't act on: system glass bars, PencilKit's tool picker handle, text the
+    /// Logs, without failing, issues the app can't act on: system glass bars, text the
     /// audit reads off the dimmed screen behind a sheet (VoiceOver skips it by design), and `formText` below.
     @MainActor
     func audit(_ app: XCUIApplication, _ types: XCUIAccessibilityAuditType = .all, screen: String = "", modal: Bool = false,
@@ -81,10 +81,6 @@ extension XCTestCase {
             if let overlayTop, issue.auditType == .contrast || issue.auditType == .textClipped,
                element.map({ $0.frame.maxY > overlayTop && $0.elementType != .button }) ?? true {
                 print("AUDIT [\(screen)] ignored under the slip: \(issue.compactDescription)")
-                return true
-            }
-            if issue.auditType == .hitRegion, element?.label == "Tool palette handle" {
-                print("AUDIT [\(screen)] ignored in PencilKit's tool picker: \(issue.compactDescription)")
                 return true
             }
             // Scrolled, text just below the glass bar sits in its fading edge, where it reads as low contrast.

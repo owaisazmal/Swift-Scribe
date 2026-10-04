@@ -2,7 +2,7 @@ import XCTest
 import PencilKit
 @testable import NotesApp
 
-/// The favourite tools: what is kept of a tool, and the shelf they are kept on.
+/// The tool tray: what is kept of a pen, the shelf the pens stand on, and the toolbox that knows which tool is in hand.
 @MainActor
 final class ToolPresetTests: XCTestCase {
     /// Settings of its own for each test, taken away afterwards.
@@ -47,10 +47,12 @@ final class ToolPresetTests: XCTestCase {
         XCTAssertEqual(name(0xFFFF_FFFF), "White")
         XCTAssertEqual(name(0x8080_80FF), "Grey")
         XCTAssertEqual(name(0xC945_2FFF), "Red")
-        XCTAssertEqual(name(0xE8B0_23FF), "Yellow")
+        XCTAssertEqual(name(0xFFD4_26FF), "Yellow")
+        XCTAssertEqual(name(0xE8B0_23FF), "Mustard", "a colour of the palette that shares its hue with another has its own name")
+        XCTAssertEqual(Set((ToolPreset.inks + ToolPreset.tints).map(ToolPreset.colorName)).count, 16, "no two of the palette are called the same")
         XCTAssertEqual(name(0x2747_B8FF), "Blue")
         XCTAssertEqual(name(0x3D5A_40FF), "Green")
-        XCTAssertEqual(ToolPreset(ink: .marker, color: 0xE8B0_23FF, width: 20).name, "Highlighter, Yellow")
+        XCTAssertEqual(ToolPreset(ink: .marker, color: 0xE8B0_23FF, width: 20).name, "Highlighter, Mustard")
     }
 
     func testANewShelfStartsWithTheAppsInksAndKeepsWhatIsSaved() throws {
@@ -67,29 +69,34 @@ final class ToolPresetTests: XCTestCase {
         shelf.move(pencil.id, by: 5)
         XCTAssertEqual(shelf.usable.map(\.id).firstIndex(of: pencil.id), ToolShelf.starters.count - 1, "there is nowhere that far down to go")
 
-        let crayon = ToolPreset(ink: .crayon, color: 0xC945_2FFF, width: 30)
-        shelf.replace(pencil.id, with: crayon)
-        XCTAssertEqual(shelf.usable.first { $0.id == pencil.id }?.inkType, .crayon, "replaced where it stood")
+        shelf.change(pencil.id) { $0.ink = PKInkingTool.InkType.crayon.rawValue; $0.color = 0xC945_2FFF }
+        XCTAssertEqual(shelf.usable.first { $0.id == pencil.id }?.inkType, .crayon, "changed where it stood")
+        XCTAssertEqual(ToolShelf(defaults: defaults).usable.first { $0.id == pencil.id }?.color, 0xC945_2FFF)
         shelf.remove(pencil.id)
         XCTAssertEqual(ToolShelf(defaults: defaults).usable.count, ToolShelf.starters.count)
     }
 
-    func testTheShelfHoldsEightAndEmptiedStaysEmpty() throws {
+    func testTheShelfHoldsEightAndATrayLeftWithNothingGetsTheStartersBack() throws {
         let defaults = try freshDefaults()
         let shelf = ToolShelf(defaults: defaults)
         for width in 0..<10 { shelf.add(ToolPreset(ink: .pen, color: 0x0000_00FF, width: 1 + Double(width))) }
         XCTAssertEqual(shelf.usable.count, ToolShelf.limit)
         XCTAssertTrue(shelf.isFull)
         for preset in shelf.presets { shelf.remove(preset.id) }
-        XCTAssertTrue(ToolShelf(defaults: defaults).presets.isEmpty, "the starters don't come back once they have been taken off")
+        XCTAssertTrue(ToolShelf(defaults: defaults).presets.isEmpty)
+        XCTAssertEqual(Toolbox(defaults: defaults).shelf.usable.count, ToolShelf.starters.count, "a tray needs something to write with")
     }
 
-    func testTheBarGivesTheToolsWhatTheyNeedOrWhatItHas() {
-        XCTAssertEqual(ToolTray.width(for: 4, in: 300), 4 * ToolTray.slot + ToolTray.slot + 8, "four tools and the empty label")
-        XCTAssertEqual(ToolTray.width(for: 8, in: 400), 8 * ToolTray.slot + 8, "a full shelf has no empty label")
-        XCTAssertEqual(ToolTray.width(for: 8, in: 170), 170, "short of room, the tools scroll in what there is")
-        XCTAssertNil(ToolTray.width(for: 8, in: 80), "less than two tools wide, they stay out of the bar")
-        XCTAssertEqual(ToolTray.width(for: 0, in: 60), ToolTray.slot + 8, "an empty shelf still shows where a tool is saved")
+    func testTheTrayGivesThePensWhatTheyNeedAndLetsShortcutsGiveWay() {
+        let fixed: CGFloat = 32 + 3 * ToolTray.button + 34 + 16
+        XCTAssertEqual(ToolTray.plan(pens: 4, extras: 2, room: 834), ToolTray.Plan(pens: 5 * ToolTray.slot, extras: 2), "four pens and the empty label")
+        XCTAssertEqual(ToolTray.plan(pens: 8, extras: 7, room: 1194), ToolTray.Plan(pens: 8 * ToolTray.slot, extras: 7), "a full shelf has no empty label")
+        XCTAssertEqual(ToolTray.plan(pens: 8, extras: 2, room: 417), ToolTray.Plan(pens: 417 - fixed - 2 * ToolTray.button, extras: 2),
+                       "short of room, the pens scroll in what there is")
+        XCTAssertEqual(ToolTray.plan(pens: 8, extras: 4, room: 375), ToolTray.Plan(pens: 375 - fixed - ToolTray.button, extras: 1),
+                       "the shortcuts give way, the last first, until three pens have a place")
+        XCTAssertEqual(ToolTray.plan(pens: 8, extras: 4, room: 320), ToolTray.Plan(pens: 320 - fixed, extras: 0))
+        XCTAssertEqual(ToolTray.plan(pens: 1, extras: 0, room: 200).pens, ToolTray.slot, "there is always a place for one pen")
     }
 
     func testAToolOfAKindThisBuildDoesNotKnowIsKeptAndLeftOut() throws {
@@ -103,19 +110,100 @@ final class ToolPresetTests: XCTestCase {
         XCTAssertEqual(ToolShelf(defaults: defaults).presets.first?.ink, "com.apple.ink.future", "saving again doesn't drop it")
     }
 
-    func testThePickerTakesASavedToolWhole() throws {
+    func testTheToolboxKnowsWhatIsInHandAndKeepsIt() throws {
+        let defaults = try freshDefaults()
+        let toolbox = Toolbox(defaults: defaults)
+        let pens = toolbox.shelf.usable
+        XCTAssertEqual(toolbox.choice, .pen(pens[0].id), "a new toolbox starts with its first pen in hand")
+        XCTAssertEqual((toolbox.tool as? PKInkingTool)?.inkType, .pen)
+
+        toolbox.take(.pen(pens[3].id))
+        XCTAssertEqual((toolbox.tool as? PKInkingTool)?.inkType, .marker)
+        toolbox.take(.pen(UUID()))
+        XCTAssertEqual(toolbox.choice, .pen(pens[3].id), "a pen that isn't on the shelf can't be taken up")
+        toolbox.take(.eraser)
+        XCTAssertEqual((toolbox.tool as? PKEraserTool)?.eraserType, .vector)
+        toolbox.setEraser(Eraser(kind: .part, width: 40))
+        XCTAssertEqual((toolbox.tool as? PKEraserTool)?.eraserType, .fixedWidthBitmap)
+        XCTAssertEqual(try XCTUnwrap((toolbox.tool as? PKEraserTool)?.width), 40, accuracy: 0.01)
+        toolbox.setExtra(.ruler, shown: true)
+        toolbox.setExtra(.text, shown: false)
+
+        let again = Toolbox(defaults: defaults)
+        XCTAssertEqual(again.choice, .eraser)
+        XCTAssertEqual(again.eraser, Eraser(kind: .part, width: 40))
+        XCTAssertEqual(again.extras, [.picture, .ruler])
+        XCTAssertFalse(again.isRulerActive, "the ruler is put away between launches")
+    }
+
+    func testAPenIsChangedAddedAndRemovedWhereItStands() throws {
+        let toolbox = Toolbox(defaults: try freshDefaults())
+        let first = toolbox.shelf.usable[0]
+        toolbox.changePen(first.id) { $0.color = 0x2F8F_4EFF; $0.width = ToolPreset.width(at: 0.5, of: .pen) }
+        XCTAssertEqual(toolbox.pen?.color, 0x2F8F_4EFF)
+        XCTAssertEqual(try XCTUnwrap(toolbox.pen).widthTravel, 0.5, accuracy: 0.001, "the slider comes back to where it was let go")
+        XCTAssertEqual((toolbox.tool as? PKInkingTool).flatMap { ToolPreset($0) }?.color, 0x2F8F_4EFF, "and the pen in hand writes with it")
+
+        let added = try XCTUnwrap(toolbox.addPen())
+        XCTAssertEqual(toolbox.choice, .pen(added), "a new pen is taken up")
+        XCTAssertEqual(toolbox.pen?.inkType, .pen)
+        XCTAssertEqual(toolbox.pen?.color, 0x1B22_30FF, "in the first of the palette's colours no pen of its kind has")
+        toolbox.removePen(added)
+        XCTAssertEqual(toolbox.choice, .pen(toolbox.shelf.usable[3].id), "taken off while in hand, the pen beside it is taken up")
+
+        for pen in toolbox.shelf.usable { toolbox.removePen(pen.id) }
+        XCTAssertEqual(toolbox.shelf.usable.count, 1, "the last pen stays")
+        XCTAssertEqual(toolbox.choice, .pen(toolbox.shelf.usable[0].id))
+    }
+
+    func testThePencilSwitchesToTheEraserAndBackAndToTheToolBefore() throws {
+        let toolbox = Toolbox(defaults: try freshDefaults())
+        let pens = toolbox.shelf.usable
+        toolbox.take(.pen(pens[1].id))
+        toolbox.switchEraser()
+        XCTAssertEqual(toolbox.choice, .eraser)
+        toolbox.switchEraser()
+        XCTAssertEqual(toolbox.choice, .pen(pens[1].id), "from the eraser, back to what was in hand")
+        toolbox.take(.lasso)
+        toolbox.switchPrevious()
+        XCTAssertEqual(toolbox.choice, .pen(pens[1].id))
+        toolbox.switchPrevious()
+        XCTAssertEqual(toolbox.choice, .lasso)
+    }
+
+    func testEveryCanvasTakesTheToolInHand() throws {
         let document = try makeDocument()
         let session = EditorSession(document: document)
-        let picker = PKToolPicker()
-        let controller = PageStackController(session: session, toolPicker: picker)
-        controller.loadViewIfNeeded()
-        let marker = ToolPreset(ink: .marker, color: 0xE8B0_23FF, width: 24)
-        controller.useTool(marker)
-        let chosen = try XCTUnwrap((picker.selectedToolItem as? PKToolPickerInkingItem)?.inkingTool)
-        XCTAssertEqual(chosen.inkType, .marker)
-        XCTAssertEqual(chosen.width, 24, accuracy: 0.01)
-        XCTAssertEqual(ToolPreset(chosen)?.color, marker.color)
-        XCTAssertTrue(session.currentTool?.isSameTool(as: marker) ?? false, "and the tray is told which tool is in use")
+        let toolbox = Toolbox(defaults: try freshDefaults())
+        let controller = PageStackController(session: session, toolbox: toolbox)
+        session.canvas = controller
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let window = UIWindow(windowScene: scene)
+        window.frame = CGRect(x: 0, y: 0, width: 834, height: 1194)
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        addTeardownBlock { @MainActor in window.isHidden = true }
+        controller.view.layoutIfNeeded()
+        let canvas = try XCTUnwrap(controller.canvas(forPage: 0))
+        XCTAssertEqual((canvas.tool as? PKInkingTool)?.inkType, .pen)
+
+        let marker = toolbox.shelf.usable[3]
+        toolbox.take(.pen(marker.id))
+        XCTAssertEqual((canvas.tool as? PKInkingTool).flatMap { ToolPreset($0) }?.color, marker.color)
+        toolbox.changePen(marker.id) { $0.width = 30 }
+        XCTAssertEqual(try XCTUnwrap((canvas.tool as? PKInkingTool)?.width), 30, accuracy: 0.01, "a change to the pen in hand reaches the page at once")
+        toolbox.take(.lasso)
+        XCTAssertTrue(canvas.tool is PKLassoTool)
+        toolbox.isRulerActive = true
+        XCTAssertTrue(canvas.isRulerActive)
+
+        // "System Setting" lets a finger draw while the tools are out, as PencilKit does for its own picker.
+        controller.setDrawingPolicy(.default)
+        XCTAssertEqual(canvas.drawingPolicy, UIPencilInteraction.prefersPencilOnlyDrawing ? .pencilOnly : .anyInput)
+        session.toggleTools()
+        XCTAssertEqual(canvas.drawingPolicy, .pencilOnly, "with the tools put away, only the Pencil draws")
+        controller.setDrawingPolicy(.anyInput)
+        XCTAssertEqual(canvas.drawingPolicy, .anyInput)
     }
 
     private func makeDocument() throws -> NotebookDocument {

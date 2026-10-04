@@ -184,61 +184,24 @@ enum PencilAction: String, CaseIterable, Identifiable {
     }
 }
 
-/// Remembers which tools the picker has had, so a tap can go back to the one before, and spots a switch the picker
-/// made by itself on a tap that was meant for something else.
-struct PencilToolMemory {
-    /// How far apart the tap and the picker's own switch can arrive.
-    static let window: TimeInterval = 0.3
+/// Remembers which tools were in hand, so a tap of the Pencil can go back to the one before, or from the eraser to
+/// what was in use before it.
+struct PencilToolMemory<Tool: Equatable> {
+    private(set) var current: Tool?
+    private(set) var previous: Tool?
+    private var isEraser = false
+    private var beforeEraser: Tool?
 
-    private struct Tools {
-        var current: String?
-        var isEraser = false
-        var previous: String?
-        var beforeEraser: String?
-    }
-
-    private var tools = Tools()
-    private var switched: (from: Tools, at: TimeInterval)?
-    private var tappedAt: TimeInterval?
-
-    var current: String? { tools.current }
-    var previous: String? { tools.previous }
-
-    /// A tool the app chose itself.
-    mutating func select(_ tool: String, isEraser: Bool) {
-        guard tool != tools.current else { return }
-        if isEraser, !tools.isEraser { tools.beforeEraser = tools.current }
-        tools.previous = tools.current
-        tools.current = tool
-        tools.isEraser = isEraser
-    }
-
-    /// The picker now has `tool`. Returns the tool to put back, if a tap with an action of its own came just before.
-    mutating func pickerChanged(to tool: String, isEraser: Bool, at time: TimeInterval) -> String? {
-        guard tool != tools.current else { return nil }
-        if let tappedAt, time - tappedAt <= Self.window, let current = tools.current {
-            self.tappedAt = nil
-            return current
-        }
-        switched = (tools, time)
-        select(tool, isEraser: isEraser)
-        return nil
-    }
-
-    /// A tap with an action of its own. Returns the tool to put back, if the picker has just switched by itself.
-    mutating func tapped(at time: TimeInterval) -> String? {
-        if let switched, time - switched.at <= Self.window, let before = switched.from.current {
-            tools = switched.from
-            self.switched = nil
-            return before
-        }
-        switched = nil
-        tappedAt = time
-        return nil
+    mutating func select(_ tool: Tool, isEraser: Bool) {
+        guard tool != current else { return }
+        if isEraser, !self.isEraser { beforeEraser = current }
+        previous = current
+        current = tool
+        self.isEraser = isEraser
     }
 
     /// Where the eraser switch goes: to the eraser, or from it to the tool that was in use before.
-    func eraserSwitch(eraser: String?) -> String? {
-        tools.isEraser ? tools.beforeEraser ?? tools.previous : eraser
+    func eraserSwitch(eraser: Tool?) -> Tool? {
+        isEraser ? beforeEraser ?? previous : eraser
     }
 }

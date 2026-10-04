@@ -224,37 +224,9 @@ extension ButtonStyle where Self == ScribeButtonStyle {
 }
 
 /// An icon or a short word inside a bar: at least 44 points, ink, pressed into a small well.
-/// Named, the icon has its name beside it and grows with the text size.
 struct BarIconButtonStyle: ButtonStyle {
-    var named = false
-
     func makeBody(configuration: Configuration) -> some View {
-        if named { NamedIcon(configuration: configuration) } else { BarIcon(configuration: configuration) }
-    }
-
-    private struct NamedIcon: View {
-        let configuration: Configuration
-        @Environment(\.isEnabled) private var isEnabled
-        @Environment(\.accessibilityShowBorders) private var showBorders
-
-        var body: some View {
-            configuration.label
-                .labelStyle(.titleAndIcon)
-                .font(.subheadline.weight(.semibold))
-                .imageScale(.medium)
-                .lineLimit(1)
-                .fixedSize()
-                .foregroundStyle(Color.ink)
-                .opacity(isEnabled ? 1 : 0.35)
-                .padding(.horizontal, Space.x3)
-                .frame(minWidth: 44, minHeight: 44)
-                .background {
-                    if (configuration.isPressed && isEnabled) || showBorders { Capsule().fill(Color.well).padding(3) }
-                }
-                .contentShape(Rectangle())
-                .contentShape(.hoverEffect, Capsule().inset(by: 2))
-                .hoverEffect(.highlight)
-        }
+        BarIcon(configuration: configuration)
     }
 
     private struct BarIcon: View {

@@ -9,13 +9,9 @@ private struct SharedSlide: @unchecked Sendable {
 
 struct PageStack: UIViewControllerRepresentable {
     let session: EditorSession
-    /// The window the editor is in: its panes share one tool picker.
-    var window: EditorWindow?
 
     func makeUIViewController(context: Context) -> PageStackController {
-        let picker = window?.toolPicker ?? PKToolPicker()
-        window?.toolPicker = picker
-        let controller = PageStackController(session: session, toolPicker: picker)
+        let controller = PageStackController(session: session)
         session.canvas = controller
         return controller
     }
@@ -104,22 +100,29 @@ final class PageCanvasView: PKCanvasView {
     }
 }
 
-/// A picker's items can't be given a colour or a width, so a saved tool goes in through the setter that takes
-/// a whole tool. iPadOS 18 deprecated it in favour of the items; reaching it through a protocol keeps the build quiet.
-private protocol ToolSetting {
-    func set(_ tool: PKTool, on picker: PKToolPicker)
-}
-
-private struct PickerToolSetter: ToolSetting {
-    @available(iOS, deprecated: 18.0)
-    func set(_ tool: PKTool, on picker: PKToolPicker) { picker.selectedTool = tool }
-}
-
-/// Stays first responder so one tool picker serves every page, and routes ⌘Z and the picker's undo to the document.
-final class ToolPickerAnchor: UIView {
+/// Stays first responder so the page stack's key commands work on every page, and routes ⌘Z to the document.
+final class ResponderAnchor: UIView {
     weak var undoProxy: UndoManager?
+    var onResign: (() -> Void)?
     override var canBecomeFirstResponder: Bool { true }
     override var undoManager: UndoManager? { undoProxy ?? super.undoManager }
+
+    @discardableResult
+    override func resignFirstResponder() -> Bool {
+        let resigned = super.resignFirstResponder()
+        if resigned { onResign?() }
+        return resigned
+    }
+}
+
+private extension UIView {
+    var firstResponderInside: UIView? {
+        if isFirstResponder { return self }
+        for subview in subviews {
+            if let found = subview.firstResponderInside { return found }
+        }
+        return nil
+    }
 }
 
 /// Marks where the words being looked for are on a page. The match being shown is outlined as well as filled,
@@ -304,15 +307,15 @@ final class PageSlotView: UIView {
 }
 
 @MainActor
-final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanvasViewDelegate, PKToolPickerObserver,
+final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanvasViewDelegate,
                                  InkObserver, EditorCanvasControlling, UIGestureRecognizerDelegate, UIDropInteractionDelegate, UITextViewDelegate,
                                  UIPencilInteractionDelegate {
     private let session: EditorSession
     private var document: NotebookDocument { session.document }
     private let scrollView = UIScrollView()
     private let contentView = UIView()
-    private let anchor = ToolPickerAnchor()
-    private let toolPicker: PKToolPicker
+    private let anchor = ResponderAnchor()
+    private let toolbox: Toolbox
     private let undoProxy: CanvasUndoProxy
     private let signposter = OSSignposter(subsystem: "com.owais.NotesApp", category: "editor")
 
@@ -332,7 +335,8 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     private var isBaking = false
     private var paperLevel = 0
     private var lastBounds: CGRect = .zero
-    private var toolPickerSuppressed = false
+    private var isModalShowing = false
+    private var keepsAnchor = false
     private let laser = LaserTrailView()
     private lazy var laserGesture = UILongPressGestureRecognizer(target: self, action: #selector(pointLaser))
     private(set) var isPresenting = false
@@ -378,7 +382,6 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     private var mirrored: String?
     private var fingersDraw = false
     private let strokeHold = StrokeHoldRecognizer()
-    private var toolMemory = PencilToolMemory()
     private lazy var itemTap = UITapGestureRecognizer(target: self, action: #selector(tappedPage))
     private lazy var itemHold = UILongPressGestureRecognizer(target: self, action: #selector(heldPage))
     private lazy var tapeTap = UITapGestureRecognizer(target: self, action: #selector(tappedTape))
@@ -398,9 +401,9 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     /// Called once when the first visible page has its ink on screen (for tests and the open signpost).
     var onFirstInk: ((TimeInterval) -> Void)?
 
-    init(session: EditorSession, toolPicker: PKToolPicker = PKToolPicker()) {
+    init(session: EditorSession, toolbox: Toolbox = .shared) {
         self.session = session
-        self.toolPicker = toolPicker
+        self.toolbox = toolbox
         undoProxy = CanvasUndoProxy(document: session.document.undoManager)
         super.init(nibName: nil, bundle: nil)
         openInterval = signposter.beginInterval("Open to first ink")
@@ -439,6 +442,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         view.addSubview(scrollView)
         scrollView.addSubview(contentView)
         anchor.undoProxy = undoProxy
+        anchor.onResign = { [weak self] in DispatchQueue.main.async { self?.reclaimAnchor() } }
         anchor.frame = .zero
         view.addSubview(anchor)
         laser.frame = view.bounds
@@ -465,12 +469,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
             pan.maximumNumberOfTouches = 1
             pan.allowedTouchTypes = Self.scrollTouchTypes + [NSNumber(value: UITouch.TouchType.pencil.rawValue)]
         }
-        toolPicker.addObserver(self)
-        toolPicker.colorUserInterfaceStyle = .light
-        toolPicker.stateAutosaveName = "SwiftScribe.ToolPicker"
-        toolPicker.showsDrawingPolicyControls = false
-        toolMemory.select(toolPicker.selectedToolItemIdentifier, isEraser: isEraser(toolPicker.selectedToolItemIdentifier))
-        reportTool()
+        NotificationCenter.default.addObserver(self, selector: #selector(toolChanged), name: Toolbox.didChange, object: toolbox)
         applyDrawingPolicy(session.drawingInput.policy)
         registerForTraitChanges([UITraitUserInterfaceStyle.self, UITraitAccessibilityContrast.self]) { (self: Self, _) in
             self.updatePageEdges()
@@ -491,19 +490,33 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     private static let scrollTouchTypes = [NSNumber(value: UITouch.TouchType.direct.rawValue),
                                            NSNumber(value: UITouch.TouchType.indirectPointer.rawValue)]
 
-    @objc private func sceneDidActivate() { updateScrollTouches() }
+    /// The system's Only Draw with Apple Pencil switch may have been changed while the app was away.
+    @objc private func sceneDidActivate() { applyDrawingPolicy(drawingPolicy) }
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        setToolPickerVisible(session.isToolPickerVisible)
+        keepsAnchor = true
+        toolTrayDidChange()
+    }
+
+    /// With a keyboard attached, a menu closing or Tab moves keyboard focus and the system has the anchor resign
+    /// with nothing taking its place: the page keys and ⌘Z would go with it.
+    private func reclaimAnchor() {
+        guard keepsAnchor, textView == nil, !isModalShowing, !anchor.isFirstResponder, let window = view.window else { return }
+        var presenter = window.rootViewController
+        while let presented = presenter?.presentedViewController {
+            if presented.isFirstResponder { return }
+            presenter = presented
+        }
+        if window.firstResponderInside != nil { return }
+        anchor.becomeFirstResponder()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
+        keepsAnchor = false
         endTextEditing()
         ExternalDisplay.shared.end(for: self)
-        toolPicker.setVisible(false, forFirstResponder: anchor)
-        for canvas in allCanvases { toolPicker.setVisible(false, forFirstResponder: canvas) }
         anchor.resignFirstResponder()
         UIApplication.shared.isIdleTimerDisabled = false
     }
@@ -555,7 +568,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     }
 
     override var keyCommands: [UIKeyCommand]? {
-        guard !toolPickerSuppressed else { return [] }
+        guard !isModalShowing else { return [] }
         // While typing, every key belongs to the text box.
         guard textView == nil else { return [UIKeyCommand(title: String(localized: "Done"), action: #selector(finishTyping), input: UIKeyCommand.inputEscape)] }
         let commands = [
@@ -655,13 +668,12 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     private func updateInsets() {
         let horizontal = max(0, (scrollView.bounds.width - scrollView.contentSize.width) / 2)
         let vertical = max(0, (scrollView.bounds.height - scrollView.contentSize.height) / 2)
-        let obscured = toolPicker.isVisible ? toolPicker.frameObscured(in: view) : .null
-        let bottom = obscured.isNull ? vertical : max(vertical, view.bounds.maxY - obscured.minY)
         // Room to centre the first and last page while presenting.
         let slack = isPresenting ? scrollView.bounds.height / 2 : 0
         let panel = zoomPanel.map { view.bounds.maxY - $0.frame.minY } ?? 0
         scrollView.contentInset = UIEdgeInsets(top: max(vertical + view.safeAreaInsets.top, slack), left: horizontal,
-                                               bottom: max(bottom, slack, panel, textView == nil && !isFinding ? 0 : keyboardOverlap), right: horizontal)
+                                               bottom: max(vertical, toolsObscured, slack, panel, textView == nil && !isFinding ? 0 : keyboardOverlap),
+                                               right: horizontal)
     }
 
     private func clamped(_ offset: CGPoint) -> CGPoint {
@@ -701,13 +713,26 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         updateWindow(force: true)
     }
 
-    /// The part of the view pages can be read in: below the bar, above a docked tool picker.
-    private var readableArea: CGRect {
+    /// The part of the view the pages show in: below the bar, above the zoom window. A whiteboard is kept by the
+    /// middle of this, so it stays where it is when the tool tray comes and goes.
+    private var pageArea: CGRect {
         var area = view.bounds.inset(by: UIEdgeInsets(top: view.safeAreaInsets.top, left: 0, bottom: 0, right: 0))
-        let obscured = toolPicker.isVisible ? toolPicker.frameObscured(in: view) : .null
-        if !obscured.isNull, obscured.minY > area.minY { area.size.height = obscured.minY - area.minY }
         if let zoomPanel { area.size.height = max(min(area.height, zoomPanel.frame.minY - area.minY), 80) }
         return area
+    }
+
+    /// The part of it pages can be read in: clear of the tool tray as well. A page is fitted into this.
+    private var readableArea: CGRect {
+        var area = pageArea
+        area.size.height = max(min(area.height, view.bounds.maxY - toolsObscured - area.minY), 80)
+        return area
+    }
+
+    /// What the tool tray takes of the foot of the view while it shows: itself, the gap under it and what it stands on,
+    /// the home indicator's margin or the zoom window.
+    private var toolsObscured: CGFloat {
+        guard session.showsToolTray else { return 0 }
+        return ToolTray.height + ToolTray.gap + max(view.safeAreaInsets.bottom, zoomPanel.map { view.bounds.maxY - $0.frame.minY } ?? 0)
     }
 
     /// The zoom that fits the current page, not the widest one, so a small page can fill the screen.
@@ -731,7 +756,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
             let shown = boardFrame(index), middle = fit == .page ? CGPoint(x: shown.midX, y: shown.midY) : boardMiddle()
             pendingPage = nil
             bake(zoom: min(fitZoom(fit, page: index), maximumZoom))
-            center(on: middle)
+            center(on: middle, in: fit == .page ? area : nil)
             updateWindow(force: true)
             return session.pageDidChange(index)
         }
@@ -826,12 +851,12 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         }
     }
 
-    /// The picker's swatches show ink as the current page will: light on Chalkboard.
+    /// The tray's pens show ink as the current page will: light on Chalkboard.
     private func updateInkAppearance() {
         let index = pendingPage ?? session.currentPage
         guard pages.indices.contains(index) else { return }
-        let style = pages[index].effectivePaperColor.inkAppearance
-        if toolPicker.colorUserInterfaceStyle != style { toolPicker.colorUserInterfaceStyle = style }
+        let dark = pages[index].effectivePaperColor.inkAppearance == .dark
+        if session.inkIsLight != dark { session.inkIsLight = dark }
     }
 
     private func makeSlot(_ page: NotebookPage, at index: Int) -> PageSlotView {
@@ -911,23 +936,17 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         canvas.clipsToBounds = true
         canvas.scrollsToTop = false
         canvas.overrideUserInterfaceStyle = .light
-        canvas.drawingPolicy = session.drawingInput.policy
+        canvas.drawingPolicy = effectivePolicy
         canvas.maximumSupportedContentVersion = .latest
         canvas.isAccessibilityElement = true
         canvas.accessibilityTraits = .allowsDirectInteraction
-        toolPicker.addObserver(canvas)
         return canvas
     }
 
-    /// Observers only hear about later picker changes, so a new or reused canvas starts from the picker's current tool.
+    /// A new or reused canvas takes the tool in hand.
     private func syncTool(_ canvas: PageCanvasView) {
-        switch toolPicker.selectedToolItem {
-        case let item as PKToolPickerInkingItem: canvas.tool = item.inkingTool
-        case let item as PKToolPickerEraserItem: canvas.tool = item.eraserTool
-        case let item as PKToolPickerLassoItem: canvas.tool = item.lassoTool
-        default: break
-        }
-        canvas.isRulerActive = toolPicker.isRulerActive
+        canvas.tool = toolbox.tool
+        canvas.isRulerActive = toolbox.isRulerActive
     }
 
     private func attachCanvas(_ page: NotebookPage, to slot: PageSlotView) {
@@ -946,7 +965,6 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         if let selectionView, selectionView.superview === slot { slot.bringSubviewToFront(selectionView) }
         if let textView, textView.superview === slot { slot.bringSubviewToFront(textView) }
         if let findView = slot.findView { slot.bringSubviewToFront(findView) }
-        if toolPicker.isVisible { toolPicker.setVisible(true, forFirstResponder: canvas) }
         if let ink = document.loadedInk(page.id) {
             show(ink, in: canvas)
         } else {
@@ -978,7 +996,6 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
 
     private func recycleCanvas(_ id: UUID) {
         guard let canvas = canvases.removeValue(forKey: id) else { return }
-        toolPicker.setVisible(false, forFirstResponder: canvas)
         if canvas.isFirstResponder { anchor.becomeFirstResponder() }
         canvas.removeFromSuperview()
         canvas.pageID = nil
@@ -989,7 +1006,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         isApplyingDrawing = true
         canvas.drawing = PKDrawing()
         isApplyingDrawing = false
-        if pool.count < 3 { pool.append(canvas) } else { toolPicker.removeObserver(canvas) }
+        if pool.count < 3 { pool.append(canvas) }
     }
 
     /// Canvases are a viewport-sized window onto their page: PencilKit only backs what can be seen, even at 5×.
@@ -1129,7 +1146,6 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     /// Writing anywhere puts a selected picture down.
     func canvasViewDidBeginUsingTool(_ canvasView: PKCanvasView) {
         if session.selection != nil { select(nil) }
-        reportTool()
         guard canvasView === zoomCanvas else { return }
         zoomAdvance?.cancel()
         session.onTouchDown?()
@@ -1412,7 +1428,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         guard let textView, let typing else { return }
         let string = textView.text ?? ""
         discardTextEditor()
-        if !toolPickerSuppressed { anchor.becomeFirstResponder() }
+        if !isModalShowing { anchor.becomeFirstResponder() }
         if string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             if document.undoManager.canUndo, document.undoManager.undoActionName == EditorSession.addTextAction, item(typing)?.text?.string.isEmpty == true {
                 document.undoManager.undo()
@@ -1490,8 +1506,8 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     }
 
     override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
-        if action == #selector(paste(_:)) { return acceptsPictures && !toolPickerSuppressed && UIPasteboard.general.hasImages }
-        if action == #selector(copy(_:)) { return textSelection != nil && !toolPickerSuppressed }
+        if action == #selector(paste(_:)) { return acceptsPictures && !isModalShowing && UIPasteboard.general.hasImages }
+        if action == #selector(copy(_:)) { return textSelection != nil && !isModalShowing }
         return super.canPerformAction(action, withSender: sender)
     }
 
@@ -1583,7 +1599,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
 
     /// The point of the open whiteboard in the middle of what can be read.
     private func boardMiddle(of size: CGSize? = nil) -> CGPoint {
-        var area = readableArea
+        var area = pageArea
         if let size {
             area.size.width += size.width - view.bounds.width
             area.size.height += size.height - view.bounds.height
@@ -1592,8 +1608,8 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         return CGPoint(x: (scrollView.contentOffset.x + area.midX) / effectiveScale, y: (scrollView.contentOffset.y + area.midY) / effectiveScale)
     }
 
-    private func center(on point: CGPoint) {
-        let area = readableArea
+    private func center(on point: CGPoint, in area: CGRect? = nil) {
+        let area = area ?? pageArea
         scrollView.contentOffset = clamped(CGPoint(x: point.x * bakedScale - area.midX, y: point.y * bakedScale - area.midY))
     }
 
@@ -1672,7 +1688,8 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         }
         bake(zoom: 1)
         if let ink = document.loadedInk(id) { return showContent(of: index, ink: ink) }
-        center(on: Whiteboard.contentBounds(of: pages[index], ink: PKDrawing()).map { CGPoint(x: $0.midX, y: $0.midY) } ?? Whiteboard.center)
+        // A board opened for the first time shows what is on it, or its middle, clear of the tool tray.
+        center(on: Whiteboard.contentBounds(of: pages[index], ink: PKDrawing()).map { CGPoint(x: $0.midX, y: $0.midY) } ?? Whiteboard.center, in: readableArea)
         let placed = scrollView.contentOffset
         Task { [weak self] in
             guard let self else { return }
@@ -1684,11 +1701,12 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     }
 
     private func showContent(of index: Int, ink: PKDrawing) {
-        guard Whiteboard.contentBounds(of: pages[index], ink: ink) != nil else { return center(on: Whiteboard.center) }
-        let frame = Whiteboard.frame(of: pages[index], ink: ink), area = readableArea
+        let area = readableArea
+        guard Whiteboard.contentBounds(of: pages[index], ink: ink) != nil else { return center(on: Whiteboard.center, in: area) }
+        let frame = Whiteboard.frame(of: pages[index], ink: ink)
         let fits = min(area.width / (frame.width * fitScale), area.height / (frame.height * fitScale))
         bake(zoom: min(max(fits, minimumZoom), 1))
-        center(on: CGPoint(x: frame.midX, y: frame.midY))
+        center(on: CGPoint(x: frame.midX, y: frame.midY), in: area)
     }
 
     private func canvasLabel(_ page: NotebookPage, number: Int) -> String {
@@ -1720,17 +1738,18 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
 
     // MARK: EditorCanvasControlling
 
-    func setToolPickerVisible(_ visible: Bool) {
-        let shown = visible && !toolPickerSuppressed && !document.isReadOnly && !isLocked
-        toolPicker.setVisible(shown, forFirstResponder: anchor)
-        for canvas in allCanvases { toolPicker.setVisible(shown, forFirstResponder: canvas) }
-        if !toolPickerSuppressed, textView == nil { anchor.becomeFirstResponder() }
+    /// The tool tray came or went: the pages make room for it, and "System Setting" is read again.
+    func toolTrayDidChange() {
+        applyDrawingPolicy(drawingPolicy)
+        layoutZoomPanel()
+        updateInsets()
+        if !isModalShowing, textView == nil { anchor.becomeFirstResponder() }
     }
 
-    func setToolPickerSuppressed(_ suppressed: Bool) {
-        guard suppressed != toolPickerSuppressed else { return }
-        toolPickerSuppressed = suppressed
-        setToolPickerVisible(session.isToolPickerVisible)
+    func setModalShowing(_ showing: Bool) {
+        guard showing != isModalShowing else { return }
+        isModalShowing = showing
+        if !showing, textView == nil { anchor.becomeFirstResponder() }
     }
 
     func setDrawingPolicy(_ policy: PKCanvasViewDrawingPolicy) {
@@ -1739,22 +1758,30 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
 
     private func applyDrawingPolicy(_ policy: PKCanvasViewDrawingPolicy) {
         drawingPolicy = policy
-        for canvas in allCanvases + pool { canvas.drawingPolicy = policy }
+        let effective = effectivePolicy
+        for canvas in allCanvases + pool where canvas.drawingPolicy != effective { canvas.drawingPolicy = effective }
         updateScrollTouches()
     }
 
     private var drawingPolicy: PKCanvasViewDrawingPolicy = .default
 
-    /// When a finger can draw, scrolling takes two. "System Setting" follows the system's Only Draw with Apple Pencil
-    /// switch, which only applies while the tool picker is showing.
+    /// "System Setting" follows the system's Only Draw with Apple Pencil switch while the tools are out, and leaves
+    /// drawing to the Pencil while they are put away. PencilKit only does this for its own tool picker.
+    private var effectivePolicy: PKCanvasViewDrawingPolicy {
+        switch drawingPolicy {
+        case .anyInput, .pencilOnly: drawingPolicy
+        default: session.showsToolTray && !UIPencilInteraction.prefersPencilOnlyDrawing ? .anyInput : .pencilOnly
+        }
+    }
+
+    /// When a finger can draw, scrolling takes two.
     private func updateScrollTouches() {
-        let fingersDraw = switch drawingPolicy {
+        let fingersDraw = switch effectivePolicy {
         case _ where isPresenting: fingersPoint
         case _ where inkLasso != nil || textOverlay != nil: true
         case _ where document.isReadOnly || replay != nil || isFinding: false
         case .anyInput: true
-        case .pencilOnly: false
-        default: toolPicker.isVisible && !UIPencilInteraction.prefersPencilOnlyDrawing
+        default: false
         }
         self.fingersDraw = fingersDraw
         scrollView.panGestureRecognizer.minimumNumberOfTouches = fingersDraw ? 2 : 1
@@ -1764,7 +1791,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
 
     /// This editor's pane was touched while another had the keyboard: key commands and undo come here now.
     func paneBecameActive() {
-        if textView == nil, !toolPickerSuppressed { anchor.becomeFirstResponder() }
+        if textView == nil, !isModalShowing { anchor.becomeFirstResponder() }
     }
 
     // MARK: Selecting ink across pages
@@ -1800,7 +1827,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
             setInkSelection([:])
         }
         for canvas in canvases.values where canvas.isLoaded { setDrawingEnabled(!document.isReadOnly && !isLocked, canvas) }
-        setToolPickerVisible(session.isToolPickerVisible)
+        toolTrayDidChange()
         updateScrollTouches()
     }
 
@@ -1980,7 +2007,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
             setTextSelection(nil)
         }
         for canvas in canvases.values where canvas.isLoaded { setDrawingEnabled(!document.isReadOnly && !isLocked, canvas) }
-        setToolPickerVisible(session.isToolPickerVisible)
+        toolTrayDidChange()
         updateScrollTouches()
     }
 
@@ -2086,7 +2113,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
             for slot in slots.values { showFind(in: slot) }
         }
         for canvas in canvases.values where canvas.isLoaded { setDrawingEnabled(!document.isReadOnly && !isLocked, canvas) }
-        setToolPickerVisible(session.isToolPickerVisible)
+        toolTrayDidChange()
         updateScrollTouches()
         updateInsets()
     }
@@ -2172,7 +2199,6 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         layoutZoomPanel()
         placeZoomWindow(onPage: index, center: visibleCenter(ofPage: index))
         updateInsets()
-        if toolPicker.isVisible { toolPicker.setVisible(true, forFirstResponder: canvas) }
         revealZoomTarget()
         UIAccessibility.post(notification: .layoutChanged, argument: canvas)
     }
@@ -2181,8 +2207,6 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         guard zoomPanel != nil else { return }
         zoomAdvance?.cancel()
         if let canvas = zoomCanvas {
-            toolPicker.setVisible(false, forFirstResponder: canvas)
-            toolPicker.removeObserver(canvas)
             if canvas.isFirstResponder { anchor.becomeFirstResponder() }
             canvas.delegate = nil
         }
@@ -2192,20 +2216,21 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         zoomCanvas = nil
         zoomTarget = nil
         zoomWindow = nil
+        session.zoomPanelLift = 0
         updateInsets()
         scrollView.contentOffset = clamped(scrollView.contentOffset)
         updateWindow(force: true)
     }
 
-    /// At the foot of the view, above a tool picker docked there. The strip of paper keeps its height; the row of
-    /// buttons over it grows with the text size.
+    /// At the foot of the view; the tool tray stands on it. The strip of paper keeps its height; the row of buttons
+    /// over it grows with the text size.
     private func layoutZoomPanel() {
         guard let panel = zoomPanel else { return }
-        let obscured = toolPicker.isVisible ? toolPicker.frameObscured(in: view) : .null
-        let bottom = obscured.isNull || obscured.minY < view.bounds.midY ? view.bounds.maxY : obscured.minY
         let paper = min(max(view.bounds.height * 0.26, 170), 280) - ZoomWindowPanel.minimumBarHeight
         let height = paper + panel.barHeight(forWidth: view.bounds.width)
-        let frame = CGRect(x: 0, y: bottom - height, width: view.bounds.width, height: height)
+        let frame = CGRect(x: 0, y: view.bounds.maxY - height, width: view.bounds.width, height: height)
+        let lift = max(height - view.safeAreaInsets.bottom, 0)
+        if session.zoomPanelLift != lift { session.zoomPanelLift = lift }
         guard panel.frame != frame else { return }
         let resized = panel.frame.size != frame.size
         panel.frame = frame
@@ -2397,7 +2422,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
             undoProxy.isSuspended = replay != nil
             if replay != nil { select(nil) }
             for canvas in canvases.values where canvas.isLoaded { setDrawingEnabled(!document.isReadOnly && !isLocked, canvas) }
-            setToolPickerVisible(session.isToolPickerVisible)
+            toolTrayDidChange()
             updateScrollTouches()
         }
         for (id, canvas) in canvases where canvas.isLoaded {
@@ -2451,7 +2476,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         if presenting { ExternalDisplay.shared.begin(for: self) } else { ExternalDisplay.shared.end(for: self) }
         if presenting { select(nil) }
         for canvas in canvases.values where canvas.isLoaded { setDrawingEnabled(!document.isReadOnly && !isLocked, canvas) }
-        setToolPickerVisible(session.isToolPickerVisible)
+        toolTrayDidChange()
         updateScrollTouches()
         guard isViewLoaded, lastBounds != .zero else { return }
         if presenting {
@@ -2564,24 +2589,11 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         laserGesture.isEnabled = true
     }
 
-    // MARK: PKToolPickerObserver
+    // MARK: Tools
 
-    func toolPickerVisibilityDidChange(_ toolPicker: PKToolPicker) {
-        if !toolPickerSuppressed, textView == nil, session.isToolPickerVisible != toolPicker.isVisible {
-            session.isToolPickerVisible = toolPicker.isVisible
-        }
-        layoutZoomPanel()
-        updateInsets()
-        updateScrollTouches()
-    }
-
-    func toolPickerSelectedToolItemDidChange(_ toolPicker: PKToolPicker) {
-        let tool = toolPicker.selectedToolItemIdentifier
-        if let restored = toolMemory.pickerChanged(to: tool, isEraser: isEraser(tool), at: CACurrentMediaTime()) {
-            DispatchQueue.main.async { [weak self] in self?.selectTool(restored) }
-        }
-        reportTool()
-        updateScrollTouches()
+    /// Every canvas takes the tool in hand, the ones waiting to be reused as well.
+    @objc private func toolChanged() {
+        for canvas in allCanvases + pool { syncTool(canvas) }
     }
 
     // MARK: UIPencilInteractionDelegate
@@ -2595,18 +2607,22 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         pencil(.setting(SettingsKey.pencilSqueeze), preferred: UIPencilInteraction.preferredSqueezeAction)
     }
 
-    /// A double-tap or a squeeze. While the tool picker shows, PencilKit acts on the system's setting by itself; with
-    /// the tools hidden the app does the tool switching, and an action chosen in Settings always replaces both.
+    /// A double-tap or a squeeze: the action chosen in Settings, or what the system's own setting asks for.
     private func pencil(_ action: PencilAction, preferred: UIPencilPreferredAction) {
-        guard view.window != nil, session.isActivePane(), !toolPickerSuppressed, textView == nil, !document.isReadOnly else { return }
+        guard view.window != nil, session.isActivePane(), !isModalShowing, textView == nil, !document.isReadOnly else { return }
         let mode = session.mode, writing = mode == .writing || mode == .focus
-        if action != .system, toolPicker.isVisible, let restored = toolMemory.tapped(at: CACurrentMediaTime()) { selectTool(restored) }
         switch action {
         case .system:
-            guard writing, !toolPicker.isVisible else { return }
-            if preferred == .switchEraser { switchEraser() } else if preferred == .switchPrevious, let previous = toolMemory.previous { selectTool(previous) }
+            guard writing else { return }
+            switch preferred {
+            case .switchEraser: toolbox.switchEraser()
+            case .switchPrevious: toolbox.switchPrevious()
+            // The system's palettes are the tool picker's; the tray stands in for them.
+            case .showColorPalette, .showInkAttributes, .showContextualPalette: if !session.showsTools { session.toggleTools() }
+            default: break
+            }
         case .eraser:
-            if writing { switchEraser() }
+            if writing { toolbox.switchEraser() }
         case .undo:
             if writing || mode == .selecting { undoProxy.undo() }
         case .selectInk:
@@ -2615,62 +2631,10 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
             AccessibilityNotification.Announcement(writing ? String(localized: "Selecting ink. Draw round ink on any page, then drag it.")
                                                            : String(localized: "Back to writing")).post()
         case .toggleTools:
-            if writing { session.toggleToolPicker() }
+            if writing { session.toggleTools() }
         case .zoomWindow:
             if writing { session.setZoomWindow(!session.isZoomWindowOpen) }
         }
-    }
-
-    private func isEraser(_ identifier: String) -> Bool {
-        toolPicker.toolItems.contains { $0.identifier == identifier && $0 is PKToolPickerEraserItem }
-    }
-
-    private func switchEraser() {
-        guard let tool = toolMemory.eraserSwitch(eraser: toolPicker.toolItems.first { $0 is PKToolPickerEraserItem }?.identifier) else { return }
-        selectTool(tool)
-    }
-
-    /// Chooses a tool in the picker and on every canvas, the ones waiting to be reused as well.
-    private func selectTool(_ identifier: String) {
-        guard toolPicker.toolItems.contains(where: { $0.identifier == identifier }) else { return }
-        toolMemory.select(identifier, isEraser: isEraser(identifier))
-        toolPicker.selectedToolItemIdentifier = identifier
-        for canvas in allCanvases + pool { syncTool(canvas) }
-        reportTool()
-        updateScrollTouches()
-    }
-
-    // MARK: Favourite tools
-
-    /// The picker takes a saved tool, and with it every canvas, the ones waiting to be reused as well.
-    func useTool(_ preset: ToolPreset) {
-        guard let tool = preset.tool, !document.isReadOnly else { return }
-        (PickerToolSetter() as ToolSetting).set(tool, on: toolPicker)
-        // Should the picker ever stop taking a tool whole, its own item of that kind is still chosen.
-        if (toolPicker.selectedToolItem as? PKToolPickerInkingItem)?.inkingTool.inkType != tool.inkType,
-           let item = toolPicker.toolItems.first(where: { ($0 as? PKToolPickerInkingItem)?.inkingTool.inkType == tool.inkType }) {
-            toolPicker.selectedToolItemIdentifier = item.identifier
-        }
-        toolMemory.select(toolPicker.selectedToolItemIdentifier, isEraser: false)
-        for canvas in allCanvases + pool { syncTool(canvas) }
-        reportTool()
-        updateScrollTouches()
-        AccessibilityNotification.Announcement(preset.name).post()
-    }
-
-    /// Tells the chrome which pen, pencil or marker the picker has now.
-    private func reportTool() {
-        let tool = (toolPicker.selectedToolItem as? PKToolPickerInkingItem).flatMap { ToolPreset($0.inkingTool) }
-        switch (tool, session.currentTool) {
-        case (nil, nil): return
-        case let (new?, old?) where new.isSameTool(as: old): return
-        default: session.currentTool = tool
-        }
-    }
-
-    func toolPickerFramesObscuredDidChange(_ toolPicker: PKToolPicker) {
-        layoutZoomPanel()
-        updateInsets()
     }
 
     // MARK: UIScrollViewDelegate

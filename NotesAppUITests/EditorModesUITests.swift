@@ -173,7 +173,7 @@ final class EditorModesUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["page.canvas.1"].waitForExistence(timeout: 20))
         app.buttons["Add"].firstMatch.tap()
         app.buttons["Picture on This Page…"].firstMatch.tap()
-        // The favourite tools are images in a scroll view too: the picker's are the ones called photos.
+        // The pens in the tool tray are images in a scroll view too: the photo picker's are the ones called photos.
         let photo = app.scrollViews.images.matching(NSPredicate(format: "label CONTAINS[c] %@", "photo")).firstMatch
         try XCTSkipUnless(photo.waitForExistence(timeout: 15), "this simulator's photo library is empty")
         photo.tap()

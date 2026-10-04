@@ -2,7 +2,7 @@ import UIKit
 
 /// What a canvas returns as its `undoManager`. PencilKit registers each stroke inside its own group (and calls
 /// private grouping API), so it gets a throwaway stack here that is cleared after every group. Undo and redo,
-/// from the tool picker, keyboard or gestures, are forwarded to the document's single stack.
+/// from the keyboard or gestures, are forwarded to the document's single stack.
 final class CanvasUndoProxy: UndoManager {
     private weak var document: UndoManager?
     private var purgeScheduled = false

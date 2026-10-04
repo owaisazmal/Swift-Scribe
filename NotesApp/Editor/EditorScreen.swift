@@ -1,6 +1,5 @@
 import SwiftUI
 import SwiftData
-import PencilKit
 
 /// Where a link to another notebook was followed from, so the notebook it opened can offer the way back.
 struct NotebookReturn: Equatable {
@@ -41,8 +40,6 @@ final class EditorWindow {
     /// The documents of the tabs looked at since the editor opened. They stay open while another tab is on show, so
     /// a tab comes back with its undo history; all are saved and closed on the way back to the library.
     @ObservationIgnored private(set) var documents: [UUID: NotebookDocument] = [:]
-    /// One tool picker for both panes, so a tool chosen in one is the tool in the other.
-    @ObservationIgnored var toolPicker: PKToolPicker?
     /// Shows another notebook, at a page if one is given: in a tab when there are tabs, and otherwise in place of
     /// the editor that is open, once that has saved and closed.
     @ObservationIgnored var openNotebook: ((UUID, UUID?) -> Void)?

@@ -7,8 +7,8 @@ import UniformTypeIdentifiers
 @MainActor
 protocol EditorCanvasControlling: AnyObject {
     func scrollToPage(_ index: Int, animated: Bool)
-    func setToolPickerVisible(_ visible: Bool)
-    func setToolPickerSuppressed(_ suppressed: Bool)
+    func toolTrayDidChange()
+    func setModalShowing(_ showing: Bool)
     func setDrawingPolicy(_ policy: PKCanvasViewDrawingPolicy)
     func fit(_ fit: PageFit)
     func setPresenting(_ presenting: Bool)
@@ -31,7 +31,6 @@ protocol EditorCanvasControlling: AnyObject {
     func setFinding(_ finding: Bool)
     func showFind(_ matches: [FindMatch], current: FindMatch?)
     func setZoomWindow(_ open: Bool)
-    func useTool(_ preset: ToolPreset)
     func setSelectingText(_ selecting: Bool)
     func selectAllText()
     func highlightSelectedText(_ color: HighlightColor)
@@ -44,7 +43,7 @@ struct ItemSelection: Equatable {
 
 enum PageFit { case width, page }
 
-/// Focus hides the chrome and leaves the tools; presenting hides both and turns the Pencil into a laser pointer;
+/// Focus hides the chrome and leaves the tool tray; presenting hides both and turns the Pencil into a laser pointer;
 /// replaying plays a recording while the ink written during it appears as it was written; selecting picks ink out
 /// across pages to move, copy or delete; finding looks for words and marks them on the pages; selecting text picks
 /// out a PDF page's own words to copy or highlight.
@@ -57,7 +56,8 @@ final class EditorSession {
     let recorder: NotebookRecorder
     let finder: NotebookFinder
     var currentPage: Int
-    var isToolPickerVisible = true
+    /// Whether the tools are out. The tray itself also waits on the mode, see `showsToolTray`.
+    var showsTools = true
     var canUndo = false
     var canRedo = false
     /// The picture, sticker, text box or link being arranged. The canvas owns it; it's mirrored here for the chrome.
@@ -65,8 +65,10 @@ final class EditorSession {
     var isEditingText = false
     /// The whiteboard that is open on its own, if one is. The canvas owns it; it's mirrored here for the chrome.
     var openBoard: UUID?
-    /// The pen, pencil or marker the picker has, for the favourite tools; nil while it has the eraser or the lasso.
-    var currentTool: ToolPreset?
+    /// The page being written on is Chalkboard, where ink is light: the tray's pens show it so.
+    var inkIsLight = false
+    /// How far the zoom window stands above the foot of the editor's safe area, for the tray to stand on it.
+    var zoomPanelLift: CGFloat = 0
     /// The words selected on a PDF page, while its text is being selected. The canvas owns the selection.
     var selectedText: String?
     /// The page a link was followed from, while the page it opened is still showing.
@@ -434,9 +436,14 @@ final class EditorSession {
         }
     }
 
-    func toggleToolPicker() {
-        isToolPickerVisible.toggle()
-        canvas?.setToolPickerVisible(isToolPickerVisible)
+    /// The tool tray is at the foot of the editor while the page can be written on and nothing is being typed.
+    var showsToolTray: Bool {
+        showsTools && (mode == .writing || mode == .focus) && !document.isReadOnly && !isEditingText
+    }
+
+    func toggleTools() {
+        showsTools.toggle()
+        canvas?.toolTrayDidChange()
     }
 
     func refreshUndoState() {
@@ -535,7 +542,6 @@ fileprivate struct EditorContent: View {
     @State private var showingBoardGuide = false
     @State private var tagging: TagTarget?
     @AppStorage(SettingsKey.whiteboardTipSeen) private var boardTipSeen = false
-    @AppStorage(SettingsKey.showsToolTray) private var showsToolTray = true
     @State private var highlightColor = HighlightColor.last
     @State private var findText = ""
     @FocusState private var findFocused: Bool
@@ -543,7 +549,6 @@ fileprivate struct EditorContent: View {
     @ScaledMetric(relativeTo: .body) private var compactFindWidth: CGFloat = 190
     @State private var undoGroupWidth: CGFloat = 96
     @State private var buttonGroupWidth: CGFloat = 232
-    @ScaledMetric(relativeTo: .headline) private var titleFloor: CGFloat = 220
 
     private struct NotesTarget: Identifiable {
         let id: UUID
@@ -568,29 +573,8 @@ fileprivate struct EditorContent: View {
     private var isNarrow: Bool { paneWidth < 620 }
     private var isCompact: Bool { sizeClass == .compact || isNarrow }
 
-    /// The favourite tools sit in the bar while the page can be written on, in the room the title and the buttons leave.
-    /// Nil where two of them wouldn't fit, and at the largest text sizes, where the title needs the bar.
-    private var toolsWidth: CGFloat? {
-        guard showsToolTray, !isCompact, !document.isReadOnly, !dynamicTypeSize.isAccessibilitySize else { return nil }
-        // A short title keeps all of itself; a long one gives way down to its floor.
-        return ToolTray.width(for: ToolShelf.shared.usable.count, in: barRoom - min(titleWidth + 6, titleFloor) - Self.toolsGap)
-    }
-
-    /// What the title takes in the bar when nothing shortens it: the spine chip, the words and the chevron.
-    private var titleWidth: CGFloat {
-        let traits = UITraitCollection(preferredContentSizeCategory: UIContentSizeCategory(dynamicTypeSize))
-        let words = (document.title as NSString).size(withAttributes: [.font: UIFont.preferredFont(forTextStyle: .headline, compatibleWith: traits)])
-        let chevron = UIFont.preferredFont(forTextStyle: .caption1, compatibleWith: traits).pointSize * 1.2
-        return 7 + Space.x2 * 2 + words.width.rounded(.up) + chevron
-    }
-
-    /// The bar between the way back and the buttons: the title's, and the favourite tools'.
-    private var barRoom: CGFloat {
-        paneWidth - (isNarrow ? buttonGroupWidth : undoGroupWidth + buttonGroupWidth + Space.x4) - 90
-    }
-
-    /// What the favourite tools take from the title beyond their own width, so the two stand a little apart.
-    private static let toolsGap: CGFloat = 10
+    /// An open whiteboard has its own button in the bar, where there is room for one.
+    private var showsBoardMenu: Bool { session.openBoard != nil && !isNarrow }
 
     /// With two notebooks in the window, keyboard shortcuts go to the one last touched.
     private var isActivePane: Bool { pane == .single || window?.active == nil || window?.active == document.id }
@@ -635,7 +619,7 @@ fileprivate struct EditorContent: View {
     }
 
     private var pageStack: some View {
-        PageStack(session: session, window: window)
+        PageStack(session: session)
             .ignoresSafeArea(edges: .bottom)
             .background {
                 Group {
@@ -679,7 +663,7 @@ fileprivate struct EditorContent: View {
                 } else {
                     VStack(spacing: 0) {
                         returnBar
-                        if session.mode == .writing, session.openBoard != nil { boardBar }
+                        if session.mode == .writing, session.openBoard != nil, !boardTipSeen { boardTip }
                     }
                 }
             }
@@ -693,8 +677,32 @@ fileprivate struct EditorContent: View {
                         .floatingBar()
                         .padding(.bottom, Space.x5)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
+                } else if session.showsToolTray, !isCovered {
+                    // The tray keeps its place when a keyboard comes up; it is put away while a text box is typed in.
+                    ToolTray(session: session, room: paneWidth, use: use)
+                        .padding(.bottom, ToolTray.gap + session.zoomPanelLift)
+                        .frame(maxHeight: .infinity, alignment: .bottom)
+                        .ignoresSafeArea(.keyboard, edges: .bottom)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
+            .animation(Motion.adaptive(Motion.standard, reduceMotion: reduceMotion), value: session.showsToolTray)
+            .onChange(of: session.showsToolTray) { session.canvas?.toolTrayDidChange() }
+    }
+
+    /// A shortcut in the tool tray: the same things the Add and More menus do.
+    private func use(_ extra: ToolExtra) {
+        switch extra {
+        case .picture:
+            photoBecomesPage = false
+            showingPhotoPicker = true
+        case .text: session.addText()
+        case .sticker: showingStickers = true
+        case .link: pickingLink = true
+        case .tape: session.addTape()
+        case .ruler: Toolbox.shared.isRulerActive.toggle()
+        case .zoomWindow: session.setZoomWindow(!session.isZoomWindowOpen)
+        }
     }
 
     /// The editor's sheets, alerts and observers, kept apart from the layout so each stays quick to type-check.
@@ -722,6 +730,9 @@ fileprivate struct EditorContent: View {
         }
         .sheet(isPresented: $showingPages) {
             PageNavigator(session: session)
+        }
+        .sheet(isPresented: Binding(get: { showingBoardGuide && !showsBoardMenu }, set: { showingBoardGuide = $0 })) {
+            WhiteboardGuide().presentationBackground(Color.surface)
         }
         .sheet(item: $export) { job in ExportSheet(job: job) }
         .sheet(item: $editingCover) { record in CoverEditorView(record: record) }
@@ -795,7 +806,7 @@ fileprivate struct EditorContent: View {
         } message: {
             Text(errorMessage ?? session.recorder.errorMessage ?? "")
         }
-        .onChange(of: isPresentingModal) { _, presenting in session.canvas?.setToolPickerSuppressed(presenting) }
+        .onChange(of: isPresentingModal) { _, presenting in session.canvas?.setModalShowing(presenting) }
         .onChange(of: session.recorder.isRecording) { _, recording in
             announce(recording ? String(localized: "Recording started") : String(localized: "Recording saved"))
         }
@@ -934,9 +945,11 @@ fileprivate struct EditorContent: View {
             }
             .boardBackground()
         } else {
-            if let toolsWidth {
-                ToolbarItem(placement: .topBarTrailing) { ToolTray(session: session, width: toolsWidth) }
-                    .boardBackground()
+            if showsBoardMenu {
+                ToolbarItem(placement: .topBarTrailing) {
+                    BarGroup { boardMenu }
+                }
+                .boardBackground()
             }
             ToolbarItem(placement: .topBarTrailing) {
                 BarGroup { undoButtons }
@@ -971,13 +984,14 @@ fileprivate struct EditorContent: View {
 
     /// The bar lets a long title run under the buttons, so the title is given what they leave.
     private var titleRoom: CGFloat {
-        max(barRoom - (toolsWidth.map { $0 + Self.toolsGap } ?? 0), 44)
+        let buttons = isNarrow ? buttonGroupWidth : undoGroupWidth + buttonGroupWidth + Space.x4 + (showsBoardMenu ? 52 + Space.x4 : 0)
+        return max(paneWidth - buttons - 90, 44)
     }
 
     private var toolsButton: some View {
-        Button { session.toggleToolPicker() } label: {
-            Label(session.isToolPickerVisible ? "Hide Tools" : "Show Tools",
-                  systemImage: session.isToolPickerVisible ? "pencil.tip.crop.circle.fill" : "pencil.tip.crop.circle")
+        Button { session.toggleTools() } label: {
+            Label(session.showsTools ? "Hide Tools" : "Show Tools",
+                  systemImage: session.showsTools ? "pencil.tip.crop.circle.fill" : "pencil.tip.crop.circle")
         }
         .disabled(document.isReadOnly)
     }
@@ -1416,52 +1430,43 @@ fileprivate struct EditorContent: View {
 
     // MARK: Whiteboard
 
-    /// Over an open whiteboard: its own controls with their names beside them, and a way to the guide.
-    private var boardBar: some View {
-        VStack(spacing: Space.x2) {
-            ViewThatFits(in: .horizontal) {
-                boardButtons(named: true)
-                boardButtons(named: false)
-            }
-            .popover(isPresented: $showingBoardGuide) {
-                WhiteboardGuide()
-                    .presentationCompactAdaptation(.sheet)
-                    .presentationBackground(Color.surface)
-            }
-            if !boardTipSeen {
-                WhiteboardTip(showGuide: { showingBoardGuide = true }, dismiss: {
-                    withAnimation(Motion.adaptive(Motion.standard, reduceMotion: reduceMotion)) { boardTipSeen = true }
-                })
-            }
+    /// An open whiteboard's own controls, behind one button in the bar: they take nothing from the board.
+    private var boardMenu: some View {
+        Menu {
+            boardActions
+        } label: {
+            Label("Whiteboard", systemImage: "scribble.variable")
         }
+        .popover(isPresented: Binding(get: { showingBoardGuide && showsBoardMenu }, set: { showingBoardGuide = $0 })) {
+            WhiteboardGuide()
+                .presentationCompactAdaptation(.sheet)
+                .presentationBackground(Color.surface)
+        }
+        .accessibilityHint(Text("Fits the whiteboard, shows the pages and opens the guide"))
+        .accessibilityIdentifier("editor.board.menu")
+    }
+
+    @ViewBuilder
+    private var boardActions: some View {
+        Button { session.canvas?.fit(.page) } label: { Label("Show Everything", systemImage: "arrow.up.left.and.arrow.down.right") }
+            .accessibilityIdentifier("editor.board.everything")
+        Button { session.canvas?.fit(.width) } label: { Label("Actual Size", systemImage: "1.magnifyingglass") }
+            .accessibilityIdentifier("editor.board.actual")
+        Button { showingPages = true } label: { Label("Pages", systemImage: "rectangle.stack") }
+            .accessibilityIdentifier("editor.board.pages")
+        Button { showingBoardGuide = true } label: { Label("Whiteboard Guide", systemImage: "questionmark.circle") }
+            .accessibilityIdentifier("editor.board.guide")
+    }
+
+    /// Shown over a whiteboard until it is put away once.
+    private var boardTip: some View {
+        WhiteboardTip(showGuide: { showingBoardGuide = true }, dismiss: {
+            withAnimation(Motion.adaptive(Motion.standard, reduceMotion: reduceMotion)) { boardTipSeen = true }
+        })
         // Keeps clear of the ribbons, and stays in the middle.
         .padding(.horizontal, Space.x8 + 100)
         .padding(.top, Space.x2)
         .transition(.move(edge: .top).combined(with: .opacity))
-    }
-
-    private func boardButtons(named: Bool) -> some View {
-        HStack(spacing: 0) {
-            Group {
-                Button { session.canvas?.fit(.page) } label: { Label("Show Everything", systemImage: "arrow.up.left.and.arrow.down.right") }
-                    .accessibilityHint(Text("Zooms out until everything on the whiteboard is in view"))
-                    .accessibilityIdentifier("editor.board.everything")
-                Button { session.canvas?.fit(.width) } label: { Label("Actual Size", systemImage: "1.magnifyingglass") }
-                    .accessibilityHint(Text("Goes back to writing size"))
-                    .accessibilityIdentifier("editor.board.actual")
-                Button { showingPages = true } label: { Label("Pages", systemImage: "rectangle.stack") }
-                    .accessibilityHint(Text("Shows every page of the notebook"))
-                    .accessibilityIdentifier("editor.board.pages")
-            }
-            .buttonStyle(BarIconButtonStyle(named: named))
-            barRule
-            Button { showingBoardGuide = true } label: { Label("Whiteboard Guide", systemImage: "questionmark.circle") }
-                .accessibilityIdentifier("editor.board.guide")
-        }
-        .floatingBar(leading: Space.x1, trailing: Space.x1)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(Text("Whiteboard"))
-        .accessibilityIdentifier("editor.board.bar")
     }
 
     /// Cloth, like the library slip's Undo.
@@ -1615,8 +1620,8 @@ fileprivate struct EditorContent: View {
                         .disabled(document.isReadOnly)
                 }
                 Button { showingRecordingsSheet = true } label: { Label("Recordings", systemImage: "waveform") }
-                Button { session.toggleToolPicker() } label: {
-                    Label(session.isToolPickerVisible ? "Hide Tools" : "Show Tools", systemImage: "pencil.tip.crop.circle")
+                Button { session.toggleTools() } label: {
+                    Label(session.showsTools ? "Hide Tools" : "Show Tools", systemImage: "pencil.tip.crop.circle")
                 }
                 .disabled(document.isReadOnly)
                 Divider()
@@ -1638,9 +1643,9 @@ fileprivate struct EditorContent: View {
             }
             .disabled(document.isReadOnly)
             Divider()
-            if current?.isBoard == true {
-                Button { session.canvas?.fit(.width) } label: { Label("Actual Size", systemImage: "1.magnifyingglass") }
-                Button { session.canvas?.fit(.page) } label: { Label("Show Everything", systemImage: "arrow.up.left.and.arrow.down.right") }
+            if session.openBoard != nil {
+                // In a narrow pane the whiteboard has no button of its own in the bar.
+                if !showsBoardMenu { boardActions }
             } else {
                 Button { session.canvas?.fit(.width) } label: { Label("Fit Width", systemImage: "arrow.left.and.right") }
                 Button { session.canvas?.fit(.page) } label: { Label("Fit Page", systemImage: "arrow.up.and.down") }
@@ -1671,11 +1676,6 @@ fileprivate struct EditorContent: View {
                 Button { editingNotes = NotesTarget(id: current.id) } label: { Label("Presenter Notes…", systemImage: "note.text") }
             }
             Divider()
-            if !isCompact, !document.isReadOnly, !dynamicTypeSize.isAccessibilitySize {
-                Toggle(isOn: $showsToolTray.animation(Motion.adaptive(Motion.standard, reduceMotion: reduceMotion))) {
-                    Label("Favourite Tools", systemImage: "star.square")
-                }
-            }
             Picker(selection: $session.drawingInput) {
                 ForEach(DrawingInput.allCases) { Text($0.displayName).tag($0) }
             } label: { Label("Draw With", systemImage: "hand.draw") }
