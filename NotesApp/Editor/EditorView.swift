@@ -58,6 +58,8 @@ final class EditorSession {
     /// The picture, sticker, text box or link being arranged. The canvas owns it; it's mirrored here for the chrome.
     var selection: ItemSelection?
     var isEditingText = false
+    /// The whiteboard that is open on its own, if one is. The canvas owns it; it's mirrored here for the chrome.
+    var openBoard: UUID?
     /// The page a link was followed from, while the page it opened is still showing.
     private(set) var linkReturn: UUID?
     private(set) var mode = EditorMode.writing
@@ -518,6 +520,8 @@ fileprivate struct EditorContent: View {
     @State private var showingDeck = false
     @State private var cardDraft: CardDraft?
     @State private var studyGuide: StudyGuideRequest?
+    @State private var showingBoardGuide = false
+    @AppStorage(SettingsKey.whiteboardTipSeen) private var boardTipSeen = false
     @State private var findText = ""
     @FocusState private var findFocused: Bool
     @ScaledMetric(relativeTo: .body) private var findWidth: CGFloat = 260
@@ -631,7 +635,10 @@ fileprivate struct EditorContent: View {
                 } else if session.selection != nil, session.mode != .presenting {
                     arrangeBar
                 } else {
-                    returnBar
+                    VStack(spacing: 0) {
+                        returnBar
+                        if session.mode == .writing, session.openBoard != nil { boardBar }
+                    }
                 }
             }
             .overlay(alignment: .bottom) {
@@ -805,7 +812,7 @@ fileprivate struct EditorContent: View {
     }
 
     private var isPresentingModal: Bool {
-        showingPages || showingRecordings || showingRecordingsSheet || pickingBeside || export != nil || importingPDF || showingPhotoPicker || renaming || goToPage || paperMode != nil
+        showingPages || showingBoardGuide || showingRecordings || showingRecordingsSheet || pickingBeside || export != nil || importingPDF || showingPhotoPicker || renaming || goToPage || paperMode != nil
             || editingCover != nil || namingBookmark != nil || showingStickers || pickingLink || renamingLink || editingNotes != nil || readingInk != nil
             || isCovered || scanning || showingDeck || cardDraft != nil || studyGuide != nil
     }
@@ -1292,6 +1299,56 @@ fileprivate struct EditorContent: View {
         .floatingBar(leading: Space.x1, trailing: Space.x1)
         .padding(.top, Space.x2)
         .transition(.move(edge: .top).combined(with: .opacity))
+    }
+
+    // MARK: Whiteboard
+
+    /// Over an open whiteboard: its own controls with their names beside them, and a way to the guide.
+    private var boardBar: some View {
+        VStack(spacing: Space.x2) {
+            ViewThatFits(in: .horizontal) {
+                boardButtons(named: true)
+                boardButtons(named: false)
+            }
+            .popover(isPresented: $showingBoardGuide) {
+                WhiteboardGuide()
+                    .presentationCompactAdaptation(.sheet)
+                    .presentationBackground(Color.surface)
+            }
+            if !boardTipSeen {
+                WhiteboardTip(showGuide: { showingBoardGuide = true }, dismiss: {
+                    withAnimation(Motion.adaptive(Motion.standard, reduceMotion: reduceMotion)) { boardTipSeen = true }
+                })
+            }
+        }
+        // Keeps clear of the ribbons, and stays in the middle.
+        .padding(.horizontal, Space.x8 + 100)
+        .padding(.top, Space.x2)
+        .transition(.move(edge: .top).combined(with: .opacity))
+    }
+
+    private func boardButtons(named: Bool) -> some View {
+        HStack(spacing: 0) {
+            Group {
+                Button { session.canvas?.fit(.page) } label: { Label("Show Everything", systemImage: "arrow.up.left.and.arrow.down.right") }
+                    .accessibilityHint(Text("Zooms out until everything on the whiteboard is in view"))
+                    .accessibilityIdentifier("editor.board.everything")
+                Button { session.canvas?.fit(.width) } label: { Label("Actual Size", systemImage: "1.magnifyingglass") }
+                    .accessibilityHint(Text("Goes back to writing size"))
+                    .accessibilityIdentifier("editor.board.actual")
+                Button { showingPages = true } label: { Label("Pages", systemImage: "rectangle.stack") }
+                    .accessibilityHint(Text("Shows every page of the notebook"))
+                    .accessibilityIdentifier("editor.board.pages")
+            }
+            .buttonStyle(BarIconButtonStyle(named: named))
+            barRule
+            Button { showingBoardGuide = true } label: { Label("Whiteboard Guide", systemImage: "questionmark.circle") }
+                .accessibilityIdentifier("editor.board.guide")
+        }
+        .floatingBar(leading: Space.x1, trailing: Space.x1)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(Text("Whiteboard"))
+        .accessibilityIdentifier("editor.board.bar")
     }
 
     /// Cloth, like the library slip's Undo.

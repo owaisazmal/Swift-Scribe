@@ -2,7 +2,7 @@ import Foundation
 
 /// One-tap combinations of cover and paper in New Notebook. Everything they set stays editable.
 enum NotebookStarter: String, CaseIterable, Identifiable {
-    case journal, lecture, sketchbook, planner, music, whiteboard, plain
+    case journal, whiteboard, lecture, sketchbook, planner, music, plain
 
     var id: String { rawValue }
 

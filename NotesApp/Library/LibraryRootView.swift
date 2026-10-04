@@ -56,7 +56,7 @@ struct LibraryRootView: View {
                     ShelfView(scope: scope ?? .all, zoomNamespace: zoom, onOpen: { openNotebook($0.id) },
                               onOpenPage: { openNotebook($0.id, pageID: $1) },
                               onOpenZoomed: { openNotebook($0.id, pageID: $1, zoomSource: $2) }, onCreate: { creating = true },
-                              onQuickNote: quickNote, isCovered: open != nil || creating || showingSettings)
+                              onQuickNote: quickNote, onWhiteboard: newWhiteboard, isCovered: open != nil || creating || showingSettings)
                         .modifier(BoardSidebarToggle(shows: sizeClass == .regular && !sidebarBeside, title: "Show Sidebar",
                                                      placement: .topBarLeading) { sidebar.toggle() })
                 }
@@ -253,13 +253,17 @@ struct LibraryRootView: View {
         open == nil && !creating && !showingSettings && !creatingQuickNote && app.phase == .ready
     }
 
-    private func quickNote() {
+    private func quickNote() { createAndOpen { try await store.createQuickNote(folder: folder) } }
+
+    private func newWhiteboard() { createAndOpen { try await store.createWhiteboard(folder: folder) } }
+
+    private func createAndOpen(_ create: @escaping () async throws -> UUID) {
         guard libraryInFront else { return }
         creatingQuickNote = true
         Task {
             defer { creatingQuickNote = false }
             do {
-                openNotebook(try await store.createQuickNote(folder: folder))
+                openNotebook(try await create())
             } catch {
                 quickNoteError = error.localizedDescription
             }

@@ -81,6 +81,15 @@ final class LibraryStore {
                                         folder: folder)
     }
 
+    /// A notebook that opens on a whiteboard, created without the sheet.
+    func createWhiteboard(folder: FolderRecord?) async throws -> UUID {
+        let starter = NotebookStarter.whiteboard, id = UUID()
+        let size = UserDefaults.standard.string(forKey: SettingsKey.defaultPageSize).flatMap(PageSize.init(rawValue:)) ?? .letter
+        return try await createNotebook(id: id, title: starter.notebookTitle, cover: starter.spec(for: id),
+                                        defaults: PageDefaults(template: starter.template, paperColor: starter.paperColor, pageSize: size),
+                                        folder: folder, startsWithBoard: true)
+    }
+
     @discardableResult
     func importPDF(from url: URL, folder: FolderRecord?) async throws -> UUID {
         let folderID = folder?.id

@@ -328,11 +328,17 @@ private struct StarterCard: View {
     let isSelected: Bool
 
     var body: some View {
-        HStack(spacing: 3) {
-            cover
-                .frame(width: 36, height: 48)
-                .clipShape(UnevenRoundedRectangle(topLeadingRadius: 1, bottomLeadingRadius: 1, bottomTrailingRadius: 3, topTrailingRadius: 3))
-            paper.frame(width: 36, height: 48)
+        Group {
+            if starter == .whiteboard {
+                board.frame(width: 75, height: 48)
+            } else {
+                HStack(spacing: 3) {
+                    cover
+                        .frame(width: 36, height: 48)
+                        .clipShape(UnevenRoundedRectangle(topLeadingRadius: 1, bottomLeadingRadius: 1, bottomTrailingRadius: 3, topTrailingRadius: 3))
+                    paper.frame(width: 36, height: 48)
+                }
+            }
         }
         .padding(Space.x3)
         .background(Color.paper, in: RoundedRectangle(cornerRadius: Radius.control))
@@ -367,6 +373,25 @@ private struct StarterCard: View {
                 RoundedRectangle(cornerRadius: 1).fill(Color.labelCream).frame(width: 20, height: 12).offset(x: 11, y: 9)
             }
         }
+    }
+
+    /// A whiteboard is drawn as what it is: one wide dotted sheet with a line running across it.
+    private var board: some View {
+        Canvas { context, size in
+            let dot = Color(uiColor: TemplateInk.for(starter.paperColor).line)
+            for x in stride(from: 7.5, to: size.width, by: 10) {
+                for y in stride(from: 9, to: size.height, by: 10) {
+                    context.fill(Path(ellipseIn: CGRect(x: x - 0.75, y: y - 0.75, width: 1.5, height: 1.5)), with: .color(dot))
+                }
+            }
+            var line = Path()
+            line.move(to: CGPoint(x: 10, y: 33))
+            line.addCurve(to: CGPoint(x: 38, y: 22), control1: CGPoint(x: 18, y: 10), control2: CGPoint(x: 28, y: 42))
+            line.addCurve(to: CGPoint(x: 66, y: 15), control1: CGPoint(x: 46, y: 6), control2: CGPoint(x: 56, y: 34))
+            context.stroke(line, with: .color(spec.cloth.color), style: StrokeStyle(lineWidth: 2, lineCap: .round))
+        }
+        .background(Color(uiColor: PageRenderer.paperColor(starter.paperColor)))
+        .overlay { Rectangle().strokeBorder(Color.hairline) }
     }
 
     private var paper: some View {

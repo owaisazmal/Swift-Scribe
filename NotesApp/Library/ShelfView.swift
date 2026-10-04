@@ -17,6 +17,7 @@ struct ShelfView: View {
     let onOpenZoomed: (NotebookRecord, UUID?, String) -> Void
     let onCreate: () -> Void
     let onQuickNote: () -> Void
+    let onWhiteboard: () -> Void
     let isCovered: Bool
 
     @Environment(LibraryStore.self) private var store
@@ -468,6 +469,8 @@ struct ShelfView: View {
                         Menu {
                             Button { onCreate() } label: { Label("New Notebook", systemImage: "book.closed") }
                             Button { onQuickNote() } label: { Label("Quick Note", systemImage: "square.and.pencil") }
+                            Button { onWhiteboard() } label: { Label("Whiteboard", systemImage: "scribble.variable") }
+                                .accessibilityIdentifier("library.new.board")
                             Button { importingPDF = true } label: { Label("Import PDF…", systemImage: "doc.richtext") }
                             if DocumentScan.isAvailable {
                                 Button(action: startScan) { Label("Scan Documents…", systemImage: "doc.viewfinder") }

@@ -25,24 +25,39 @@ final class WhiteboardUITests: XCTestCase {
 
     func testWhiteboardIsWrittenOnWithoutEdgesAndStandsAsACardAmongPages() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-storageRoot", "whiteboard", "-drawingInput", "anyInput", "-resetStorage"]
+        app.launchArguments = ["-storageRoot", "whiteboard", "-drawingInput", "anyInput", "-resetStorage", "-freshWhiteboardTip"]
         app.launch()
         XCTAssertTrue(app.buttons["New"].firstMatch.waitForExistence(timeout: 30))
         app.buttons["New"].firstMatch.tap()
         let starter = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Whiteboard starter")).firstMatch
         XCTAssertTrue(starter.waitForExistence(timeout: 10), "the Whiteboard starter")
-        if !starter.isHittable { app.swipeLeft() }
+        XCTAssertTrue(starter.isHittable, "the Whiteboard starter stands beside Journal, without scrolling")
+        attach(app, "starters")
         starter.tap()
         app.buttons["Create"].firstMatch.tap()
 
         let board = app.element("page.canvas.1")
         XCTAssertTrue(board.waitForExistence(timeout: 15), "the notebook opens on its whiteboard")
         XCTAssertTrue(board.label.hasPrefix("Whiteboard"), board.label)
+
+        // The first time, a tip says what a whiteboard is and leads to the guide that names every button.
+        XCTAssertTrue(app.buttons["editor.board.tip.guide"].waitForExistence(timeout: 5), "the first whiteboard comes with a tip")
+        attach(app, "board-tip")
+        app.buttons["editor.board.tip.guide"].tap()
+        XCTAssertTrue(app.buttons["editor.board.guide.done"].waitForExistence(timeout: 5), "the guide")
+        XCTAssertTrue(app.staticTexts["Whiteboard Guide"].exists)
+        attach(app, "board-guide")
+        try audit(app, [.contrast, .elementDetection, .hitRegion, .sufficientElementDescription], screen: "whiteboard guide", modal: true, popover: true)
+        app.buttons["editor.board.guide.done"].tap()
+        app.buttons["editor.board.tip.done"].tap()
+        XCTAssertTrue(app.buttons["editor.board.tip.done"].waitForNonExistence(timeout: 5), "the tip is put away for good")
+        XCTAssertEqual(app.buttons["editor.board.everything"].label, "Show Everything")
+
         draw(on: board, from: CGVector(dx: 0.3, dy: 0.3), to: CGVector(dx: 0.6, dy: 0.32))
         draw(on: board, from: CGVector(dx: 0.3, dy: 0.4), to: CGVector(dx: 0.6, dy: 0.5))
         XCTAssertEqual(strokeCount(board), 2)
         attach(app, "board-written")
-        try audit(app, [.contrast, .elementDetection, .hitRegion, .sufficientElementDescription], screen: "whiteboard")
+        try audit(app, [.contrast, .elementDetection, .hitRegion, .sufficientElementDescription], screen: "whiteboard", bar: app.otherElements["editor.board.bar"])
 
         // Zoomed out, a corner of the screen is far from where the board was first written on.
         board.pinch(withScale: 0.3, velocity: -1)
@@ -52,9 +67,11 @@ final class WhiteboardUITests: XCTestCase {
         attach(app, "board-zoomed-out")
 
         app.buttons["More"].firstMatch.tap()
-        XCTAssertTrue(app.buttons["Show Everything"].waitForExistence(timeout: 5), "a board is fitted by what is on it")
-        XCTAssertTrue(app.buttons["Actual Size"].exists)
-        app.buttons["Show Everything"].tap()
+        XCTAssertTrue(app.buttons["Show Everything"].firstMatch.waitForExistence(timeout: 5), "a board is fitted by what is on it")
+        XCTAssertTrue(app.buttons["Actual Size"].firstMatch.exists)
+        app.buttons["Show Everything"].firstMatch.tap()
+        app.buttons["editor.board.actual"].tap()
+        app.buttons["editor.board.everything"].tap()
         attach(app, "board-everything")
 
         // An ordinary page after it: the pages are a stack again and the board is a card in it.

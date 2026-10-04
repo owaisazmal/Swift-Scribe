@@ -364,7 +364,9 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     private lazy var itemHold = UILongPressGestureRecognizer(target: self, action: #selector(heldPage))
     private lazy var tapeTap = UITapGestureRecognizer(target: self, action: #selector(tappedTape))
     /// The whiteboard that is open on its own, the zoom the stack of pages was left at, and where each board was left.
-    private var soloID: UUID?
+    private var soloID: UUID? {
+        didSet { if session.openBoard != soloID { session.openBoard = soloID } }
+    }
     private var stackZoom: CGFloat = 1
     private var boardViews: [UUID: (center: CGPoint, zoom: CGFloat)] = [:]
     private var isSolo: Bool { layout.solo != nil }

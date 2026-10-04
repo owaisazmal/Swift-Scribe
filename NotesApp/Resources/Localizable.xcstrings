@@ -3938,6 +3938,28 @@
         }
       }
     },
+    "A page, another whiteboard, a picture, a text box, a sticker or a link." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eine Seite, ein weiteres Whiteboard, ein Bild, ein Textfeld, ein Sticker oder ein Link."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una página, otra pizarra, una imagen, un cuadro de texto, una pegatina o un enlace."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une page, un autre tableau blanc, une image, une zone de texte, un autocollant ou un lien."
+          }
+        }
+      }
+    },
     "A quiet month" : {
       "localizations" : {
         "de" : {
@@ -3978,6 +4000,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "De A à Z"
+          }
+        }
+      }
+    },
+    "A whiteboard is a page with no edges. Write in any direction and it keeps going." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein Whiteboard ist eine Seite ohne Ränder. Schreib in jede Richtung, es geht immer weiter."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una pizarra es una página sin bordes. Escribe en cualquier dirección y sigue sin fin."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un tableau blanc est une page sans bords. Écrivez dans n’importe quelle direction, il continue."
           }
         }
       }
@@ -4828,6 +4872,28 @@
         }
       }
     },
+    "At the Top" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oben"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arriba"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En haut"
+          }
+        }
+      }
+    },
     "Back to %@" : {
       "localizations" : {
         "de" : {
@@ -5535,6 +5601,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Changer le papier…"
+          }
+        }
+      }
+    },
+    "Change the paper, find words, make flashcards, present, and choose what draws." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Papier ändern, Wörter suchen, Karteikarten erstellen, präsentieren und wählen, womit gezeichnet wird."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cambia el papel, busca palabras, crea tarjetas de estudio, presenta y elige con qué se dibuja."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changez le papier, recherchez des mots, créez des cartes mémoire, présentez et choisissez ce qui dessine."
           }
         }
       }
@@ -7453,6 +7541,28 @@
         }
       }
     },
+    "Drag with two fingers. If only Apple Pencil draws, one finger moves the whiteboard too." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mit zwei Fingern ziehen. Wenn nur der Apple Pencil zeichnet, bewegt auch ein Finger das Whiteboard."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arrastra con dos dedos. Si solo dibuja el Apple Pencil, un dedo también mueve la pizarra."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Faites glisser à deux doigts. Si seul l’Apple Pencil dessine, un doigt déplace aussi le tableau blanc."
+          }
+        }
+      }
+    },
     "Draw a line, circle, rectangle or triangle and hold still before lifting to straighten it, or draw a loop round ink and hold still to select it. Scribble back and forth over ink with a pen to erase it; Undo brings it back. For Double-Tap and Squeeze, “System Setting” follows Settings › Apple Pencil." : {
       "localizations" : {
         "de" : {
@@ -7867,6 +7977,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Chaque page en image…"
+          }
+        }
+      }
+    },
+    "Every page of the notebook. Among them a whiteboard is a card: tap the card to open it again." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle Seiten des Notizbuchs. Dazwischen ist ein Whiteboard eine Karte: Tippe auf die Karte, um es wieder zu öffnen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Todas las páginas del cuaderno. Entre ellas, una pizarra es una tarjeta: toca la tarjeta para abrirla de nuevo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toutes les pages du carnet. Parmi elles, un tableau blanc est une carte : touchez la carte pour le rouvrir."
           }
         }
       }
@@ -8998,6 +9130,28 @@
         }
       }
     },
+    "Goes back to writing size" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kehrt zur Schreibgröße zurück"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vuelve al tamaño de escritura"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revient à la taille d’écriture"
+          }
+        }
+      }
+    },
     "Good" : {
       "localizations" : {
         "de" : {
@@ -9016,6 +9170,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bien"
+          }
+        }
+      }
+    },
+    "Got It" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verstanden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entendido"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compris"
           }
         }
       }
@@ -11008,6 +11184,28 @@
         }
       }
     },
+    "Marks this page so it is easy to come back to." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Markiert diese Seite, damit du leicht zu ihr zurückfindest."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marca esta página para volver a ella fácilmente."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marque cette page pour y revenir facilement."
+          }
+        }
+      }
+    },
     "Match %lld of %lld, page %lld" : {
       "localizations" : {
         "de" : {
@@ -11670,6 +11868,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Déplacement vers la page %lld"
+          }
+        }
+      }
+    },
+    "Moving Around" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bewegen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Moverse"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se déplacer"
           }
         }
       }
@@ -13158,6 +13378,28 @@
         }
       }
     },
+    "On the Whiteboard" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auf dem Whiteboard"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En la pizarra"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sur le tableau blanc"
+          }
+        }
+      }
+    },
     "Once you have another notebook, you can link to it from here." : {
       "localizations" : {
         "de" : {
@@ -14162,6 +14404,28 @@
         }
       }
     },
+    "Page Number" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seitenzahl"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Número de página"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Numéro de page"
+          }
+        }
+      }
+    },
     "Page Size" : {
       "localizations" : {
         "de" : {
@@ -14532,6 +14796,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Image sur cette page…"
+          }
+        }
+      }
+    },
+    "Pinch to step back and see more, or to come closer and write small." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zuziehen zeigt mehr, Aufziehen holt dich näher heran, um klein zu schreiben."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pellizca para alejarte y ver más, o para acercarte y escribir pequeño."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pincez pour prendre du recul et voir plus, ou pour vous rapprocher et écrire petit."
           }
         }
       }
@@ -15554,6 +15840,28 @@
         }
       }
     },
+    "Records sound while you write, to play back along with your ink." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nimmt Ton auf, während du schreibst, und spielt ihn später zusammen mit deiner Tinte ab."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Graba el sonido mientras escribes, para reproducirlo junto con tu tinta."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enregistre le son pendant que vous écrivez, pour le réécouter avec votre encre."
+          }
+        }
+      }
+    },
     "Recovered %lld pages written just before the app last quit. They're at the end." : {
       "localizations" : {
         "de" : {
@@ -16408,6 +16716,28 @@
         }
       }
     },
+    "Returns to writing size, where you are looking." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kehrt zur Schreibgröße zurück, an der Stelle, die du gerade ansiehst."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vuelve al tamaño de escritura, en el punto que estás mirando."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revient à la taille d’écriture, à l’endroit que vous regardez."
+          }
+        }
+      }
+    },
     "Ribbon Banner" : {
       "localizations" : {
         "de" : {
@@ -16602,6 +16932,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Enregistrées dans les cartes"
+          }
+        }
+      }
+    },
+    "Saves the notebook and goes back to your shelves." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sichert das Notizbuch und kehrt zu deinen Regalen zurück."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guarda el cuaderno y vuelve a tus estantes."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enregistre le carnet et revient à vos étagères."
           }
         }
       }
@@ -17376,6 +17728,50 @@
         }
       }
     },
+    "Shows every page of the notebook" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zeigt alle Seiten des Notizbuchs"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muestra todas las páginas del cuaderno"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Affiche toutes les pages du carnet"
+          }
+        }
+      }
+    },
+    "Shows every page. Touch and hold it to go to a page by its number." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zeigt alle Seiten. Halte sie gedrückt, um über die Seitenzahl zu einer Seite zu gehen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muestra todas las páginas. Mantenlo pulsado para ir a una página por su número."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Affiche toutes les pages. Touchez-le longuement pour aller à une page par son numéro."
+          }
+        }
+      }
+    },
     "Shows it" : {
       "localizations" : {
         "de" : {
@@ -17394,6 +17790,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "L’affiche"
+          }
+        }
+      }
+    },
+    "Shows or hides the pens, the eraser and the lasso." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blendet Stifte, Radierer und Lasso ein oder aus."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muestra u oculta los bolígrafos, la goma y el lazo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Affiche ou masque les stylos, la gomme et le lasso."
           }
         }
       }
@@ -17944,6 +18362,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Crée un carnet avec votre papier par défaut et l’ouvre, prêt pour l’écriture."
+          }
+        }
+      }
+    },
+    "Steps back until everything on the whiteboard is in view." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zoomt heraus, bis alles auf dem Whiteboard zu sehen ist."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se aleja hasta que se ve todo lo que hay en la pizarra."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prend du recul jusqu’à ce que tout le contenu du tableau blanc soit visible."
           }
         }
       }
@@ -18890,6 +19330,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Étiquettes"
+          }
+        }
+      }
+    },
+    "Takes back the last thing you did, or does it again." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nimmt das zuletzt Getane zurück oder führt es erneut aus."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deshace lo último que hiciste, o lo vuelve a hacer."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Annule votre dernière action, ou la refait."
           }
         }
       }
@@ -20264,6 +20726,28 @@
         }
       }
     },
+    "This page has no edges." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Seite hat keine Ränder."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta página no tiene bordes."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette page n’a pas de bords."
+          }
+        }
+      }
+    },
     "This PDF is password protected. Unlock it in Files or Preview, then import it again." : {
       "localizations" : {
         "de" : {
@@ -20830,6 +21314,28 @@
         }
       }
     },
+    "Tools" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Werkzeuge"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Herramientas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Outils"
+          }
+        }
+      }
+    },
     "Top Level" : {
       "localizations" : {
         "de" : {
@@ -21380,6 +21886,28 @@
         }
       }
     },
+    "Undo and Redo" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Widerrufen und Wiederholen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deshacer y rehacer"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Annuler et rétablir"
+          }
+        }
+      }
+    },
     "Unfavourite" : {
       "localizations" : {
         "de" : {
@@ -21688,6 +22216,28 @@
         }
       }
     },
+    "What has been recorded in this notebook." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Was in diesem Notizbuch aufgenommen wurde."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lo que se ha grabado en este cuaderno."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce qui a été enregistré dans ce carnet."
+          }
+        }
+      }
+    },
     "What it answers" : {
       "localizations" : {
         "de" : {
@@ -21706,6 +22256,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ce qu'elle répond"
+          }
+        }
+      }
+    },
+    "What the Buttons Do" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Was die Tasten tun"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qué hacen los botones"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "À quoi servent les boutons"
           }
         }
       }
@@ -21794,6 +22366,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tableau blanc"
+          }
+        }
+      }
+    },
+    "Whiteboard Guide" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Whiteboard-Hilfe"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guía de la pizarra"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guide du tableau blanc"
           }
         }
       }
@@ -21992,6 +22586,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rédiger à partir de : %@"
+          }
+        }
+      }
+    },
+    "Write in any direction. Drag with two fingers to move, and pinch to zoom." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schreib in jede Richtung. Mit zwei Fingern ziehen bewegt die Seite, Auf- und Zuziehen zoomt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escribe en cualquier dirección. Arrastra con dos dedos para moverte y pellizca para ampliar."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Écrivez dans n’importe quelle direction. Faites glisser à deux doigts pour vous déplacer et pincez pour zoomer."
           }
         }
       }
@@ -22446,6 +23062,28 @@
         }
       }
     },
+    "Zoom" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zoomen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zoom"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zoom"
+          }
+        }
+      }
+    },
     "Zoom area" : {
       "localizations" : {
         "de" : {
@@ -22618,6 +23256,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Fenêtre de zoom, page %lld"
+          }
+        }
+      }
+    },
+    "Zooms out until everything on the whiteboard is in view" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zoomt heraus, bis alles auf dem Whiteboard zu sehen ist"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se aleja hasta que se ve todo lo que hay en la pizarra"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prend du recul jusqu’à ce que tout le contenu du tableau blanc soit visible"
           }
         }
       }

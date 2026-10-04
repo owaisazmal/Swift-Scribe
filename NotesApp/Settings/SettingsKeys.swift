@@ -28,6 +28,7 @@ enum SettingsKey {
     static let defaultPageSize = "defaultPageSize"
     static let librarySort = "librarySort"
     static let dailyJournalID = "dailyJournalID"
+    static let whiteboardTipSeen = "whiteboardTipSeen"
     static let dailyJournalPromptHidden = "dailyJournalPromptHidden"
     static let showsOnThisDay = "showsOnThisDay"
     static let onThisDayHiddenDay = "onThisDayHiddenDay"
