@@ -4,6 +4,430 @@
     "" : {
 
     },
+    "%@ · %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ · %2$@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ · %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ · %2$@"
+          }
+        }
+      }
+    },
+    "%lld cards" : {
+      "localizations" : {
+        "de" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Karte"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Karten"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld card"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld cards"
+                }
+              }
+            }
+          }
+        },
+        "es" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tarjeta"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tarjetas"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld carte"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld cartes"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld cards to review" : {
+      "localizations" : {
+        "de" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Karte zu wiederholen"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Karten zu wiederholen"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld card to review"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld cards to review"
+                }
+              }
+            }
+          }
+        },
+        "es" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tarjeta por repasar"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tarjetas por repasar"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld carte à revoir"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld cartes à revoir"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld due today" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld heute fällig"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld para hoy"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld à revoir aujourd'hui"
+          }
+        }
+      }
+    },
+    "%lld flashcards made" : {
+      "localizations" : {
+        "de" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Karteikarte erstellt"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Karteikarten erstellt"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld flashcard made"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld flashcards made"
+                }
+              }
+            }
+          }
+        },
+        "es" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tarjeta creada"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tarjetas creadas"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld carte créée"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld cartes créées"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld strips of tape have no card yet" : {
+      "localizations" : {
+        "de" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Klebestreifen hat noch keine Karte"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Klebestreifen haben noch keine Karte"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld strip of tape has no card yet"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld strips of tape have no card yet"
+                }
+              }
+            }
+          }
+        },
+        "es" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tira de cinta aún no tiene tarjeta"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tiras de cinta aún no tienen tarjeta"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld bande de ruban n'a pas encore de carte"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld bandes de ruban n'ont pas encore de carte"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld strokes erased" : {
+      "localizations" : {
+        "de" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Strich gelöscht"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Striche gelöscht"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld stroke erased"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld strokes erased"
+                }
+              }
+            }
+          }
+        },
+        "es" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld trazo borrado"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld trazos borrados"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld trait effacé"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld traits effacés"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "“%@” couldn't be deleted: %@" : {
       "localizations" : {
         "de" : {
@@ -54,24 +478,24 @@
         }
       }
     },
-    "“System Setting” follows Settings › Apple Pencil › Only Draw with Apple Pencil. With Straighten Shapes on, draw a line, circle, rectangle or triangle and hold still for a moment before lifting; Undo brings your own stroke back." : {
+    "“System Setting” follows Settings › Apple Pencil › Only Draw with Apple Pencil." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "„Systemeinstellung“ folgt Einstellungen › Apple Pencil › Nur mit Apple Pencil zeichnen. Ist „Formen begradigen“ aktiviert, zeichne eine Linie, einen Kreis, ein Rechteck oder ein Dreieck und halte kurz still, bevor du den Stift anhebst. „Widerrufen“ bringt deinen eigenen Strich zurück."
+            "value" : "„Systemeinstellung“ folgt Einstellungen › Apple Pencil › Nur mit Apple Pencil zeichnen."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "“Ajuste del sistema” sigue Ajustes › Apple Pencil › Dibujar solo con el Apple Pencil. Con Enderezar figuras activado, dibuja una línea, un círculo, un rectángulo o un triángulo y mantén el lápiz quieto un momento antes de levantarlo; Deshacer recupera tu trazo original."
+            "value" : "«Ajuste del sistema» sigue Ajustes › Apple Pencil › Dibujar solo con Apple Pencil."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "« Réglage système » suit Réglages › Apple Pencil › Dessiner seulement avec l’Apple Pencil. Lorsque « Redresser les formes » est activé, tracez une ligne, un cercle, un rectangle ou un triangle et restez immobile un instant avant de lever le crayon ; Annuler rétablit votre propre trait."
+            "value" : "« Réglage système » suit Réglages › Apple Pencil › Dessiner uniquement avec l’Apple Pencil."
           }
         }
       }
@@ -3404,6 +3828,28 @@
         }
       }
     },
+    "A clipping from the page" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein Ausschnitt der Seite"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un recorte de la página"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un extrait de la page"
+          }
+        }
+      }
+    },
     "A damaged file (%@) was set aside and kept. The notebook opened from its last good copy." : {
       "localizations" : {
         "de" : {
@@ -3734,6 +4180,28 @@
         }
       }
     },
+    "Add Summary" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zusammenfassung hinzufügen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añadir resumen"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter le résumé"
+          }
+        }
+      }
+    },
     "Add Text Box" : {
       "localizations" : {
         "de" : {
@@ -3818,6 +4286,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ajouter la page du jour"
+          }
+        }
+      }
+    },
+    "Add words, if you like" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Text hinzufügen, wenn du magst"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añade texto, si quieres"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajoutez du texte, si vous voulez"
           }
         }
       }
@@ -3986,6 +4476,28 @@
         }
       }
     },
+    "Again" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nochmal"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Otra vez"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "À revoir"
+          }
+        }
+      }
+    },
     "Alignment" : {
       "localizations" : {
         "de" : {
@@ -4004,6 +4516,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Alignement"
+          }
+        }
+      }
+    },
+    "All caught up" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alles erledigt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Todo al día"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tout est à jour"
+          }
+        }
+      }
+    },
+    "All caught up." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alles erledigt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Todo al día."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tout est à jour."
           }
         }
       }
@@ -4074,6 +4630,28 @@
         }
       }
     },
+    "Answer" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antwort"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Respuesta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réponse"
+          }
+        }
+      }
+    },
     "App Icon" : {
       "localizations" : {
         "de" : {
@@ -4092,6 +4670,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Icône de l’app"
+          }
+        }
+      }
+    },
+    "Apple Intelligence is still getting ready on this iPad. Try again in a little while." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence wird auf diesem iPad noch vorbereitet. Versuche es gleich noch einmal."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence aún se está preparando en este iPad. Inténtalo de nuevo dentro de un rato."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence est encore en préparation sur cet iPad. Réessayez dans un moment."
+          }
+        }
+      }
+    },
+    "Apple Pencil" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Pencil"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Pencil"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Pencil"
           }
         }
       }
@@ -4653,6 +5275,94 @@
         }
       }
     },
+    "Card %lld of %lld" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Karte %1$lld von %2$lld"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tarjeta %1$lld de %2$lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carte %1$lld sur %2$lld"
+          }
+        }
+      }
+    },
+    "Card Options" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kartenoptionen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opciones de la tarjeta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Options de la carte"
+          }
+        }
+      }
+    },
+    "Cards" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Karten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tarjetas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cartes"
+          }
+        }
+      }
+    },
+    "Cards come back here when it is time to see them again." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Karten kommen hierher zurück, wenn es Zeit ist, sie wiederzusehen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las tarjetas vuelven aquí cuando toca verlas de nuevo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les cartes reviennent ici quand il est temps de les revoir."
+          }
+        }
+      }
+    },
     "Centre" : {
       "localizations" : {
         "de" : {
@@ -4961,6 +5671,28 @@
         }
       }
     },
+    "Circle and Hold to Select" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Einkreisen und halten zum Auswählen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rodear y mantener para seleccionar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entourer et maintenir pour sélectionner"
+          }
+        }
+      }
+    },
     "Clear Text" : {
       "localizations" : {
         "de" : {
@@ -5045,6 +5777,72 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Effacer votre historique d’écriture ?"
+          }
+        }
+      }
+    },
+    "Clipping" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ausschnitt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recorte"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Extrait"
+          }
+        }
+      }
+    },
+    "Clipping from page %lld" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ausschnitt von Seite %lld"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recorte de la página %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Extrait de la page %lld"
+          }
+        }
+      }
+    },
+    "Clipping from the page" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ausschnitt der Seite"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recorte de la página"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Extrait de la page"
           }
         }
       }
@@ -5221,6 +6019,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Couleur"
+          }
+        }
+      }
+    },
+    "Comes back: %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kommt wieder: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vuelve: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revient : %@"
           }
         }
       }
@@ -5473,6 +6293,28 @@
         }
       }
     },
+    "Couldn't Write This" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Konnte nicht geschrieben werden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo escribir"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Écriture impossible"
+          }
+        }
+      }
+    },
     "Cover" : {
       "localizations" : {
         "de" : {
@@ -5491,6 +6333,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Couverture"
+          }
+        }
+      }
+    },
+    "Cover an answer with study tape and make a card from the strip, select handwriting and turn it into one, or write a card yourself. Each comes back when it is time to see it again." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Decke eine Antwort mit Lernklebeband ab und mache aus dem Streifen eine Karte, wähle Handschrift aus und verwandle sie in eine, oder schreibe selbst eine Karte. Jede kommt zurück, wenn es Zeit ist, sie wiederzusehen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tapa una respuesta con cinta de estudio y crea una tarjeta a partir de la tira, selecciona escritura y conviértela en una, o escribe una tarjeta tú mismo. Cada una vuelve cuando toca verla de nuevo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couvrez une réponse avec du ruban de révision et créez une carte à partir de la bande, sélectionnez de l'écriture pour en faire une, ou écrivez une carte vous-même. Chacune revient quand il est temps de la revoir."
           }
         }
       }
@@ -5871,6 +6735,72 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Supprimer"
+          }
+        }
+      }
+    },
+    "Delete Flashcard" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Karteikarte löschen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminar tarjeta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer la carte"
+          }
+        }
+      }
+    },
+    "Delete Flashcard…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Karteikarte löschen …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminar tarjeta…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer la carte…"
+          }
+        }
+      }
+    },
+    "Delete this flashcard?" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Karteikarte löschen?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Eliminar esta tarjeta?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer cette carte ?"
           }
         }
       }
@@ -6413,6 +7343,28 @@
         }
       }
     },
+    "Double-Tap" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Doppeltippen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Doble toque"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toucher deux fois"
+          }
+        }
+      }
+    },
     "Drag notebooks onto %@ in the sidebar, or start one here." : {
       "localizations" : {
         "de" : {
@@ -6457,6 +7409,28 @@
         }
       }
     },
+    "Draw a line, circle, rectangle or triangle and hold still before lifting to straighten it, or draw a loop round ink and hold still to select it. Scribble back and forth over ink with a pen to erase it; Undo brings it back. For Double-Tap and Squeeze, “System Setting” follows Settings › Apple Pencil." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zeichne eine Linie, einen Kreis, ein Rechteck oder ein Dreieck und halte vor dem Abheben still, um die Form zu begradigen, oder zeichne eine Schlaufe um Tinte und halte still, um sie auszuwählen. Kritzle mit einem Stift über Tinte hin und her, um sie zu löschen; „Widerrufen“ bringt sie zurück. Für Doppeltippen und Drücken folgt „Systemeinstellung“ den Einstellungen › Apple Pencil."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dibuja una línea, un círculo, un rectángulo o un triángulo y mantén el lápiz quieto antes de levantarlo para enderezarlo, o dibuja un lazo alrededor de la tinta y mantenlo quieto para seleccionarla. Garabatea de un lado a otro sobre la tinta con un bolígrafo para borrarla; Deshacer la recupera. Para Doble toque y Apretar, «Ajuste del sistema» sigue Ajustes › Apple Pencil."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tracez une ligne, un cercle, un rectangle ou un triangle et restez immobile avant de lever le crayon pour le redresser, ou tracez une boucle autour de l’encre et restez immobile pour la sélectionner. Gribouillez en va-et-vient sur l’encre avec un stylo pour l’effacer ; Annuler la rétablit. Pour Toucher deux fois et Presser, « Réglage système » suit Réglages › Apple Pencil."
+          }
+        }
+      }
+    },
     "Draw round ink on any page" : {
       "localizations" : {
         "de" : {
@@ -6497,6 +7471,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dessiner avec"
+          }
+        }
+      }
+    },
+    "Due" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fällig"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pendiente"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "À revoir"
           }
         }
       }
@@ -6607,6 +7603,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Plus tôt ce mois-ci"
+          }
+        }
+      }
+    },
+    "Easy" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Leicht"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fácil"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Facile"
+          }
+        }
+      }
+    },
+    "Edit Flashcard" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Karteikarte bearbeiten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Editar tarjeta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modifier la carte"
           }
         }
       }
@@ -6739,6 +7779,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ingénierie"
+          }
+        }
+      }
+    },
+    "Every card has been through your hands today." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Heute ist jede Karte durch deine Hände gegangen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hoy has repasado todas las tarjetas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toutes les cartes sont passées entre vos mains aujourd'hui."
           }
         }
       }
@@ -7366,6 +8428,214 @@
         }
       }
     },
+    "Flashcard Made" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Karteikarte erstellt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tarjeta creada"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carte créée"
+          }
+        }
+      }
+    },
+    "Flashcard made from the tape" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Karteikarte aus dem Klebeband erstellt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tarjeta creada a partir de la cinta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carte créée à partir du ruban"
+          }
+        }
+      }
+    },
+    "Flashcard saved" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Karteikarte gesichert"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tarjeta guardada"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carte enregistrée"
+          }
+        }
+      }
+    },
+    "Flashcards" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Karteikarten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tarjetas de estudio"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cartes mémoire"
+          }
+        }
+      }
+    },
+    "Flashcards: %lld cards to review" : {
+      "localizations" : {
+        "de" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Karteikarten: %lld Karte zu wiederholen"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Karteikarten: %lld Karten zu wiederholen"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Flashcards: %lld card to review"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Flashcards: %lld cards to review"
+                }
+              }
+            }
+          }
+        },
+        "es" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Tarjetas de estudio: %lld tarjeta por repasar"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Tarjetas de estudio: %lld tarjetas por repasar"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Cartes mémoire : %lld carte à revoir"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Cartes mémoire : %lld cartes à revoir"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Flashcards: all caught up. %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Karteikarten: alles erledigt. %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tarjetas de estudio: todo al día. %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cartes mémoire : tout est à jour. %@"
+          }
+        }
+      }
+    },
+    "Flashcards…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Karteikarten …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tarjetas de estudio…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cartes mémoire…"
+          }
+        }
+      }
+    },
     "Fluorescent pink" : {
       "localizations" : {
         "de" : {
@@ -7476,6 +8746,82 @@
         }
       }
     },
+    "From %lld notebooks" : {
+      "localizations" : {
+        "de" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Aus %lld Notizbuch"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Aus %lld Notizbüchern"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "From %lld notebook"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "From %lld notebooks"
+                }
+              }
+            }
+          }
+        },
+        "es" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "De %lld cuaderno"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "De %lld cuadernos"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "De %lld carnet"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "De %lld carnets"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "From Photo…" : {
       "localizations" : {
         "de" : {
@@ -7542,6 +8888,28 @@
         }
       }
     },
+    "Go Through Them All Again" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle noch einmal durchgehen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Repasarlas todas otra vez"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les revoir toutes"
+          }
+        }
+      }
+    },
     "Go to page" : {
       "localizations" : {
         "de" : {
@@ -7582,6 +8950,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aller à la page"
+          }
+        }
+      }
+    },
+    "Good" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gut"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bien"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bien"
           }
         }
       }
@@ -7824,6 +9214,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Masqué"
+          }
+        }
+      }
+    },
+    "Hide Answer" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antwort ausblenden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ocultar respuesta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Masquer la réponse"
           }
         }
       }
@@ -8088,6 +9500,158 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "dans %@"
+          }
+        }
+      }
+    },
+    "In %lld days" : {
+      "localizations" : {
+        "de" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "In %lld Tag"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "In %lld Tagen"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "In %lld day"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "In %lld days"
+                }
+              }
+            }
+          }
+        },
+        "es" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "En %lld día"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "En %lld días"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Dans %lld jour"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Dans %lld jours"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "In %lld months" : {
+      "localizations" : {
+        "de" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "In %lld Monat"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "In %lld Monaten"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "In %lld month"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "In %lld months"
+                }
+              }
+            }
+          }
+        },
+        "es" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "En %lld mes"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "En %lld meses"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Dans %lld mois"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Dans %lld mois"
+                }
+              }
+            }
           }
         }
       }
@@ -8444,6 +10008,28 @@
         }
       }
     },
+    "Key Points" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kernpunkte"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Puntos clave"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Points clés"
+          }
+        }
+      }
+    },
     "Kraft" : {
       "localizations" : {
         "de" : {
@@ -8704,6 +10290,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Laissez vide pour nommer le lien d’après ce qu’il ouvre."
+          }
+        }
+      }
+    },
+    "Leave Out Question %lld" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Frage %lld weglassen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Omitir la pregunta %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Écarter la question %lld"
           }
         }
       }
@@ -9286,6 +10894,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Créé avec une version plus récente de Swift Scribe : il ne peut être que consulté ici."
+          }
+        }
+      }
+    },
+    "Make Cards from Study Tape" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Karten aus Lernklebeband erstellen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Crear tarjetas con la cinta de estudio"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Créer des cartes à partir du ruban de révision"
+          }
+        }
+      }
+    },
+    "Make Flashcard" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Karteikarte erstellen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Crear tarjeta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Créer une carte"
           }
         }
       }
@@ -10242,6 +11894,28 @@
         }
       }
     },
+    "New Flashcard" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neue Karteikarte"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nueva tarjeta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouvelle carte"
+          }
+        }
+      }
+    },
     "New Folder" : {
       "localizations" : {
         "de" : {
@@ -10484,6 +12158,28 @@
         }
       }
     },
+    "Next on %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nächste am %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las próximas, el %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prochaines : %@"
+          }
+        }
+      }
+    },
     "Next Page" : {
       "localizations" : {
         "de" : {
@@ -10568,6 +12264,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucun favori pour l’instant"
+          }
+        }
+      }
+    },
+    "No flashcards yet." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noch keine Karteikarten."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aún no hay tarjetas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pas encore de cartes."
           }
         }
       }
@@ -10814,6 +12532,28 @@
         }
       }
     },
+    "None due today" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Heute keine fällig"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ninguna para hoy"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune à revoir aujourd'hui"
+          }
+        }
+      }
+    },
     "Not on a shelf" : {
       "localizations" : {
         "de" : {
@@ -10832,6 +12572,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sur aucune étagère"
+          }
+        }
+      }
+    },
+    "Not on This iPad Yet" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noch nicht auf diesem iPad"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aún no en este iPad"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pas encore sur cet iPad"
           }
         }
       }
@@ -11198,6 +12960,50 @@
         }
       }
     },
+    "Nothing is due" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nichts fällig"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nada pendiente"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien à revoir"
+          }
+        }
+      }
+    },
+    "Nothing is due." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nichts fällig."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nada pendiente."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien à revoir."
+          }
+        }
+      }
+    },
     "Nothing on %@ yet." : {
       "localizations" : {
         "de" : {
@@ -11440,6 +13246,28 @@
         }
       }
     },
+    "Open Its Page" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zugehörige Seite öffnen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir su página"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir sa page"
+          }
+        }
+      }
+    },
     "Open Link" : {
       "localizations" : {
         "de" : {
@@ -11568,6 +13396,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ouvre l’adresse dans votre navigateur. Maintenez le doigt pour déplacer ou redimensionner."
+          }
+        }
+      }
+    },
+    "Opens the cards to study" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Öffnet die Karten zum Lernen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abre las tarjetas para estudiar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvre les cartes à étudier"
           }
         }
       }
@@ -12796,6 +14646,28 @@
         }
       }
     },
+    "Practice Questions" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Übungsfragen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preguntas de práctica"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questions d'entraînement"
+          }
+        }
+      }
+    },
     "Present" : {
       "localizations" : {
         "de" : {
@@ -13198,6 +15070,50 @@
         }
       }
     },
+    "Question" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Frage"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pregunta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Question"
+          }
+        }
+      }
+    },
+    "Question %lld" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Frage %lld"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pregunta %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Question %lld"
+          }
+        }
+      }
+    },
     "Question Mark" : {
       "localizations" : {
         "de" : {
@@ -13216,6 +15132,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Point d’interrogation"
+          }
+        }
+      }
+    },
+    "Questions ready" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fragen fertig"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preguntas listas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questions prêtes"
           }
         }
       }
@@ -13304,6 +15242,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Lecture de votre écriture…"
+          }
+        }
+      }
+    },
+    "Reading your notes…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deine Notizen werden gelesen …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Leyendo tus notas…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lecture de vos notes…"
           }
         }
       }
@@ -13688,6 +15648,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Supprimer le signet"
+          }
+        }
+      }
+    },
+    "Remove Clipping" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ausschnitt entfernen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quitar recorte"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer l'extrait"
           }
         }
       }
@@ -14492,6 +16474,50 @@
         }
       }
     },
+    "Save %lld as Flashcards" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld als Karteikarten sichern"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guardar %lld como tarjetas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enregistrer %lld comme cartes"
+          }
+        }
+      }
+    },
+    "Saved to Flashcards" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In Karteikarten gesichert"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guardadas en las tarjetas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enregistrées dans les cartes"
+          }
+        }
+      }
+    },
     "Scan %@" : {
       "localizations" : {
         "de" : {
@@ -14554,6 +16580,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Numériser des documents…"
+          }
+        }
+      }
+    },
+    "Scribble Erase" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Durch Kritzeln löschen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Borrar con garabato"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Effacer par gribouillage"
+          }
+        }
+      }
+    },
+    "Scribble to Erase" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kritzeln zum Löschen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Garabatear para borrar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gribouiller pour effacer"
           }
         }
       }
@@ -14998,6 +17068,28 @@
         }
       }
     },
+    "Show Answer" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antwort zeigen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar respuesta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher la réponse"
+          }
+        }
+      }
+    },
     "Show Folders Inside" : {
       "localizations" : {
         "de" : {
@@ -15038,6 +17130,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Afficher « Ce jour-là »"
+          }
+        }
+      }
+    },
+    "Show or Hide Tools" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Werkzeuge ein- oder ausblenden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar u ocultar herramientas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher ou masquer les outils"
           }
         }
       }
@@ -15570,6 +17684,28 @@
         }
       }
     },
+    "Squeeze" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drücken"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apretar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Presser"
+          }
+        }
+      }
+    },
     "Star" : {
       "localizations" : {
         "de" : {
@@ -16032,6 +18168,160 @@
         }
       }
     },
+    "Study" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lernen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estudiar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Étudier"
+          }
+        }
+      }
+    },
+    "Study Anyway" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trotzdem lernen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estudiar igualmente"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Étudier quand même"
+          }
+        }
+      }
+    },
+    "Study Guide" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lernhilfe"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guía de estudio"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guide d'étude"
+          }
+        }
+      }
+    },
+    "Study guides are written by Apple Intelligence on the iPad itself, and this iPad doesn't have it. Swift Scribe never sends your notes anywhere to be read." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lernhilfen werden von Apple Intelligence auf dem iPad selbst geschrieben, und dieses iPad hat es nicht. Swift Scribe sendet deine Notizen nie irgendwohin, um sie zu lesen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las guías de estudio las escribe Apple Intelligence en el propio iPad, y este iPad no lo tiene. Swift Scribe nunca envía tus notas a ningún sitio para leerlas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les guides d'étude sont rédigés par Apple Intelligence sur l'iPad lui-même, et cet iPad n'en dispose pas. Swift Scribe n'envoie jamais vos notes ailleurs pour les lire."
+          }
+        }
+      }
+    },
+    "Study guides are written by Apple Intelligence on the iPad itself, which needs iPadOS 26 or later. Your notes never leave it." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lernhilfen werden von Apple Intelligence auf dem iPad selbst geschrieben, wofür iPadOS 26 oder neuer nötig ist. Deine Notizen verlassen es nie."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las guías de estudio las escribe Apple Intelligence en el propio iPad, que necesita iPadOS 26 o posterior. Tus notas nunca salen de él."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les guides d'étude sont rédigés par Apple Intelligence sur l'iPad lui-même, ce qui nécessite iPadOS 26 ou ultérieur. Vos notes ne le quittent jamais."
+          }
+        }
+      }
+    },
+    "Study guides are written by Apple Intelligence on the iPad itself. Turn it on in Settings, under Apple Intelligence and Siri, and come back. Your notes never leave the iPad." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lernhilfen werden von Apple Intelligence auf dem iPad selbst geschrieben. Schalte es in den Einstellungen unter „Apple Intelligence & Siri“ ein und komm zurück. Deine Notizen verlassen das iPad nie."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las guías de estudio las escribe Apple Intelligence en el propio iPad. Actívalo en Ajustes, en Apple Intelligence y Siri, y vuelve. Tus notas nunca salen del iPad."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les guides d'étude sont rédigés par Apple Intelligence sur l'iPad lui-même. Activez-le dans Réglages, sous Apple Intelligence et Siri, puis revenez. Vos notes ne quittent jamais l'iPad."
+          }
+        }
+      }
+    },
+    "Study Guide…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lernhilfe …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guía de estudio…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guide d'étude…"
+          }
+        }
+      }
+    },
     "Study tape" : {
       "localizations" : {
         "de" : {
@@ -16076,6 +18366,94 @@
         }
       }
     },
+    "Study tape on page %lld" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lernklebeband auf Seite %lld"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cinta de estudio en la página %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ruban de révision page %lld"
+          }
+        }
+      }
+    },
+    "Study Them Anyway" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trotzdem lernen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estudiarlas igualmente"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les étudier quand même"
+          }
+        }
+      }
+    },
+    "Summary" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zusammenfassung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Resumen"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Résumé"
+          }
+        }
+      }
+    },
+    "Summary ready" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zusammenfassung fertig"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Resumen listo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Résumé prêt"
+          }
+        }
+      }
+    },
     "Sun" : {
       "localizations" : {
         "de" : {
@@ -16094,6 +18472,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Soleil"
+          }
+        }
+      }
+    },
+    "Swap Question and Answer" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Frage und Antwort tauschen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Intercambiar pregunta y respuesta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Échanger la question et la réponse"
           }
         }
       }
@@ -16270,6 +18670,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Swift Scribe conserve la liste des jours où vous avez écrit et des pages concernées, sur cet appareil uniquement. Elle n’est jamais partagée."
+          }
+        }
+      }
+    },
+    "Switch to Eraser" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zum Radiergummi wechseln"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cambiar al borrador"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Passer à la gomme"
           }
         }
       }
@@ -16736,6 +19158,28 @@
         }
       }
     },
+    "The card couldn't be saved" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Karte konnte nicht gesichert werden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo guardar la tarjeta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La carte n'a pas pu être enregistrée"
+          }
+        }
+      }
+    },
     "The file couldn't be read." : {
       "localizations" : {
         "de" : {
@@ -16940,6 +19384,72 @@
         }
       }
     },
+    "The model on this iPad can't read the language of these notes yet." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Modell auf diesem iPad kann die Sprache dieser Notizen noch nicht lesen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El modelo de este iPad aún no puede leer el idioma de estas notas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le modèle de cet iPad ne sait pas encore lire la langue de ces notes."
+          }
+        }
+      }
+    },
+    "The model on this iPad wouldn't write about these notes." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Modell auf diesem iPad wollte nicht über diese Notizen schreiben."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El modelo de este iPad no quiso escribir sobre estas notas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le modèle de cet iPad n'a pas voulu écrire sur ces notes."
+          }
+        }
+      }
+    },
+    "The next cards come back on %@." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die nächsten Karten kommen am %@ wieder."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las próximas tarjetas vuelven el %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les prochaines cartes reviennent %@."
+          }
+        }
+      }
+    },
     "The note couldn't be created" : {
       "localizations" : {
         "de" : {
@@ -17046,6 +19556,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "La page en train d’être écrite, en boucle"
+          }
+        }
+      }
+    },
+    "The page it was made from stays as it is." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Seite, von der sie stammt, bleibt, wie sie ist."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La página de la que salió se queda como está."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La page dont elle vient reste telle quelle."
           }
         }
       }
@@ -17244,6 +19776,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Il n’y a rien dans votre calendrier aujourd’hui."
+          }
+        }
+      }
+    },
+    "There isn't enough writing here to study from yet." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hier steht noch nicht genug zum Lernen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aún no hay suficiente texto aquí para estudiar."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il n'y a pas encore assez de texte ici pour étudier."
+          }
+        }
+      }
+    },
+    "These notes are too long for the model on this iPad to read at once." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Notizen sind zu lang, als dass das Modell auf diesem iPad sie auf einmal lesen könnte."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estas notas son demasiado largas para que el modelo de este iPad las lea de una vez."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ces notes sont trop longues pour que le modèle de cet iPad les lise d'un coup."
           }
         }
       }
@@ -18024,6 +20600,28 @@
         }
       }
     },
+    "Tomorrow" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Morgen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mañana"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demain"
+          }
+        }
+      }
+    },
     "Took “%@” off its shelf" : {
       "localizations" : {
         "de" : {
@@ -18518,6 +21116,28 @@
         }
       }
     },
+    "Turn Card Over" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Karte umdrehen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dar la vuelta a la tarjeta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retourner la carte"
+          }
+        }
+      }
+    },
     "Turn Ink into Text" : {
       "localizations" : {
         "de" : {
@@ -18580,6 +21200,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Désactiver « Ce jour-là »"
+          }
+        }
+      }
+    },
+    "Turns back to the question" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dreht zurück zur Frage"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vuelve a la pregunta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revient à la question"
+          }
+        }
+      }
+    },
+    "Turns the card over" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dreht die Karte um"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Da la vuelta a la tarjeta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retourne la carte"
           }
         }
       }
@@ -18914,6 +21578,50 @@
         }
       }
     },
+    "What it answers" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Was sie antwortet"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lo que responde"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce qu'elle répond"
+          }
+        }
+      }
+    },
+    "What the card asks" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Was die Karte fragt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lo que pregunta la tarjeta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce que demande la carte"
+          }
+        }
+      }
+    },
     "What you want to say on this page. Only you see it, beside the page, while you present." : {
       "localizations" : {
         "de" : {
@@ -18958,6 +21666,28 @@
         }
       }
     },
+    "Whole Notebook" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ganzes Notizbuch"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Todo el cuaderno"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tout le carnet"
+          }
+        }
+      }
+    },
     "Wide Ruled" : {
       "localizations" : {
         "de" : {
@@ -18998,6 +21728,94 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Écran large"
+          }
+        }
+      }
+    },
+    "Write a Card" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eine Karte schreiben"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escribir una tarjeta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Écrire une carte"
+          }
+        }
+      }
+    },
+    "Write From" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schreiben aus"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escribir a partir de"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rédiger à partir de"
+          }
+        }
+      }
+    },
+    "Write from: %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schreiben aus: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escribir a partir de: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rédiger à partir de : %@"
+          }
+        }
+      }
+    },
+    "Write It Again" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neu schreiben"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escribirlo de nuevo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réécrire"
           }
         }
       }
@@ -19068,6 +21886,28 @@
         }
       }
     },
+    "Writing questions from your notes…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fragen werden aus deinen Notizen geschrieben …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escribiendo preguntas a partir de tus notas…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rédaction de questions à partir de vos notes…"
+          }
+        }
+      }
+    },
     "Written in notebooks since deleted." : {
       "localizations" : {
         "de" : {
@@ -19086,6 +21926,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Écrites dans des carnets supprimés depuis."
+          }
+        }
+      }
+    },
+    "Written on this iPad from what your notes say. Nothing was sent anywhere. Check it against your notes: it can be wrong." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auf diesem iPad aus dem geschrieben, was in deinen Notizen steht. Nichts wurde irgendwohin gesendet. Vergleiche es mit deinen Notizen: Es kann falsch sein."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escrito en este iPad a partir de lo que dicen tus notas. No se envió nada a ningún sitio. Compáralo con tus notas: puede equivocarse."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rédigé sur cet iPad à partir de ce que disent vos notes. Rien n'a été envoyé ailleurs. Vérifiez avec vos notes : il peut se tromper."
           }
         }
       }

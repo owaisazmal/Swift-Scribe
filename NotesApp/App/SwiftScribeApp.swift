@@ -36,6 +36,7 @@ struct ScribeRoot: View {
         .environment(app)
         .environment(app.library)
         .environment(app.activity)
+        .environment(app.flashcards)
         .modelContainer(app.container)
         .task {
             #if DEBUG

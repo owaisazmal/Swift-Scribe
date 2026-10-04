@@ -267,6 +267,39 @@ enum HandwritingSeed {
     }
 }
 
+/// A notebook of typed notes with a strip of study tape and three flashcards, two of them due (`-seedStudy`).
+enum StudySeed {
+    static let notes = """
+        Mitochondria make ATP, the cell's energy.
+        Ribosomes build proteins from amino acids.
+        The nucleus holds the cell's DNA.
+        Chloroplasts turn light into sugar in plants.
+        The cell membrane decides what goes in and out.
+        """
+
+    static func write(root: StorageRoot) async {
+        let paper = PageDefaults(template: .dotted, paperColor: .ivory, pageSize: .letter)
+        var page = paper.newPage()
+        var box = TextBox(string: notes)
+        box.fontSize = 17
+        let width: CGFloat = 400
+        page.items = [PageItem(content: .text(box), center: CGPoint(x: 280, y: 220), size: CGSize(width: width, height: box.height(width: width))),
+                      PageItem(content: .tape(.mustard), center: CGPoint(x: 240, y: 178), size: CGSize(width: 120, height: 24))]
+        var manifest = NotebookManifest(title: "Biology", defaults: paper, pages: [page, paper.newPage()])
+        manifest.cover.cloth = .moss
+        let package = NotebookPackage(root: root, id: manifest.id)
+        try? await package.create(manifest)
+        let ink = PKDrawing(strokes: BlockLetters.strokes("HELLO", origin: CGPoint(x: 90, y: 420), from: Date.now.addingTimeInterval(-600)))
+        _ = try? await package.write(SaveSnapshot(manifest: manifest, ink: [page.id: ink]))
+        var later = Flashcard(front: CardSide(text: "What does the nucleus hold?"), back: CardSide(text: "The cell's DNA"), pageID: page.id)
+        later = CardSchedule.graded(later, .easy)
+        let cards = [Flashcard(front: CardSide(text: "What makes ATP?"), back: CardSide(text: "Mitochondria"), pageID: page.id),
+                     Flashcard(front: CardSide(text: "What do ribosomes build?"), back: CardSide(text: "Proteins, from amino acids"), pageID: page.id),
+                     later]
+        try? CardFiles.write(cards, to: package.url)
+    }
+}
+
 enum LibrarySeed {
     /// Writes `count` notebooks with a mix of cover styles and a few folders, for scrolling tests.
     static func write(count: Int, root: StorageRoot) async {

@@ -12,6 +12,10 @@ struct ScribeSettingsView: View {
     @AppStorage(SettingsKey.dailyJournalID) private var journalID = ""
     @AppStorage(SettingsKey.showsOnThisDay) private var showsOnThisDay = true
     @AppStorage(SettingsKey.snapsShapes) private var snapsShapes = true
+    @AppStorage(SettingsKey.scribbleErases) private var scribbleErases = true
+    @AppStorage(SettingsKey.circleSelects) private var circleSelects = true
+    @AppStorage(SettingsKey.pencilDoubleTap) private var pencilDoubleTap: PencilAction = .system
+    @AppStorage(SettingsKey.pencilSqueeze) private var pencilSqueeze: PencilAction = .system
     @AppStorage(SettingsKey.journalAgenda) private var printsAgenda = false
     @AppStorage(SettingsKey.spotlight) private var showsInSpotlight = true
     @State private var agendaMessage: String?
@@ -38,11 +42,31 @@ struct ScribeSettingsView: View {
                     Picker("Draw With", selection: $drawingInput) {
                         ForEach(DrawingInput.allCases) { Text($0.displayName).tag($0) }
                     }
-                    Toggle("Straighten Shapes", isOn: $snapsShapes)
                 } header: {
                     SettingsNote("Input")
                 } footer: {
-                    SettingsNote("“System Setting” follows Settings › Apple Pencil › Only Draw with Apple Pencil. With Straighten Shapes on, draw a line, circle, rectangle or triangle and hold still for a moment before lifting; Undo brings your own stroke back.")
+                    SettingsNote("“System Setting” follows Settings › Apple Pencil › Only Draw with Apple Pencil.")
+                }
+                .listRowBackground(Color.surface)
+
+                Section {
+                    Toggle("Straighten Shapes", isOn: $snapsShapes)
+                    Toggle("Circle and Hold to Select", isOn: $circleSelects)
+                        .accessibilityIdentifier("settings.pencil.circle")
+                    Toggle("Scribble to Erase", isOn: $scribbleErases)
+                        .accessibilityIdentifier("settings.pencil.scribble")
+                    Picker("Double-Tap", selection: $pencilDoubleTap) {
+                        ForEach(PencilAction.allCases) { Text($0.displayName).tag($0) }
+                    }
+                    .accessibilityIdentifier("settings.pencil.doubleTap")
+                    Picker("Squeeze", selection: $pencilSqueeze) {
+                        ForEach(PencilAction.allCases) { Text($0.displayName).tag($0) }
+                    }
+                    .accessibilityIdentifier("settings.pencil.squeeze")
+                } header: {
+                    SettingsNote("Apple Pencil")
+                } footer: {
+                    SettingsNote("Draw a line, circle, rectangle or triangle and hold still before lifting to straighten it, or draw a loop round ink and hold still to select it. Scribble back and forth over ink with a pen to erase it; Undo brings it back. For Double-Tap and Squeeze, “System Setting” follows Settings › Apple Pencil.")
                 }
                 .listRowBackground(Color.surface)
 
@@ -265,6 +289,7 @@ struct ScribeSettingsView: View {
             do {
                 let summary = try await store.restoreBackup(from: url)
                 await activity.load()
+                await AppModel.shared.flashcards.loadNewNotebooks()
                 backupMessage = summary.message
             } catch {
                 backupMessage = error.localizedDescription

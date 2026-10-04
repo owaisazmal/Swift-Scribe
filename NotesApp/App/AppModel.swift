@@ -14,6 +14,7 @@ final class AppModel {
     let container: ModelContainer
     let library: LibraryStore
     let activity: WritingActivity
+    let flashcards: FlashcardLibrary
     let sync: SyncCenter
     let spotlight: SpotlightIndexer
     private(set) var phase: Phase = .starting
@@ -31,12 +32,20 @@ final class AppModel {
         indexWasRecovered = recovered
         library = LibraryStore(root: root, context: container.mainContext)
         activity = WritingActivity(root: root)
+        flashcards = FlashcardLibrary(root: root)
         sync = SyncCenter(root: root)
         spotlight = SpotlightIndexer(container: container)
-        library.onPermanentlyDeleted = { [activity] in activity.forget(notebooks: $0) }
+        library.onPermanentlyDeleted = { [activity, flashcards] in
+            activity.forget(notebooks: $0)
+            flashcards.forget(notebooks: $0)
+        }
         sync.busy = { Set(DocumentRegistry.shared.openDocuments.map(\.id)) }
-        sync.onLibraryChanged = { [library] _ in await library.reloadFromDisk() }
-        library.onIndexSaved = { [sync, spotlight, weak library] in
+        sync.onLibraryChanged = { [library, flashcards] _ in
+            await library.reloadFromDisk()
+            await flashcards.load()
+        }
+        library.onIndexSaved = { [sync, spotlight, flashcards, weak library] in
+            Task { await flashcards.loadNewNotebooks() }
             sync.schedule()
             if let library { spotlight.schedule(library) }
         }
@@ -63,6 +72,7 @@ final class AppModel {
             if LaunchOptions.arguments.contains("-seedLongPDF") { await LibrarySeed.writeLongPDF(root: root) }
             if LaunchOptions.arguments.contains("-seedReplay") { await ReplaySeed.write(root: root) }
             if LaunchOptions.arguments.contains("-seedHandwriting") { await HandwritingSeed.write(root: root) }
+            if LaunchOptions.arguments.contains("-seedStudy") { await StudySeed.write(root: root) }
             await DailyJournal.seedForTests(root: root)
         }
         if LaunchOptions.arguments.contains("-seedActivity") { await WritingActivity.seedForTests(root: root) }
@@ -77,6 +87,7 @@ final class AppModel {
         await LibraryIndex.refresh(root: root, context: container.mainContext, full: indexWasRecovered || indexSchema < LibraryIndex.schemaNumber)
         if indexSchema != LibraryIndex.schemaNumber { UserDefaults.standard.set(LibraryIndex.schemaNumber, forKey: SettingsKey.indexSchema) }
         await activity.load()
+        await flashcards.load()
         library.purgeExpiredTrash()
         phase = .ready
         spotlight.schedule(library)

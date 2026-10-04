@@ -121,6 +121,20 @@ A's one weakness is simulator footprint at 5×. We addressed it with the measure
 - **A tap lifts it.** A tape view takes the touches that land on it, so nothing is written on tape and a tap never leaves a dot, whether fingers draw or not. One tap recogniser on the page stack, which only begins over tape, toggles it for a finger, the Pencil or a pointer; touch and hold still picks it up to move, and the side grip lengthens it.
 - **Lifting isn't saved.** `EditorSession.liftedTapes` is the set of strips lifted for now. It never reaches the document, so there is no undo step and nothing to save, and a notebook always opens with every strip in place. A lifted strip is drawn as a dashed outline so it can be found and put back. While presenting, the page sent to a second screen is rendered without the lifted strips.
 
+## Flashcards
+
+- **Where they are kept.** A notebook's cards are `cards.json` beside its manifest (`FlashcardFile`: a version and the cards), and their clippings are PNGs in `cards/`. Nothing in the manifest names them, so the document never writes them and the asset collector never sees them; a duplicate, a backup and a sync carry them because they copy the whole package. `CardFiles` does the reading and writing: a file that won't decode is set aside as `.corrupt`, a file from a newer version can be studied but is never written, and a write is refused once the package's manifest is gone, so a review can't bring back a deleted notebook.
+- **One library.** `FlashcardLibrary` (main actor, observable, owned by `AppModel`) reads every package's cards at launch, again after a sync or restore, and picks up new packages after each index save. Changes are applied in memory and written by one actor in order. The library desk card and a notebook's deck sheet both read from it; locked and deleted notebooks are left out by whoever asks.
+- **The schedule.** `CardSchedule` is SM-2 with three answers. Good waits 1 day, then 3, then the last wait times the card's ease (2.5 to start). Easy waits 4 days at first, then the wait times ease times 1.3, and raises the ease by 0.15. Again resets the wait, lowers the ease by 0.2 (never below 1.3) and counts a lapse if the card had been learned. Due dates are day keys in the user's calendar, so a card is due on a day, not at an hour. `ReviewSession` puts a forgotten card back at the end of the sitting.
+- **Clippings.** `CardClipping` renders the page with `PageRenderer` at 2x and crops it. A tape card's region is the strip plus the line it sits in; its answer lifts only that strip and draws the lifted outline in its place. Selected handwriting is drawn alone on its page's paper.
+
+## Study guide
+
+- **The words.** `StudyGuide.text` saves the notebook, has `HandwritingIndexer` read any page whose text is out of date, and joins the pages' text files without their stamps; for a recording it is the transcript's text.
+- **The model.** `StudyModel` is a protocol with two questions: the key points of a text, and questions with answers about it. `AppleStudyModel` asks Apple's on-device model (Foundation Models, iPadOS 26 and later) through guided generation, a fresh session for each piece. `StudyGuide.status` says why there is none (system too old, device not eligible, turned off, still downloading), and the sheet then explains instead of offering anything.
+- **Long notes.** The model reads about 4,000 tokens at once, so `StudyGuide.chunks` cuts the text between lines into pieces of 3,200 characters. A summary takes up to five points from each piece and then asks for the most important of those; questions are spread evenly over the pieces. A piece the model still finds too long is read as two halves.
+- **Tests** use `ScriptedStudyModel` (`-fakeModel`), which answers with the notes' own lines, and `-noModel` for the sheet's explanation.
+
 ## Focus and presenting
 
 - `EditorSession.mode` is writing, focus or presenting. Focus hides the navigation bar, status bar and ribbons and leaves the tool picker. Presenting also hides the tool picker, turns drawing off, shows one whole page at a time (extra scroll inset lets the first and last page centre) and dims its neighbours.
@@ -244,6 +258,8 @@ ink/<pageID>.pkdrawing page-local ink, one file per page
 assets/                imported PDFs, photos, audio
 thumbs/                page thumbnails keyed by ink hash and page appearance
 text/<pageID>.txt      recognised handwriting and PDF text, stamped with the ink hash it came from
+cards.json             the notebook's flashcards and when each is next due
+cards/                 clippings shown on flashcards (PNG)
 ```
 
 ### Writing

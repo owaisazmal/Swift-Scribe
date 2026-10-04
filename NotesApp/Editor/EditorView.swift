@@ -21,9 +21,11 @@ protocol EditorCanvasControlling: AnyObject {
     func showReplay(_ timeline: ReplayTimeline?, at time: TimeInterval)
     func paneBecameActive()
     func setSelectingInk(_ selecting: Bool)
+    func catchInk(inside outline: [CGPoint])
     func duplicateInkSelection()
     func deleteInkSelection()
     func selectedInk() -> [PKDrawing]
+    func selectedInkByPage() -> [(pageID: UUID, ink: PKDrawing)]
     func replaceInkSelection(with text: String) -> ItemSelection?
     func tapesDidChange()
     func setFinding(_ finding: Bool)
@@ -85,6 +87,8 @@ final class EditorSession {
     }
     /// Called when a touch lands on the pages, so a window showing two notebooks knows which one is being worked on.
     @ObservationIgnored var onTouchDown: (() -> Void)?
+    /// Whether this is the pane being worked in: a double-tap of the Pencil reaches both panes of a window.
+    @ObservationIgnored var isActivePane: () -> Bool = { true }
     @ObservationIgnored var openURL: (URL) -> Void = { UIApplication.shared.open($0) }
     /// Opens another notebook, at a page if the link names one; the last value is the page the link sits on.
     @ObservationIgnored var openNotebook: ((UUID, UUID?, UUID) -> Void)?
@@ -130,6 +134,13 @@ final class EditorSession {
         canvas?.setPresenting(newMode == .presenting)
         if newMode == .selecting { canvas?.setSelectingInk(true) }
         if newMode == .finding { canvas?.setFinding(true) }
+    }
+
+    /// Circle and hold: starts selecting with the ink inside `outline`, given in the page stack's points, already caught.
+    func selectInk(inside outline: [CGPoint]) {
+        guard mode == .writing || mode == .focus else { return }
+        enter(.selecting)
+        if mode == .selecting { canvas?.catchInk(inside: outline) }
     }
 
     // MARK: Zoom window
@@ -455,6 +466,7 @@ fileprivate struct EditorContent: View {
     let close: () -> Void
 
     @Environment(LibraryStore.self) private var store
+    @Environment(FlashcardLibrary.self) private var flashcards
     @Environment(EditorWindow.self) private var window: EditorWindow?
     @Environment(\.editorPane) private var pane
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -492,6 +504,9 @@ fileprivate struct EditorContent: View {
     @State private var readingInk: InkToRead?
     @State private var hidesTranscript = false
     @State private var scanning = false
+    @State private var showingDeck = false
+    @State private var cardDraft: CardDraft?
+    @State private var studyGuide: StudyGuideRequest?
     @State private var findText = ""
     @FocusState private var findFocused: Bool
     @ScaledMetric(relativeTo: .body) private var findWidth: CGFloat = 260
@@ -533,7 +548,7 @@ fileprivate struct EditorContent: View {
     private var cloth: ClothColor { document.manifest.cover.cloth }
 
     var body: some View {
-        sheets(layout)
+        studySheets(sheets(layout))
     }
 
     private var layout: some View {
@@ -730,6 +745,7 @@ fileprivate struct EditorContent: View {
             document.noteCurrentPage(session.currentPage)
             session.openNotebook = { openLinkedNotebook($0, page: $1, from: $2) }
             session.onTouchDown = { if pane != .single, window?.active != document.id { window?.active = document.id } }
+            session.isActivePane = { pane == .single || window?.active.map { $0 == document.id } ?? (pane != .secondary) }
             session.recorder.onTranscriptChange = { refreshSearchText() }
             refreshNotebookTitles()
         }
@@ -745,10 +761,42 @@ fileprivate struct EditorContent: View {
         }
     }
 
+    /// Flashcards and the study guide.
+    private func studySheets<Content: View>(_ content: Content) -> some View {
+        content
+        .sheet(isPresented: $showingDeck) { DeckSheet(session: session) }
+        .sheet(item: $cardDraft) { draft in
+            CardComposer(notebook: document.id, draft: draft) { _ in announce(String(localized: "Flashcard saved")) }
+        }
+        .sheet(item: $studyGuide) { request in
+            StudyGuideSheet(session: session, request: request)
+        }
+    }
+
+    private func makeCardFromInk() {
+        document.perform {
+            guard let clipping = await session.inkClipping() else { return }
+            cardDraft = CardDraft(pageID: clipping.pageID, answer: clipping.image)
+        }
+    }
+
+    private func makeCard(from tape: PageItem) {
+        guard let page = document.pages.first(where: { $0.id == session.selection?.pageID }) else { return }
+        document.perform {
+            do {
+                try await session.makeCard(from: tape, on: page, in: flashcards)
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                announce(String(localized: "Flashcard made from the tape"))
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
     private var isPresentingModal: Bool {
         showingPages || showingRecordings || showingRecordingsSheet || pickingBeside || export != nil || importingPDF || showingPhotoPicker || renaming || goToPage || paperMode != nil
             || editingCover != nil || namingBookmark != nil || showingStickers || pickingLink || renamingLink || editingNotes != nil || readingInk != nil
-            || isCovered || scanning
+            || isCovered || scanning || showingDeck || cardDraft != nil || studyGuide != nil
     }
 
     private func enter(_ mode: EditorMode) {
@@ -1042,6 +1090,13 @@ fileprivate struct EditorContent: View {
                 arrangeButton(lifted ? "Put Tape Back" : "Lift Tape", lifted ? "eye.slash" : "eye") { session.toggleTape(id) }
                     .accessibilityIdentifier("editor.arrange.lift")
                 tapeColorMenu(tape)
+                if let item, flashcards.canChange(document.id) {
+                    let made = flashcards.card(for: id, in: document.id) != nil
+                    arrangeButton(made ? "Flashcard Made" : "Make Flashcard", "rectangle.on.rectangle.angled") { makeCard(from: item) }
+                        .symbolVariant(made ? .fill : .none)
+                        .disabled(made)
+                        .accessibilityIdentifier("editor.arrange.card")
+                }
                 arrangeButton("Duplicate", "plus.square.on.square") { session.duplicateSelection() }
             } else if isCompact, item?.text != nil || item?.link != nil {
                 Menu {
@@ -1123,6 +1178,10 @@ fileprivate struct EditorContent: View {
                     if let ink = session.canvas?.selectedInk(), !ink.isEmpty { readingInk = InkToRead(ink: ink) }
                 }
                 .accessibilityIdentifier("editor.ink.text")
+                if flashcards.canChange(document.id) {
+                    arrangeButton("Make Flashcard", "rectangle.on.rectangle.angled", action: makeCardFromInk)
+                        .accessibilityIdentifier("editor.ink.card")
+                }
                 arrangeButton("Duplicate", "plus.square.on.square") { session.canvas?.duplicateInkSelection() }
                     .accessibilityIdentifier("editor.ink.duplicate")
                 arrangeButton("Delete", "trash", role: .destructive) { session.canvas?.deleteInkSelection() }
@@ -1410,6 +1469,9 @@ fileprivate struct EditorContent: View {
                     Label(session.isZoomWindowOpen ? "Close Zoom Window" : "Zoom Window", systemImage: "plus.magnifyingglass")
                 }
             }
+            Divider()
+            Button { showingDeck = true } label: { Label("Flashcards…", systemImage: "rectangle.on.rectangle.angled") }
+            Button { studyGuide = StudyGuideRequest(scope: .notebook) } label: { Label("Study Guide…", systemImage: "text.badge.star") }
             Divider()
             Button { enter(.focus) } label: { Label("Focus Mode", systemImage: "arrow.up.left.and.arrow.down.right") }
             Button { enter(.presenting) } label: { Label("Present", systemImage: "play.rectangle") }

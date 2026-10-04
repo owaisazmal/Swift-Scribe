@@ -187,7 +187,8 @@ final class PageSlotView: UIView {
 
 @MainActor
 final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanvasViewDelegate, PKToolPickerObserver,
-                                 InkObserver, EditorCanvasControlling, UIGestureRecognizerDelegate, UIDropInteractionDelegate, UITextViewDelegate {
+                                 InkObserver, EditorCanvasControlling, UIGestureRecognizerDelegate, UIDropInteractionDelegate, UITextViewDelegate,
+                                 UIPencilInteractionDelegate {
     private let session: EditorSession
     private var document: NotebookDocument { session.document }
     private let scrollView = UIScrollView()
@@ -251,6 +252,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     private var mirrored: String?
     private var fingersDraw = false
     private let strokeHold = StrokeHoldRecognizer()
+    private var toolMemory = PencilToolMemory()
     private lazy var itemTap = UITapGestureRecognizer(target: self, action: #selector(tappedPage))
     private lazy var itemHold = UILongPressGestureRecognizer(target: self, action: #selector(heldPage))
     private lazy var tapeTap = UITapGestureRecognizer(target: self, action: #selector(tappedTape))
@@ -315,6 +317,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         laserGesture.isEnabled = false
         view.addGestureRecognizer(laserGesture)
         view.addInteraction(UIDropInteraction(delegate: self))
+        view.addInteraction(UIPencilInteraction(delegate: self))
         itemTap.allowedTouchTypes = [NSNumber(value: UITouch.TouchType.direct.rawValue)]
         itemHold.minimumPressDuration = 0.45
         for recognizer in [itemTap, itemHold, strokeHold, tapeTap] {
@@ -330,6 +333,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         toolPicker.colorUserInterfaceStyle = .light
         toolPicker.stateAutosaveName = "SwiftScribe.ToolPicker"
         toolPicker.showsDrawingPolicyControls = false
+        toolMemory.select(toolPicker.selectedToolItemIdentifier, isEraser: isEraser(toolPicker.selectedToolItemIdentifier))
         applyDrawingPolicy(session.drawingInput.policy)
         registerForTraitChanges([UITraitUserInterfaceStyle.self, UITraitAccessibilityContrast.self]) { (self: Self, _) in
             self.updatePageEdges()
@@ -835,10 +839,37 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         guard !isApplyingDrawing, let canvas = canvasView as? PageCanvasView, canvas.isLoaded, let id = canvas.pageID else { return }
         canvas.strokeCount = nil
         let before = document.loadedInk(id)
+        let rest = canvas === zoomCanvas ? nil : strokeHold.takeHold()
+        if pencilGesture(on: canvas, pageID: id, before: before, rest: rest) { return }
         document.canvasDidChangeInk(id, to: canvas.drawing)
         mirrorInk(from: canvas, pageID: id)
         if canvas === zoomCanvas { return zoomStrokeEnded(canvas, before: before) }
-        straightenLastStroke(on: canvas, pageID: id, before: before)
+        straightenLastStroke(on: canvas, pageID: id, before: before, rest: rest)
+    }
+
+    /// Circle and hold to select, and scribble to erase. Neither stroke reaches the document: the loop leaves nothing
+    /// to undo, and the erasing is one undo step that brings the ink back without the scribble.
+    private func pencilGesture(on canvas: PageCanvasView, pageID: UUID, before: PKDrawing?, rest: TimeInterval?) -> Bool {
+        guard let before, !before.strokes.isEmpty, canvas.drawing.strokes.count == before.strokes.count + 1, let drawn = canvas.drawing.strokes.last,
+              PencilGestures.writes(canvas.tool), !canvas.isRulerActive, !document.isReadOnly else { return false }
+        if let rest, rest >= ShapeSnap.holdDuration, PencilGestures.circleSelects, let frame = stackFrames[pageID],
+           let outline = PencilGestures.outline(of: drawn, roundInkIn: before) {
+            document.replaceInk(pageID, with: before)
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            let stack = outline.map { CGPoint(x: $0.x + frame.minX, y: $0.y + frame.minY) }
+            DispatchQueue.main.async { [weak self] in self?.session.selectInk(inside: stack) }
+            return true
+        }
+        guard PencilGestures.scribbleErases, let erased = PencilGestures.erasing(drawn, from: before) else { return false }
+        document.canvasDidChangeInk(pageID, to: erased.drawing)
+        document.undoManager.setActionName(String(localized: "Scribble Erase"))
+        isApplyingDrawing = true
+        canvas.drawing = erased.drawing
+        isApplyingDrawing = false
+        mirrorInk(from: canvas, pageID: pageID)
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        AccessibilityNotification.Announcement(String(localized: "\(erased.count) strokes erased")).post()
+        return true
     }
 
     /// A page being written in the zoom window has two canvases: whichever was written in, the other shows the same ink.
@@ -854,8 +885,8 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     /// Draw and hold: a stroke that ended with the pen at rest is redrawn as the line, circle or figure it looks like.
     /// The tidied stroke is an undo step of its own, so Undo gives the hand-drawn one back. For that it has to wait
     /// until the stroke's own undo group has closed, which happens at the end of this pass of the run loop.
-    private func straightenLastStroke(on canvas: PageCanvasView, pageID: UUID, before: PKDrawing?) {
-        guard let rest = strokeHold.takeHold(), rest >= ShapeSnap.holdDuration, ShapeSnap.isEnabled, canvas.tool is PKInkingTool, !canvas.isRulerActive,
+    private func straightenLastStroke(on canvas: PageCanvasView, pageID: UUID, before: PKDrawing?, rest: TimeInterval?) {
+        guard let rest, rest >= ShapeSnap.holdDuration, ShapeSnap.isEnabled, canvas.tool is PKInkingTool, !canvas.isRulerActive,
               let before, canvas.drawing.strokes.count == before.strokes.count + 1, let drawn = canvas.drawing.strokes.last,
               let snapped = ShapeSnap.snapped(drawn) else { return }
         let count = canvas.drawing.strokes.count, stamp = drawn.path.creationDate
@@ -1419,8 +1450,9 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         }
     }
 
-    private func catchInk(inside outline: [CGPoint]) {
-        guard outline.count >= 3 else { return }
+    /// Selects the ink inside an outline given in the page stack's points, as if a lasso had been drawn there.
+    func catchInk(inside outline: [CGPoint]) {
+        guard inkLasso != nil, outline.count >= 3 else { return }
         var caught: InkSelection = [:]
         let box = ShapeRecognizer.bounds(of: outline)
         for (id, frame) in stackFrames where frame.intersects(box) {
@@ -1496,6 +1528,16 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
             let chosen = Set(indices)
             let strokes = ink.strokes.enumerated().filter { chosen.contains($0.offset) }.map(\.element)
             return strokes.isEmpty ? nil : PKDrawing(strokes: strokes)
+        }
+    }
+
+    /// The same ink with the page each piece is on, for cutting a clipping out of the page.
+    func selectedInkByPage() -> [(pageID: UUID, ink: PKDrawing)] {
+        pages.compactMap { page in
+            guard let indices = inkSelection[page.id], let ink = document.loadedInk(page.id) else { return nil }
+            let chosen = Set(indices)
+            let strokes = ink.strokes.enumerated().filter { chosen.contains($0.offset) }.map(\.element)
+            return strokes.isEmpty ? nil : (page.id, PKDrawing(strokes: strokes))
         }
     }
 
@@ -2010,6 +2052,65 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     }
 
     func toolPickerSelectedToolItemDidChange(_ toolPicker: PKToolPicker) {
+        let tool = toolPicker.selectedToolItemIdentifier
+        if let restored = toolMemory.pickerChanged(to: tool, isEraser: isEraser(tool), at: CACurrentMediaTime()) {
+            DispatchQueue.main.async { [weak self] in self?.selectTool(restored) }
+        }
+        updateScrollTouches()
+    }
+
+    // MARK: UIPencilInteractionDelegate
+
+    func pencilInteraction(_ interaction: UIPencilInteraction, didReceiveTap tap: UIPencilInteraction.Tap) {
+        pencil(.setting(SettingsKey.pencilDoubleTap), preferred: UIPencilInteraction.preferredTapAction)
+    }
+
+    func pencilInteraction(_ interaction: UIPencilInteraction, didReceiveSqueeze squeeze: UIPencilInteraction.Squeeze) {
+        guard squeeze.phase == .ended else { return }
+        pencil(.setting(SettingsKey.pencilSqueeze), preferred: UIPencilInteraction.preferredSqueezeAction)
+    }
+
+    /// A double-tap or a squeeze. While the tool picker shows, PencilKit acts on the system's setting by itself; with
+    /// the tools hidden the app does the tool switching, and an action chosen in Settings always replaces both.
+    private func pencil(_ action: PencilAction, preferred: UIPencilPreferredAction) {
+        guard view.window != nil, session.isActivePane(), !toolPickerSuppressed, textView == nil, !document.isReadOnly else { return }
+        let mode = session.mode, writing = mode == .writing || mode == .focus
+        if action != .system, toolPicker.isVisible, let restored = toolMemory.tapped(at: CACurrentMediaTime()) { selectTool(restored) }
+        switch action {
+        case .system:
+            guard writing, !toolPicker.isVisible else { return }
+            if preferred == .switchEraser { switchEraser() } else if preferred == .switchPrevious, let previous = toolMemory.previous { selectTool(previous) }
+        case .eraser:
+            if writing { switchEraser() }
+        case .undo:
+            if writing || mode == .selecting { undoProxy.undo() }
+        case .selectInk:
+            guard writing || mode == .selecting else { return }
+            session.enter(writing ? .selecting : .writing)
+            AccessibilityNotification.Announcement(writing ? String(localized: "Selecting ink. Draw round ink on any page, then drag it.")
+                                                           : String(localized: "Back to writing")).post()
+        case .toggleTools:
+            if writing { session.toggleToolPicker() }
+        case .zoomWindow:
+            if writing { session.setZoomWindow(!session.isZoomWindowOpen) }
+        }
+    }
+
+    private func isEraser(_ identifier: String) -> Bool {
+        toolPicker.toolItems.contains { $0.identifier == identifier && $0 is PKToolPickerEraserItem }
+    }
+
+    private func switchEraser() {
+        guard let tool = toolMemory.eraserSwitch(eraser: toolPicker.toolItems.first { $0 is PKToolPickerEraserItem }?.identifier) else { return }
+        selectTool(tool)
+    }
+
+    /// Chooses a tool in the picker and on every canvas, the ones waiting to be reused as well.
+    private func selectTool(_ identifier: String) {
+        guard toolPicker.toolItems.contains(where: { $0.identifier == identifier }) else { return }
+        toolMemory.select(identifier, isEraser: isEraser(identifier))
+        toolPicker.selectedToolItemIdentifier = identifier
+        for canvas in allCanvases + pool { syncTool(canvas) }
         updateScrollTouches()
     }
 

@@ -12,6 +12,7 @@ Swift Scribe is built entirely on Apple frameworks (SwiftUI, PencilKit, PDFKit, 
 - Apple Pencil handwriting with palm rejection and pressure/tilt, powered by PencilKit
 - Full tool palette: pen, monoline, fountain pen, pencil, marker/highlighter, crayon, watercolor, eraser, lasso (move/copy/delete), ruler, and custom colors
 - Draw and hold: draw a line, circle, ellipse, rectangle, triangle or any figure with straight sides and rest the pen a moment before lifting, and it straightens. Undo gives your own stroke back; Settings › Input turns it off
+- Pencil gestures: scribble back and forth over ink with a pen to erase it (one undo brings it back), and draw a loop round ink and hold still to select it. Settings › Apple Pencil turns each off, and chooses what the Pencil's double-tap and squeeze do: the system's setting, the eraser, Undo, Select Ink, showing or hiding the tools, or the zoom window. **Needs a check on a device:** double-tap and squeeze can't be tried in the simulator, and the scribble and loop have only been recognised from drawn test strokes
 - Select ink across pages (⋯ › Select Ink Across Pages): draw round ink on any page, or drag across it, then drag what you caught to move it, onto another page if you like, or duplicate or delete it. Each is one undo step
 - Handwriting to text: with ink selected, Turn into Text reads it on the device and shows the words to correct, copy, or type onto the page in the handwriting's place. One undo brings the handwriting back
 - Translate handwriting: in that same sheet, Translate turns the words into another language with Apple's translator, which works on the iPad once iPadOS has downloaded the language. Show Original brings the words back as they were read. **Needs a check on a device:** the simulator has no translator, so the translation itself has only run through a stand-in
@@ -55,6 +56,12 @@ Swift Scribe is built entirely on Apple frameworks (SwiftUI, PencilKit, PDFKit, 
 - Export pages as images: every page of a notebook, or just the one you're on, as PNGs at twice the page's size
 - Export a page as a time-lapse video: the page being written, every stroke in the order and at the pace you made it with the waits taken out, sped up to fit twenty seconds at most. It plays in the export sheet and shares like any video
 
+**Studying**
+- Flashcards: every notebook can hold a deck (⋯ › Flashcards). Select study tape and choose Make Flashcard, and the card's question is that part of the page with the tape on and its answer the same part with the tape lifted. Select handwriting and Make Flashcard clips it onto a card as it looks on its paper. Or write a card yourself
+- Spaced repetition: after turning a card over you say Again, Good or Easy, and it comes back later the better you knew it (tomorrow, then in three days, then in about a week, and so on up to a year). A card you forgot comes round again in the same sitting
+- The library's Flashcards card says how many are due across your notebooks and opens them in one sitting. Cards in a locked notebook stay out of it. Cards live in the notebook's own package, so a duplicate, a backup and iCloud sync carry them
+- Study guide (⋯ › Study Guide): the main points of a page, a whole notebook or a recording's transcript, and practice questions with their answers, written by Apple Intelligence on the iPad itself. Add the summary to the page as a text box, or save the questions as flashcards. On an iPad without Apple Intelligence the sheet says so and nothing else happens. **Needs a check on a device:** Apple's model has written summaries and questions in the simulator from short typed notes, but not yet on an iPad from real handwriting or a long notebook
+
 **Audio**
 - Record lectures or meetings alongside a notebook, and play them back later
 - Replay a recording with your ink: what you wrote during it is faint until the sound reaches the moment you wrote it, the page turns to follow the writing, and tapping ink jumps the sound to when it was written
@@ -95,7 +102,7 @@ Swift Scribe is built entirely on Apple frameworks (SwiftUI, PencilKit, PDFKit, 
 
 ## Privacy
 
-Swift Scribe has no accounts and no analytics. Handwriting and speech are recognised on the device: a recording is only transcribed when you ask, and only if the iPad can do it without sending it anywhere. Translation uses Apple's translator on the iPad. Your calendar is read only when you ask for today's events, or when you have turned on printing them in the journal, and the events go nowhere but onto the page. The camera is used only while you scan. iCloud sync is off unless you turn it on; with it on, your notebooks, folders and stickers are copied to the app's private container in your own iCloud storage, which Apple syncs between your devices. The writing history is never synced. The writing history behind the week strip and calendar is a small file on your device (`Library/activity.json`) listing the days you wrote and which pages. It is never shared, and Settings › Writing History turns it off or clears it.
+Swift Scribe has no accounts and no analytics. Handwriting and speech are recognised on the device: a recording is only transcribed when you ask, and only if the iPad can do it without sending it anywhere. Translation uses Apple's translator on the iPad. Study guides are written by Apple's language model on the iPad, from the words already read from your pages, and are never sent anywhere; without that model there is no study guide. Your calendar is read only when you ask for today's events, or when you have turned on printing them in the journal, and the events go nowhere but onto the page. The camera is used only while you scan. iCloud sync is off unless you turn it on; with it on, your notebooks, folders and stickers are copied to the app's private container in your own iCloud storage, which Apple syncs between your devices. The writing history is never synced. The writing history behind the week strip and calendar is a small file on your device (`Library/activity.json`) listing the days you wrote and which pages. It is never shared, and Settings › Writing History turns it off or clears it.
 
 The widgets read a small snapshot the app writes to its own shared container on the device (the last notebook's title, page and cover, and page counts for recent days). With writing history off, no days are written there. A locked notebook is never in that snapshot, nor in Spotlight's index, which iPadOS keeps on the device and which Settings › Search switches off.
 
@@ -158,6 +165,8 @@ Contributions toward any of these are very welcome:
 - [ ] Try iCloud sync on two real devices (it has only run against a stand-in folder), then sync a notebook while it is open
 - [ ] Try transcription on a real iPad, with real speech and a long recording (the simulator can't recognise speech on the device)
 - [ ] Try on a real iPad what the simulator can only stand in for: scanning with the camera, Face ID on a locked notebook, translation, the calendar's permission prompt, the Control Center buttons, and the zoom window with a Pencil
+- [ ] Try the study guide on an iPad with Apple Intelligence: how good its summaries and questions are from real handwriting, and how long a long notebook takes
+- [ ] Try the Pencil gestures with a real Pencil: double-tap and squeeze (and whether the tool picker also reacts), and how readily a scribble or a loop is recognised in real handwriting
 - [ ] A ruler that spans pages (PencilKit's ruler belongs to one canvas, and each page has its own)
 - [ ] Native-speaker review of the Spanish, French and German translations, and more languages
 

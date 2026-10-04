@@ -10,6 +10,7 @@ struct DeskCards: View {
     let onOpen: (NotebookRecord, UUID?, String) -> Void
 
     @Environment(LibraryStore.self) private var store
+    @Environment(FlashcardLibrary.self) private var flashcards
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.scenePhase) private var scenePhase
@@ -34,23 +35,43 @@ struct DeskCards: View {
         let journal = journal
         let offersJournal = journal == nil && !promptHidden && records.contains { !$0.isTrashed }
         let memory = memory(journal: journal)
+        let studies = !StudyCard.notebooks(in: records).allSatisfy { flashcards.cards(in: $0).isEmpty }
         if asRows {
             todaySlot(journal, offersJournal: offersJournal).listRowBackground(Color.surface)
             if let memory { memoryCard(memory).listRowBackground(Color.surface) }
-        } else if journal != nil || offersJournal || memory != nil {
+            if studies { studyCard.listRowBackground(Color.surface) }
+        } else if journal != nil || offersJournal || memory != nil || studies {
             let sideBySide = sizeClass == .regular && !dynamicTypeSize.isAccessibilitySize && width >= 680
             let layout = sideBySide ? AnyLayout(HStackLayout(alignment: .top, spacing: Space.x4))
                                     : AnyLayout(VStackLayout(alignment: .leading, spacing: Space.x3))
-            let isPair = (journal != nil || offersJournal) && memory != nil
-            layout {
-                todaySlot(journal, offersJournal: offersJournal)
-                if let memory { memoryCard(memory) }
+            let others = (journal != nil || offersJournal ? 1 : 0) + (memory != nil ? 1 : 0)
+            // Two cards share a row; a third starts a row of its own, and one alone stays card-sized.
+            let ownRow = studies && others == 2
+            VStack(alignment: .leading, spacing: sideBySide ? Space.x4 : Space.x3) {
+                layout {
+                    todaySlot(journal, offersJournal: offersJournal)
+                    if let memory { memoryCard(memory) }
+                    if studies, !ownRow { studyCard }
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: others + (studies && !ownRow ? 1 : 0) >= 2 ? .infinity : 520, alignment: .leading)
+                if ownRow {
+                    layout {
+                        studyCard
+                        if sideBySide { Color.clear.frame(maxWidth: .infinity, maxHeight: 1) }
+                    }
+                    .fixedSize(horizontal: false, vertical: true)
+                }
             }
-            .fixedSize(horizontal: false, vertical: true)
-            // Two cards share the row; one on its own stays card-sized.
-            .frame(maxWidth: isPair ? .infinity : 520, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .leading)
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+        }
+    }
+
+    private var studyCard: some View {
+        StudyCard(records: records, asRow: asRows) { notebook, page in
+            guard let record = records.first(where: { $0.id == notebook && !$0.isTrashed }) else { return }
+            onOpen(record, page, "cover-\(notebook.uuidString)")
         }
     }
 
