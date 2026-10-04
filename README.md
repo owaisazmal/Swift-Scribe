@@ -24,7 +24,7 @@ Swift Scribe is built entirely on Apple frameworks (SwiftUI, PencilKit, PDFKit, 
 - Hardware keyboard: arrows, space and Page Up/Down to scroll, ⌘↑/⌘↓ for the first and last page, ⌘N for a new page, ⇧⌘P for the page navigator, ⌘F to find in the notebook, and ⌘Z to undo library changes too
 - Choose to draw with Apple Pencil only, finger and pencil, or follow the system setting
 - Focus mode (⌃⌘F) puts the toolbar away and leaves the page and your tools
-- Favourite tools: a small tray beside the page keeps up to eight saved pens, pencils and highlighters, each with its colour and width. Tap one to write with it; the plus at its foot saves the tool you are using, and touch and hold replaces, moves or removes one. ⋯ › Favourite Tools puts the tray away
+- Favourite tools: the editor's bar keeps up to eight saved pens, pencils and highlighters, each with its colour and width, and the page keeps the whole window. Tap one to write with it; the empty label at the end saves the tool you are using, and touch and hold replaces, moves or removes one. ⋯ › Favourite Tools takes them out of the bar
 - Notebook tabs: choose Open Another Notebook in a Tab from a notebook's title menu and a tab bar appears, with a plus for more. Each tab keeps its notebook open, undo history and all, while you look at another; ⇧⌘] and ⇧⌘[ step along the bar and ⌘W closes a tab. Your tabs are still there after a visit to the library and the next time the app opens
 - Two notebooks in one window: choose Open Another Notebook Beside from a notebook's title menu and write in both, side by side in landscape or one above the other in portrait, with a divider you can drag. Each keeps its own undo, and the tool you choose is the tool in both
 

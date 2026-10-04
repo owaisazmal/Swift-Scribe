@@ -1,6 +1,6 @@
 import XCTest
 
-/// The favourite tools beside the page: a saved tool is taken up with one tap, and the tool in use can be saved.
+/// The favourite tools in the editor's bar: a saved tool is taken up with one tap, and the tool in use can be saved.
 @MainActor
 final class ToolTrayUITests: XCTestCase {
     override func setUpWithError() throws {
@@ -29,10 +29,15 @@ final class ToolTrayUITests: XCTestCase {
 
         // The shelf starts with the app's own four inks; the pen the picker starts with is none of them.
         let cobalt = app.buttons["editor.tools.2"], highlighter = app.buttons["editor.tools.4"], save = app.buttons["editor.tools.save"]
-        XCTAssertTrue(cobalt.waitForExistence(timeout: 10), "the favourite tools stand beside the page")
+        XCTAssertTrue(cobalt.waitForExistence(timeout: 10), "the favourite tools sit in the bar")
         XCTAssertEqual(cobalt.label, "Pen, Blue")
         XCTAssertEqual(highlighter.label, "Highlighter, Yellow")
         XCTAssertFalse(app.buttons["editor.tools.5"].exists)
+        // They take nothing from the page: it keeps the middle of the window, and they stay above it.
+        let canvas = app.element("page.canvas.1"), window = app.windows.firstMatch
+        XCTAssertEqual(canvas.frame.midX, window.frame.midX, accuracy: 1)
+        XCTAssertLessThanOrEqual(cobalt.frame.maxY, canvas.frame.minY)
+        XCTAssertTrue(save.isHittable, "four tools and the empty label fit beside a short title")
         attach(app, "tray")
 
         cobalt.tap()
@@ -45,7 +50,6 @@ final class ToolTrayUITests: XCTestCase {
         try audit(app, screen: "favourite tools")
 
         // Writing with it still works, and the page keeps the stroke.
-        let canvas = app.element("page.canvas.1")
         canvas.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.3))
             .press(forDuration: 0.05, thenDragTo: canvas.coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: 0.3)), withVelocity: 400, thenHoldForDuration: 0.05)
         XCTAssertEqual(strokeCount(canvas), 1)
@@ -63,7 +67,7 @@ final class ToolTrayUITests: XCTestCase {
         XCTAssertEqual(highlighter.label, "Highlighter, Yellow")
         XCTAssertTrue(highlighter.isSelected)
 
-        // The tray can be put away from the More menu, and the page takes the room.
+        // The tools can be taken out of the bar from the More menu, and put back.
         app.buttons["More"].firstMatch.tap()
         app.buttons["Favourite Tools"].firstMatch.tap()
         XCTAssertTrue(cobalt.waitForNonExistence(timeout: 5))

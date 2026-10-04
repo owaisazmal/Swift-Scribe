@@ -543,6 +543,7 @@ fileprivate struct EditorContent: View {
     @ScaledMetric(relativeTo: .body) private var compactFindWidth: CGFloat = 190
     @State private var undoGroupWidth: CGFloat = 96
     @State private var buttonGroupWidth: CGFloat = 232
+    @ScaledMetric(relativeTo: .headline) private var titleFloor: CGFloat = 220
 
     private struct NotesTarget: Identifiable {
         let id: UUID
@@ -567,10 +568,29 @@ fileprivate struct EditorContent: View {
     private var isNarrow: Bool { paneWidth < 620 }
     private var isCompact: Bool { sizeClass == .compact || isNarrow }
 
-    /// The favourite tools stand beside the page while it can be written on, where there is room for them.
-    private var showsTools: Bool {
-        showsToolTray && !isCompact && !document.isReadOnly && (session.mode == .writing || session.mode == .focus)
+    /// The favourite tools sit in the bar while the page can be written on, in the room the title and the buttons leave.
+    /// Nil where two of them wouldn't fit, and at the largest text sizes, where the title needs the bar.
+    private var toolsWidth: CGFloat? {
+        guard showsToolTray, !isCompact, !document.isReadOnly, !dynamicTypeSize.isAccessibilitySize else { return nil }
+        // A short title keeps all of itself; a long one gives way down to its floor.
+        return ToolTray.width(for: ToolShelf.shared.usable.count, in: barRoom - min(titleWidth + 6, titleFloor) - Self.toolsGap)
     }
+
+    /// What the title takes in the bar when nothing shortens it: the spine chip, the words and the chevron.
+    private var titleWidth: CGFloat {
+        let traits = UITraitCollection(preferredContentSizeCategory: UIContentSizeCategory(dynamicTypeSize))
+        let words = (document.title as NSString).size(withAttributes: [.font: UIFont.preferredFont(forTextStyle: .headline, compatibleWith: traits)])
+        let chevron = UIFont.preferredFont(forTextStyle: .caption1, compatibleWith: traits).pointSize * 1.2
+        return 7 + Space.x2 * 2 + words.width.rounded(.up) + chevron
+    }
+
+    /// The bar between the way back and the buttons: the title's, and the favourite tools'.
+    private var barRoom: CGFloat {
+        paneWidth - (isNarrow ? buttonGroupWidth : undoGroupWidth + buttonGroupWidth + Space.x4) - 90
+    }
+
+    /// What the favourite tools take from the title beyond their own width, so the two stand a little apart.
+    private static let toolsGap: CGFloat = 10
 
     /// With two notebooks in the window, keyboard shortcuts go to the one last touched.
     private var isActivePane: Bool { pane == .single || window?.active == nil || window?.active == document.id }
@@ -589,11 +609,6 @@ fileprivate struct EditorContent: View {
     private var layout: some View {
         NavigationStack {
             HStack(spacing: 0) {
-                if showsTools {
-                    ToolTray(session: session)
-                        .frame(maxHeight: .infinity, alignment: .top)
-                        .transition(.move(edge: .leading).combined(with: .opacity))
-                }
                 pageStack
                 if showsPresenterPanel {
                     PresenterPanel(session: session, since: presentingSince) {
@@ -919,6 +934,10 @@ fileprivate struct EditorContent: View {
             }
             .boardBackground()
         } else {
+            if let toolsWidth {
+                ToolbarItem(placement: .topBarTrailing) { ToolTray(session: session, width: toolsWidth) }
+                    .boardBackground()
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 BarGroup { undoButtons }
                     .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { undoGroupWidth = $0 }
@@ -952,8 +971,7 @@ fileprivate struct EditorContent: View {
 
     /// The bar lets a long title run under the buttons, so the title is given what they leave.
     private var titleRoom: CGFloat {
-        let buttons = isNarrow ? buttonGroupWidth : undoGroupWidth + buttonGroupWidth + Space.x4
-        return max(paneWidth - buttons - 90, 44)
+        max(barRoom - (toolsWidth.map { $0 + Self.toolsGap } ?? 0), 44)
     }
 
     private var toolsButton: some View {
@@ -1653,7 +1671,7 @@ fileprivate struct EditorContent: View {
                 Button { editingNotes = NotesTarget(id: current.id) } label: { Label("Presenter Notes…", systemImage: "note.text") }
             }
             Divider()
-            if !isCompact, !document.isReadOnly {
+            if !isCompact, !document.isReadOnly, !dynamicTypeSize.isAccessibilitySize {
                 Toggle(isOn: $showsToolTray.animation(Motion.adaptive(Motion.standard, reduceMotion: reduceMotion))) {
                     Label("Favourite Tools", systemImage: "star.square")
                 }

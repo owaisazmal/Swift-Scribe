@@ -84,6 +84,14 @@ final class ToolPresetTests: XCTestCase {
         XCTAssertTrue(ToolShelf(defaults: defaults).presets.isEmpty, "the starters don't come back once they have been taken off")
     }
 
+    func testTheBarGivesTheToolsWhatTheyNeedOrWhatItHas() {
+        XCTAssertEqual(ToolTray.width(for: 4, in: 300), 4 * ToolTray.slot + ToolTray.slot + 8, "four tools and the empty label")
+        XCTAssertEqual(ToolTray.width(for: 8, in: 400), 8 * ToolTray.slot + 8, "a full shelf has no empty label")
+        XCTAssertEqual(ToolTray.width(for: 8, in: 170), 170, "short of room, the tools scroll in what there is")
+        XCTAssertNil(ToolTray.width(for: 8, in: 80), "less than two tools wide, they stay out of the bar")
+        XCTAssertEqual(ToolTray.width(for: 0, in: 60), ToolTray.slot + 8, "an empty shelf still shows where a tool is saved")
+    }
+
     func testAToolOfAKindThisBuildDoesNotKnowIsKeptAndLeftOut() throws {
         let defaults = try freshDefaults()
         let stored = #"[{"id":"\#(UUID().uuidString)","ink":"com.apple.ink.future","color":255,"width":3},{"id":"\#(UUID().uuidString)","ink":"com.apple.ink.pen","color":255,"width":3}]"#
