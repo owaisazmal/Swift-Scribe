@@ -43,6 +43,53 @@ private extension UIColor {
 }
 
 extension PageRenderer {
+    /// A whiteboard's rules have no margins and never end: the same gaps as a Letter page, drawn only inside the clip.
+    /// `origin` is where the piece being drawn sits on its board, so the rules stay under the ink they were under.
+    /// Zoomed far out, every second or fourth rule is left out rather than run together.
+    static func drawBoardPaper(_ template: PaperTemplate, color: PaperColor, origin: CGPoint, scale: CGFloat, in ctx: CGContext) {
+        let gap: CGFloat = switch template {
+        case .grid, .dotted: 26
+        case .narrowRuled: 28
+        case .wideRuled: 38
+        default: 0
+        }
+        let unit = Whiteboard.unit * scale, clip = ctx.boundingBoxOfClipPath
+        guard gap > 0, unit > 0, !clip.isNull, !clip.isInfinite else { return }
+        let pixels = abs(ctx.ctm.a) + abs(ctx.ctm.b)
+        var step = gap * unit
+        while step * pixels < 14 { step *= 2 }
+        let visible = clip.insetBy(dx: -2 * unit - 2, dy: -2 * unit - 2)
+        func marks(from low: CGFloat, to high: CGFloat, offset: CGFloat) -> [CGFloat] {
+            let first = Int(((low + offset) / step).rounded(.down)), last = Int(((high + offset) / step).rounded(.up))
+            return last - first > 4000 ? [] : (first...last).map { CGFloat($0) * step - offset }
+        }
+        let xs = marks(from: visible.minX, to: visible.maxX, offset: origin.x * scale)
+        let ys = marks(from: visible.minY, to: visible.maxY, offset: origin.y * scale)
+        let ink = TemplateInk.for(color)
+        ctx.saveGState()
+        ctx.setLineWidth(max(0.5, unit))
+        switch template {
+        case .dotted:
+            let r = max(0.8, 1.6 * unit)
+            ctx.setFillColor(ink.line.withAlphaComponent(ink.dots).cgColor)
+            for y in ys { for x in xs { ctx.fillEllipse(in: CGRect(x: x - r, y: y - r, width: r * 2, height: r * 2)) } }
+        case .grid:
+            for x in xs {
+                ctx.move(to: CGPoint(x: x, y: visible.minY))
+                ctx.addLine(to: CGPoint(x: x, y: visible.maxY))
+            }
+            fallthrough
+        default:
+            for y in ys {
+                ctx.move(to: CGPoint(x: visible.minX, y: y))
+                ctx.addLine(to: CGPoint(x: visible.maxX, y: y))
+            }
+            ctx.setStrokeColor((template == .grid ? ink.line.withAlphaComponent(ink.grid) : ink.line).cgColor)
+            ctx.strokePath()
+        }
+        ctx.restoreGState()
+    }
+
     /// Rules scale with the page width (v1's 800-unit grid); only rules inside the clip are drawn.
     static func drawTemplate(_ template: PaperTemplate, color: PaperColor, in ctx: CGContext, size: CGSize) {
         let unit = size.width / 800

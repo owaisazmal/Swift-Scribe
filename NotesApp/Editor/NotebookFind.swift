@@ -111,10 +111,14 @@ actor FindReader {
 
     func inkRects(for query: String, page: NotebookPage, ink: PKDrawing, assets: URL) -> [CGRect] {
         guard !ink.strokes.isEmpty else { return [] }
-        let key = "ink-\(page.id.uuidString)-\(NotebookFind.fingerprint(ink))"
-        return rects(for: query, key: key, pageSize: page.size) {
-            PageRenderer.image(of: page, ink: ink, assets: assets, width: 1400, includeBackground: false)
+        // A whiteboard is read as the part of it that has something on it, and what is found is put back where it lies.
+        let piece = Whiteboard.whole(page, ink: ink)
+        let key = "ink-\(page.id.uuidString)-\(NotebookFind.fingerprint(ink))" + (piece.cut == nil ? "" : "-\(piece.inkRect)")
+        let found = rects(for: query, key: key, pageSize: piece.size) {
+            PageRenderer.image(of: piece, ink: ink, assets: assets, width: Whiteboard.readingWidth(for: piece), includeBackground: false)
         }
+        guard let cut = piece.cut else { return found }
+        return found.map { $0.offsetBy(dx: cut.x, dy: cut.y) }
     }
 
     func pictureRects(for query: String, file: URL, pageSize: CGSize) -> [CGRect] {

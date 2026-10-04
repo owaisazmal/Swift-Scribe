@@ -451,7 +451,7 @@ extension EditorSession {
         let page = document.pages[currentPage]
         var box = TextBox(string: StudyGuide.listed(points))
         box.fontSize = 13
-        let width = min(max(box.naturalWidth(limit: page.size.width * 0.7), 200), page.size.width * 0.7)
+        let width = min(max(box.naturalWidth(limit: page.sheetSize.width * 0.7), 200), page.sheetSize.width * 0.7)
         addItem(.text(box), size: CGSize(width: width, height: box.height(width: width)), actionName: String(localized: "Add Summary"))
     }
 }

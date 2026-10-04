@@ -190,7 +190,8 @@ struct PageNavigator: View {
             if targeted { dropTarget = page.id } else if dropTarget == page.id { dropTarget = nil }
         }
         .accessibilityLabel(isCurrent ? Text("Page \(index + 1) of \(document.pages.count), current") : Text("Page \(index + 1) of \(document.pages.count)"))
-        .accessibilityValue(Text(page.bookmark == nil ? "" : String(localized: "Bookmarked")))
+        .accessibilityValue(Text([page.isBoard ? String(localized: "Whiteboard") : nil, page.bookmark == nil ? nil : String(localized: "Bookmarked")]
+            .compactMap { $0 }.joined(separator: ", ")))
         .accessibilityHint(Text("Opens this page"))
         .accessibilityActions {
             if !document.isReadOnly, index > 0 { Button("Move earlier") { move(page.id, to: index - 1) } }
@@ -312,6 +313,7 @@ struct PageThumbnailCell: View {
                     .font(.caption.weight(isCurrent ? .bold : .regular).monospacedDigit())
                     .foregroundStyle(isCurrent ? Color.ink : Color.textSecondary)
                 if isCurrent { Text("Current").metaStyle(.caption) }
+                if page.isBoard { Text("Whiteboard").metaStyle(.caption) }
             }
         }
     }
@@ -340,7 +342,7 @@ struct PageThumbnailCell: View {
                 Rectangle().fill(Color(uiColor: PageRenderer.paperColor(page.effectivePaperColor)))
             }
         }
-        .aspectRatio(page.size.width / max(page.size.height, 1), contentMode: .fit)
+        .aspectRatio(page.shownSize.width / max(page.shownSize.height, 1), contentMode: .fit)
         .overlay { Rectangle().strokeBorder(Color.hairline, lineWidth: 1) }
         .overlay { if isCurrent { StitchedSelection() } }
         .overlay(alignment: .topTrailing) { if isCurrent { ribbon } }
@@ -373,6 +375,7 @@ struct PageThumbnailCell: View {
 
     private var paperName: String {
         switch page.background {
+        case .template where page.isBoard: String(localized: "Whiteboard, \(page.paperColor.displayName)")
         case .template: "\(page.template?.displayName ?? PaperTemplate.blank.displayName), \(page.paperColor.displayName)"
         case .pdf: String(localized: "PDF page")
         case .image: String(localized: "Photo")

@@ -134,7 +134,7 @@ private struct PresenterThumbnail: View {
                 Rectangle().fill(Color(uiColor: PageRenderer.paperColor(page.effectivePaperColor)))
             }
         }
-        .aspectRatio(page.size.width / max(page.size.height, 1), contentMode: .fit)
+        .aspectRatio(page.shownSize.width / max(page.shownSize.height, 1), contentMode: .fit)
         .overlay { Rectangle().strokeBorder(Color.hairline, lineWidth: 1) }
         .task(id: "\(page.id)-\(page.inkHash ?? "")-\(page.appearanceKey)") { image = await document.thumbnail(for: page) }
     }

@@ -36,7 +36,7 @@ enum DailyJournal {
     static func makeTodayPage(after pages: [NotebookPage], defaults: PageDefaults, key: String, id: UUID = UUID()) -> NotebookPage {
         var page = defaults.newPage()
         page.id = id
-        if let anchor = pages.last(where: { $0.template != nil }) {
+        if let anchor = pages.last(where: { $0.template != nil && !$0.isBoard }) {
             page.size = anchor.size
             page.paperColor = anchor.paperColor
             page.background = anchor.background

@@ -393,7 +393,7 @@ private struct CalendarPageCard: View {
                         Rectangle().fill(Color(uiColor: PageRenderer.paperColor(entry.page.effectivePaperColor)))
                     }
                 }
-                .aspectRatio(entry.page.size.width / max(entry.page.size.height, 1), contentMode: .fit)
+                .aspectRatio(entry.page.shownSize.width / max(entry.page.shownSize.height, 1), contentMode: .fit)
                 .overlay { Rectangle().strokeBorder(Color.hairline, lineWidth: 1) }
                 .overlay { if isLocked { LockBadge(diameter: 28) } }
                 .shadow(color: .black.opacity(0.08), radius: 2, y: 1)

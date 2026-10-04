@@ -29,7 +29,7 @@ enum NotebookExporter {
 
         let format = UIGraphicsPDFRendererFormat()
         format.documentInfo = [kCGPDFContextTitle as String: input.title, kCGPDFContextCreator as String: "Swift Scribe"]
-        let renderer = UIGraphicsPDFRenderer(bounds: CGRect(origin: .zero, size: input.pages.first?.size ?? PageSize.letter.points), format: format)
+        let renderer = UIGraphicsPDFRenderer(bounds: CGRect(origin: .zero, size: input.pages.first?.shownSize ?? PageSize.letter.points), format: format)
         let assets = input.package.assetsDirectory
         let count = Double(max(input.pages.count, 1))
         let outline = outline(for: input.pages)
@@ -40,6 +40,9 @@ enum NotebookExporter {
             for (index, page) in input.pages.enumerated() {
                 if Task.isCancelled { return }
                 autoreleasepool {
+                    let ink = input.inMemoryInk[page.id] ?? savedInk(page, in: input.package)
+                    // A whiteboard goes out as one sheet, as large as what is on it.
+                    let page = Whiteboard.whole(page, ink: ink)
                     let bounds = CGRect(origin: .zero, size: page.size)
                     context.beginPage(withBounds: bounds, pageInfo: [:])
                     PageRenderer.drawBackground(page, assets: assets, in: context.cgContext, size: page.size, links: links)
@@ -57,11 +60,10 @@ enum NotebookExporter {
                             }
                         }
                     }
-                    let ink = input.inMemoryInk[page.id] ?? savedInk(page, in: input.package)
                     if !ink.strokes.isEmpty {
                         var image: UIImage?
                         UITraitCollection(userInterfaceStyle: page.effectivePaperColor.inkAppearance).performAsCurrent {
-                            image = ink.image(from: bounds, scale: 3)
+                            image = ink.image(from: page.inkRect, scale: Whiteboard.scale(for: page.size, wanted: 3))
                         }
                         image?.draw(in: bounds)
                     }
@@ -103,7 +105,8 @@ enum NotebookExporter {
             let url = directory.appending(path: "\(name)\(number).png")
             let ink = input.inMemoryInk[page.id] ?? savedInk(page, in: input.package)
             let data = autoreleasepool {
-                PageRenderer.image(of: page, ink: ink, assets: assets, width: page.size.width, scale: 2, links: links).pngData()
+                let page = Whiteboard.whole(page, ink: ink)
+                return PageRenderer.image(of: page, ink: ink, assets: assets, width: page.size.width, scale: Whiteboard.scale(for: page.size, wanted: 2), links: links).pngData()
             }
             guard let data else { throw ImportError.unreadable }
             try data.write(to: url, options: .atomic)

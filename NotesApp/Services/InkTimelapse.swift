@@ -109,9 +109,10 @@ enum InkTimelapse {
 
     private static func film(_ page: NotebookPage, ink: PKDrawing, plan: Plan, assets: URL, links: LinkTitles, to url: URL,
                              progress: @escaping @Sendable (Double) async -> Void) async throws {
+        let page = Whiteboard.whole(page, ink: ink)
         let (width, height) = frameSize(for: page.size)
         let size = CGSize(width: width, height: height), scale = size.width / page.size.width
-        let pageRect = CGRect(origin: .zero, size: page.size), whole = CGRect(origin: .zero, size: size)
+        let pageRect = page.inkRect, whole = CGRect(origin: .zero, size: size)
         let appearance = UITraitCollection(userInterfaceStyle: page.effectivePaperColor.inkAppearance)
         let onDark = page.effectivePaperColor.isDark
 
@@ -156,7 +157,8 @@ enum InkTimelapse {
             var image: UIImage?
             appearance.performAsCurrent { image = PKDrawing(strokes: [stroke]).image(from: bounds, scale: scale) }
             guard let cgImage = image?.cgImage else { return nil }
-            let rect = CGRect(x: bounds.minX * scale, y: size.height - bounds.maxY * scale, width: bounds.width * scale, height: bounds.height * scale)
+            let rect = CGRect(x: (bounds.minX - pageRect.minX) * scale, y: size.height - (bounds.maxY - pageRect.minY) * scale,
+                              width: bounds.width * scale, height: bounds.height * scale)
             return (cgImage, rect, stroke.ink.inkType == .marker && !onDark)
         }
 

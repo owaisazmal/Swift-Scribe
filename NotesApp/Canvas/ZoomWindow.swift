@@ -32,7 +32,7 @@ struct ZoomWindow: Equatable {
 
     /// The gap between the lines of ruled, squared and dotted paper; half the window's height on anything else.
     static func lineHeight(for page: NotebookPage, windowHeight: CGFloat) -> CGFloat {
-        let unit = page.size.width / 800
+        let unit = page.sheetSize.width / 800
         switch page.template {
         case .narrowRuled, .cornell, .checklist: return 28 * unit
         case .wideRuled: return 38 * unit

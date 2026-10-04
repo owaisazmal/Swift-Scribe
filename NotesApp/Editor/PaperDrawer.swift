@@ -48,7 +48,8 @@ struct PaperDrawer: View {
 
     private var selectedTemplate: PaperTemplate { changing?.template ?? template }
     private var selectedColor: PaperColor { changing?.paperColor ?? color }
-    private var previewSize: CGSize { changing?.size ?? pageSize?.points ?? newPageSize }
+    private var previewSize: CGSize { changing?.shownSize ?? pageSize?.points ?? newPageSize }
+    private var isBoard: Bool { changing?.isBoard ?? false }
 
     private var hint: String {
         switch mode {
@@ -65,7 +66,7 @@ struct PaperDrawer: View {
                         controls
                         Divider().overlay(Color.hairline)
                         PaperGallery(template: Binding(get: { selectedTemplate }, set: { template = $0 }), color: selectedColor,
-                                     pageSize: previewSize, hint: { _ in hint }, onPick: pick)
+                                     pageSize: previewSize, hint: { _ in hint }, onPick: pick, only: isBoard ? Whiteboard.templates : nil)
                     }
                     .padding(Space.x5)
                 }
@@ -165,6 +166,8 @@ struct PaperGallery: View {
     var hint: (PaperTemplate) -> String
     var onPick: (PaperTemplate) -> Void
     var compact = false
+    /// The paper a whiteboard can have: rules with no margins to end at.
+    var only: [PaperTemplate]?
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -184,14 +187,20 @@ struct PaperGallery: View {
         .animation(Motion.adaptive(Motion.standard, reduceMotion: reduceMotion), value: template)
     }
 
+    private var families: [PaperFamily] { PaperFamily.allCases.filter { !templates(in: $0).isEmpty } }
+
+    private func templates(in family: PaperFamily) -> [PaperTemplate] {
+        family.templates.filter { only?.contains($0) ?? true }
+    }
+
     private var grid: some View {
         VStack(alignment: .leading, spacing: Space.x6) {
-            ForEach(PaperFamily.allCases) { family in
+            ForEach(families) { family in
                 VStack(alignment: .leading, spacing: Space.x3) {
                     header(family)
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: tileWidth + Space.x3), spacing: Space.x3, alignment: .top)],
                               alignment: .leading, spacing: Space.x5) {
-                        ForEach(family.templates) { tile($0).id($0) }
+                        ForEach(templates(in: family)) { tile($0).id($0) }
                     }
                 }
             }
@@ -202,11 +211,11 @@ struct PaperGallery: View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: Space.x8) {
-                    ForEach(PaperFamily.allCases) { family in
+                    ForEach(families) { family in
                         VStack(alignment: .leading, spacing: Space.x2) {
                             header(family)
                             HStack(alignment: .top, spacing: Space.x4) {
-                                ForEach(family.templates) { tile($0).id($0) }
+                                ForEach(templates(in: family)) { tile($0).id($0) }
                             }
                         }
                     }
@@ -224,9 +233,9 @@ struct PaperGallery: View {
 
     private var rows: some View {
         VStack(alignment: .leading, spacing: Space.x4) {
-            ForEach(PaperFamily.allCases) { family in
+            ForEach(families) { family in
                 header(family).padding(.bottom, Space.x6)
-                ForEach(family.templates) { option in
+                ForEach(templates(in: family)) { option in
                     HStack(spacing: Space.x6) {
                         button(option) { preview(option).frame(width: 60) }
                         name(option)
@@ -251,7 +260,7 @@ struct PaperGallery: View {
     }
 
     private func preview(_ option: PaperTemplate) -> some View {
-        PaperPreview(template: option, color: color, pageSize: pageSize)
+        PaperPreview(template: option, color: color, pageSize: pageSize, isBoard: only != nil)
             .overlay {
                 if option == template {
                     StitchedSelection().transition(reduceMotion ? .opacity : .scale(scale: 1.06).combined(with: .opacity))
@@ -327,12 +336,13 @@ struct PaperPreview: View {
     let color: PaperColor
     let pageSize: CGSize
     var renderWidth: CGFloat = 120
+    var isBoard = false
     @Environment(\.displayScale) private var displayScale
     @State private var image: UIImage?
     @State private var shownKey = ""
 
     var body: some View {
-        let key = PaperPreviewCache.key(template: template, color: color, size: pageSize, width: renderWidth, scale: displayScale)
+        let key = PaperPreviewCache.key(template: template, color: color, size: pageSize, width: renderWidth, scale: displayScale, board: isBoard)
         Rectangle()
             .fill(Color(uiColor: PageRenderer.paperColor(color)))
             .aspectRatio(pageSize.width / max(pageSize.height, 1), contentMode: .fit)
@@ -349,7 +359,7 @@ struct PaperPreview: View {
                     shownKey = key
                     return
                 }
-                let rendered = await PaperPreviewCache.image(template: template, color: color, size: pageSize, width: renderWidth, scale: displayScale)
+                let rendered = await PaperPreviewCache.image(template: template, color: color, size: pageSize, width: renderWidth, scale: displayScale, board: isBoard)
                 guard !Task.isCancelled else { return }
                 withAnimation(Motion.standard) {
                     image = rendered
@@ -362,18 +372,21 @@ struct PaperPreview: View {
 enum PaperPreviewCache {
     static let images = LRUCache<PageThumbnailer.SharedUIImage>(capacity: 64)
 
-    static func key(template: PaperTemplate, color: PaperColor, size: CGSize, width: CGFloat, scale: CGFloat) -> String {
-        "\(template.rawValue)|\(color.rawValue)|\(Int(size.width))x\(Int(size.height))|\(Int(width))@\(scale)"
+    static func key(template: PaperTemplate, color: PaperColor, size: CGSize, width: CGFloat, scale: CGFloat, board: Bool = false) -> String {
+        "\(template.rawValue)|\(color.rawValue)|\(Int(size.width))x\(Int(size.height))|\(Int(width))@\(scale)\(board ? "|board" : "")"
     }
 
     static func cached(_ key: String) -> UIImage? { images.value(key) { nil }?.image }
 
-    static func image(template: PaperTemplate, color: PaperColor, size: CGSize, width: CGFloat = 120, scale: CGFloat) async -> UIImage {
-        let key = key(template: template, color: color, size: size, width: width, scale: scale)
+    static func image(template: PaperTemplate, color: PaperColor, size: CGSize, width: CGFloat = 120, scale: CGFloat, board: Bool = false) async -> UIImage {
+        let key = key(template: template, color: color, size: size, width: width, scale: scale, board: board)
         if let hit = cached(key) { return hit }
         let image = await Task.detached(priority: .userInitiated) {
-            PageRenderer.image(of: NotebookPage(background: .template(template), paperColor: color, size: size), ink: PKDrawing(),
-                               assets: FileManager.default.temporaryDirectory, width: width, scale: scale)
+            // A whiteboard's miniature is a small piece of it, so its rules show at a size that can be told apart.
+            let page = board ? Whiteboard.piece(of: .board(template: template, color: color),
+                                                in: CGRect(origin: Whiteboard.center, size: CGSize(width: 320, height: 320 * size.height / max(size.width, 1))))
+                             : NotebookPage(background: .template(template), paperColor: color, size: size)
+            return PageRenderer.image(of: page, ink: PKDrawing(), assets: FileManager.default.temporaryDirectory, width: width, scale: scale)
         }.value
         return images.value(key) { PageThumbnailer.SharedUIImage(image: image) }?.image ?? image
     }

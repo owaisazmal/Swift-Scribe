@@ -76,6 +76,8 @@ enum PageRenderer {
 
     private static func drawPaper(_ page: NotebookPage, assets: URL, in ctx: CGContext, size: CGSize) {
         switch page.background {
+        case .template where page.isBoard:
+            drawBoardPaper(page.template ?? .blank, color: page.paperColor, origin: page.cut ?? .zero, scale: size.width / max(page.size.width, 1), in: ctx)
         case .template:
             drawTemplate(page.template ?? .blank, color: page.paperColor, in: ctx, size: size)
             if let day = page.day { PageMasthead.draw(day: day, template: page.template ?? .blank, paper: page.paperColor, in: ctx, size: size) }
@@ -135,8 +137,10 @@ enum PageRenderer {
     }
 
     /// Renders a page (background plus ink clipped to the page) to an image `width` points wide. Thread-safe.
+    /// A whiteboard is drawn as the part of it that has something on it.
     static func image(of page: NotebookPage, ink: PKDrawing, assets: URL, width: CGFloat, scale: CGFloat = 1,
                       includeBackground: Bool = true, links: LinkTitles? = nil, lifted: Set<UUID> = []) -> UIImage {
+        let page = Whiteboard.whole(page, ink: ink)
         let factor = width / max(page.size.width, 1)
         let size = CGSize(width: width, height: (page.size.height * factor).rounded())
         let format = UIGraphicsImageRendererFormat()
@@ -145,7 +149,7 @@ enum PageRenderer {
         var inkImage: UIImage?
         if !ink.strokes.isEmpty {
             UITraitCollection(userInterfaceStyle: includeBackground ? page.effectivePaperColor.inkAppearance : .light).performAsCurrent {
-                inkImage = ink.image(from: CGRect(origin: .zero, size: page.size), scale: factor * scale)
+                inkImage = ink.image(from: page.inkRect, scale: factor * scale)
             }
         }
         return UIGraphicsImageRenderer(size: size, format: format).image { context in

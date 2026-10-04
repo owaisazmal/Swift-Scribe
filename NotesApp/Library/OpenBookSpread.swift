@@ -58,7 +58,7 @@ struct OpenBookSpread: View {
 
     /// Each page at the current page's proportions; a landscape page is narrowed to keep the spread compact.
     private func pageSize(height: CGFloat) -> CGSize {
-        let aspect = pages.map { $0.current.size.width / max($0.current.size.height, 1) } ?? PageSize.letter.points.width / PageSize.letter.points.height
+        let aspect = pages.map { $0.current.shownSize.width / max($0.current.shownSize.height, 1) } ?? PageSize.letter.points.width / PageSize.letter.points.height
         let width = min(height * aspect, height * 0.9)
         return CGSize(width: width.rounded(), height: (width / aspect).rounded())
     }

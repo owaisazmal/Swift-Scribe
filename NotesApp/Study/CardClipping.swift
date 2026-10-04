@@ -20,11 +20,19 @@ enum CardClipping {
 
     private static func fitted(_ rect: CGRect, to page: NotebookPage) -> CGRect {
         let cut = rect.intersection(CGRect(origin: .zero, size: page.size)).integral
-        return cut.isNull || cut.width < 8 || cut.height < 8 ? CGRect(origin: .zero, size: page.size) : cut
+        guard cut.isNull || cut.width < 8 || cut.height < 8 else { return cut }
+        return page.isBoard ? CGRect(x: rect.midX - 210, y: rect.midY - 150, width: 420, height: 300).integral : CGRect(origin: .zero, size: page.size)
     }
 
     /// `region` of the page. Tape named in `lifted` is taken off; `revealed` is left as the outline of where it was.
     static func image(of page: NotebookPage, ink: PKDrawing, assets: URL, region: CGRect, lifted: Set<UUID> = [], revealed: PageItem? = nil) -> UIImage {
+        if page.isBoard, page.cut == nil {
+            // Only the piece is drawn: a whiteboard is far too large to draw whole and cut down.
+            var moved = revealed
+            moved?.center = CGPoint(x: (revealed?.center.x ?? 0) - region.minX, y: (revealed?.center.y ?? 0) - region.minY)
+            return image(of: Whiteboard.piece(of: page, in: region), ink: ink, assets: assets, region: CGRect(origin: .zero, size: region.size),
+                         lifted: lifted, revealed: moved)
+        }
         let whole = PageRenderer.image(of: page, ink: ink, assets: assets, width: page.size.width, scale: scale, lifted: lifted)
         let format = UIGraphicsImageRendererFormat()
         format.scale = scale

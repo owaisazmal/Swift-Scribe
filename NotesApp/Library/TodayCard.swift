@@ -351,7 +351,7 @@ struct DeskPage: View {
     var width: CGFloat = 56
 
     var body: some View {
-        let aspect = page.map { $0.size.width / max($0.size.height, 1) } ?? PageSize.letter.points.width / PageSize.letter.points.height
+        let aspect = page.map { $0.shownSize.width / max($0.shownSize.height, 1) } ?? PageSize.letter.points.width / PageSize.letter.points.height
         let height = min((width / aspect).rounded(), 76)
         let pageWidth = min(width, (height * aspect).rounded())
         ZStack {

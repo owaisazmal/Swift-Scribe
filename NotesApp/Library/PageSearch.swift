@@ -134,7 +134,7 @@ private struct PageHitCard: View {
                         Rectangle().fill(Color(uiColor: PageRenderer.paperColor(hit.page.effectivePaperColor)))
                     }
                 }
-                .aspectRatio(hit.page.size.width / max(hit.page.size.height, 1), contentMode: .fit)
+                .aspectRatio(hit.page.shownSize.width / max(hit.page.shownSize.height, 1), contentMode: .fit)
                 .frame(width: 56)
                 .overlay { Rectangle().strokeBorder(Color.hairline, lineWidth: 1) }
                 VStack(alignment: .leading, spacing: Space.x1) {

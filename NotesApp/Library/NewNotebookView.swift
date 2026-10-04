@@ -241,7 +241,7 @@ struct NewNotebookView: View {
         do {
             let created = try await store.createNotebook(id: id, title: displayTitle, cover: spec,
                                                          defaults: PageDefaults(template: template, paperColor: paperColor, pageSize: pageSize),
-                                                         folder: folder)
+                                                         folder: folder, startsWithBoard: starter?.startsWithBoard(template: template) ?? false)
             if useForQuickNote {
                 let defaults = UserDefaults.standard
                 defaults.set(template.rawValue, forKey: SettingsKey.defaultTemplate)

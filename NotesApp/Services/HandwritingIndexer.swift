@@ -75,7 +75,8 @@ actor HandwritingIndexer {
         if !typed.isEmpty { chunks.append(typed) }
         if page.inkHash != nil, case .ink(let drawing, _) = await package.readInk(page.id), !drawing.strokes.isEmpty {
             guard !Task.isCancelled else { return }
-            let image = PageRenderer.image(of: page, ink: drawing, assets: package.assetsDirectory, width: 1400, includeBackground: false)
+            let piece = Whiteboard.whole(page, ink: drawing)
+            let image = PageRenderer.image(of: piece, ink: drawing, assets: package.assetsDirectory, width: Whiteboard.readingWidth(for: piece), includeBackground: false)
             guard !Task.isCancelled, let lines = Self.recognizeText(in: image) else { return }
             chunks += lines
         }

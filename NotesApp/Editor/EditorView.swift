@@ -302,7 +302,7 @@ final class EditorSession {
         let page = document.pages[currentPage]
         var box = TextBox(string: Agenda.text(for: events, heading: page.day == nil ? day.formatted(.dateTime.weekday(.wide).day().month(.wide)) : nil))
         box.fontSize = 13
-        let width = min(max(box.naturalWidth(limit: page.size.width * 0.6), 150), page.size.width * 0.6)
+        let width = min(max(box.naturalWidth(limit: page.sheetSize.width * 0.6), 150), page.sheetSize.width * 0.6)
         addItem(.text(box), size: CGSize(width: width, height: box.height(width: width)), actionName: String(localized: "Add Today's Events"))
     }
 
@@ -314,7 +314,7 @@ final class EditorSession {
     func addText() {
         guard !document.isReadOnly, document.pages.indices.contains(currentPage) else { return }
         let box = TextBox(string: "")
-        let width = min(280, (document.pages[currentPage].size.width * 0.6).rounded())
+        let width = min(280, (document.pages[currentPage].sheetSize.width * 0.6).rounded())
         addItem(.text(box), size: CGSize(width: width, height: box.height(width: width)), actionName: Self.addTextAction)
         canvas?.editText()
     }
@@ -342,6 +342,8 @@ final class EditorSession {
         let index = index ?? currentPage
         guard !document.isReadOnly, document.pages.indices.contains(index) else { return }
         let page = document.pages[index]
+        // A whiteboard is opened first, so the new thing lands in the part of it that is looked at.
+        if page.isBoard { go(to: index, animated: false) }
         var centre = point ?? canvas?.visibleCenter(ofPage: index) ?? CGPoint(x: page.size.width / 2, y: page.size.height / 2)
         // Never exactly on top of the last one placed.
         let taken = page.items.map(\.center)
@@ -365,7 +367,7 @@ final class EditorSession {
         let file = try await document.package.writeAsset(picture.data, ext: picture.ext)
         let index = index ?? currentPage
         guard document.pages.indices.contains(index) else { return }
-        let page = document.pages[index].size
+        let page = document.pages[index].sheetSize
         let fit = min(page.width * 0.55 / picture.size.width, page.height * 0.4 / picture.size.height)
         addItem(.image(file: file), size: CGSize(width: (picture.size.width * fit).rounded(), height: (picture.size.height * fit).rounded()),
                 onPage: index, at: point)
@@ -387,7 +389,7 @@ final class EditorSession {
             shape = picture.size
         }
         guard let file, let shape, document.pages.indices.contains(currentPage) else { return }
-        let page = document.pages[currentPage].size
+        let page = document.pages[currentPage].sheetSize
         let fit = min(150, page.width * 0.4) / max(shape.width, shape.height, 1)
         addItem(.image(file: file), size: CGSize(width: (shape.width * fit).rounded(), height: (shape.height * fit).rounded()), source: sticker.id)
     }
@@ -438,6 +440,15 @@ final class EditorSession {
 
     func duplicatePage(at index: Int) async {
         if let position = await document.duplicatePage(at: index) { go(to: position) }
+    }
+
+    /// Inserts a whiteboard after `index` (or at the end) and opens it. It takes the colour of the page before it.
+    func addBoard(after index: Int? = nil) {
+        guard !document.isReadOnly else { return }
+        let position = (index ?? document.pages.count - 1) + 1
+        let paper = document.newPage(after: index)
+        document.insertPages([.board(template: .dotted, color: paper.paperColor)], at: position, actionName: String(localized: "Add Whiteboard"))
+        go(to: position)
     }
 }
 
@@ -1399,6 +1410,8 @@ fileprivate struct EditorContent: View {
             Button { session.addPage(after: session.currentPage) } label: { Label("Page After Current", systemImage: "doc.badge.plus") }
             Button { session.addPage() } label: { Label("Page at End", systemImage: "arrow.down.doc") }
             Button { paperMode = .add(after: session.currentPage) } label: { Label("Choose Paper…", systemImage: "square.grid.3x3") }
+            Button { session.addBoard(after: session.currentPage) } label: { Label("Whiteboard", systemImage: "scribble.variable") }
+                .accessibilityIdentifier("editor.add.board")
             Divider()
             Button { importingPDF = true } label: { Label("Insert PDF…", systemImage: "doc.richtext") }
             Button { photoBecomesPage = true; showingPhotoPicker = true } label: { Label("Insert Photo…", systemImage: "photo") }
@@ -1454,8 +1467,13 @@ fileprivate struct EditorContent: View {
             }
             .disabled(document.isReadOnly)
             Divider()
-            Button { session.canvas?.fit(.width) } label: { Label("Fit Width", systemImage: "arrow.left.and.right") }
-            Button { session.canvas?.fit(.page) } label: { Label("Fit Page", systemImage: "arrow.up.and.down") }
+            if current?.isBoard == true {
+                Button { session.canvas?.fit(.width) } label: { Label("Actual Size", systemImage: "1.magnifyingglass") }
+                Button { session.canvas?.fit(.page) } label: { Label("Show Everything", systemImage: "arrow.up.left.and.arrow.down.right") }
+            } else {
+                Button { session.canvas?.fit(.width) } label: { Label("Fit Width", systemImage: "arrow.left.and.right") }
+                Button { session.canvas?.fit(.page) } label: { Label("Fit Page", systemImage: "arrow.up.and.down") }
+            }
             Divider()
             if !document.isReadOnly {
                 Button { enter(.selecting) } label: { Label("Select Ink Across Pages", systemImage: "lasso") }

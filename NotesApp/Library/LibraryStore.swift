@@ -58,8 +58,10 @@ final class LibraryStore {
     // MARK: Creating
 
     @discardableResult
-    func createNotebook(id: UUID = UUID(), title: String, cover: CoverSpec, defaults: PageDefaults, folder: FolderRecord?) async throws -> UUID {
-        var manifest = NotebookManifest(id: id, title: title, cover: cover, defaults: defaults, pages: [defaults.newPage()])
+    func createNotebook(id: UUID = UUID(), title: String, cover: CoverSpec, defaults: PageDefaults, folder: FolderRecord?,
+                        startsWithBoard: Bool = false) async throws -> UUID {
+        let first = startsWithBoard ? NotebookPage.board(template: defaults.template, color: defaults.paperColor) : defaults.newPage()
+        var manifest = NotebookManifest(id: id, title: title, cover: cover, defaults: defaults, pages: [first])
         manifest.library.folderID = folder?.id
         manifest.library.lastOpenedAt = .now
         try await NotebookPackage(root: root, id: manifest.id).create(manifest)

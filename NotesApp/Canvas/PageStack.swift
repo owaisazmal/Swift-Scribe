@@ -23,25 +23,48 @@ struct PageStack: UIViewControllerRepresentable {
     func updateUIViewController(_ controller: PageStackController, context: Context) {}
 }
 
-/// Page frames in page points, stacked vertically and centred on the widest page.
+/// Page frames in page points, stacked vertically and centred on the widest page. A whiteboard has no size to
+/// stack: among the pages it is a card, and once opened it is laid out alone, with every other page put away.
 struct PageStackLayout {
     static let margin: CGFloat = 16
 
     private(set) var frames: [CGRect] = []
     private(set) var size = CGSize(width: 1, height: 1)
+    /// The whiteboard that is open, in place of the stack.
+    let solo: Int?
 
-    init(pages: [NotebookPage] = []) {
-        let width = (pages.map(\.size.width).max() ?? PageSize.letter.points.width) + Self.margin * 2
+    init(pages: [NotebookPage] = [], solo: Int? = nil) {
+        self.solo = solo.flatMap { pages.indices.contains($0) && pages[$0].isBoard ? $0 : nil }
+        if let solo = self.solo {
+            frames = pages.indices.map { $0 == solo ? CGRect(origin: .zero, size: Whiteboard.size) : .zero }
+            size = Whiteboard.size
+            return
+        }
+        let sheet = Self.sheetWidth(pages)
+        let width = sheet + Self.margin * 2
         var y = Self.margin
         frames = pages.map { page in
-            defer { y += page.size.height + Self.margin }
-            return CGRect(x: ((width - page.size.width) / 2).rounded(), y: y, width: page.size.width, height: page.size.height)
+            let size = page.isBoard ? CGSize(width: sheet, height: (sheet * Whiteboard.shownSize.height / Whiteboard.shownSize.width).rounded()) : page.size
+            defer { y += size.height + Self.margin }
+            return CGRect(x: ((width - size.width) / 2).rounded(), y: y, width: size.width, height: size.height)
         }
         size = CGSize(width: width, height: max(y, 1))
     }
 
+    /// The widest page that has a width; a whiteboard counts as a Letter page when there is none.
+    static func sheetWidth(_ pages: [NotebookPage]) -> CGFloat {
+        pages.lazy.filter { !$0.isBoard }.map(\.size.width).max() ?? Whiteboard.sheet.width
+    }
+
+    /// Whether the page is on show at its own size: the open whiteboard, or any page but a whiteboard in the stack.
+    func isLaidOut(_ index: Int, in pages: [NotebookPage]) -> Bool {
+        guard pages.indices.contains(index), frames.indices.contains(index) else { return false }
+        return solo.map { $0 == index } ?? !pages[index].isBoard
+    }
+
     /// The page at `y`, counting the gap below a page as part of it.
     func pageIndex(atY y: CGFloat) -> Int {
+        if let solo { return solo }
         guard !frames.isEmpty else { return 0 }
         var low = 0, high = frames.count - 1
         while low < high {
@@ -52,6 +75,7 @@ struct PageStackLayout {
     }
 
     func range(from top: CGFloat, to bottom: CGFloat) -> ClosedRange<Int>? {
+        if let solo { return solo...solo }
         guard !frames.isEmpty else { return nil }
         let first = pageIndex(atY: top)
         var last = first
@@ -122,9 +146,92 @@ final class FindHighlightView: UIView {
     }
 }
 
+/// A whiteboard among the pages: what is on it, on a card that opens it. Nothing is written here.
+final class BoardCardView: UIView {
+    private let picture = UIImageView()
+    private let chip = UIView()
+    private let label = UILabel()
+    private let symbol = UIImageView(image: UIImage(systemName: "arrow.up.left.and.arrow.down.right",
+                                                    withConfiguration: UIImage.SymbolConfiguration(pointSize: 13, weight: .semibold)))
+    var onOpen: (() -> Void)?
+    /// What the picture was drawn from, so it is only drawn again when that changes.
+    var shownKey: String?
+
+    var image: UIImage? {
+        get { picture.image }
+        set { picture.image = newValue }
+    }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        picture.contentMode = .scaleAspectFill
+        picture.clipsToBounds = true
+        picture.frame = bounds
+        picture.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        addSubview(picture)
+
+        chip.backgroundColor = .board
+        chip.layer.borderColor = UIColor.hairline.resolvedColor(with: traitCollection).cgColor
+        chip.layer.borderWidth = 1
+        chip.layer.shadowColor = UIColor(hex: 0x3A2A12).cgColor
+        chip.layer.shadowOpacity = 0.16
+        chip.layer.shadowRadius = 3
+        chip.layer.shadowOffset = CGSize(width: 0, height: 1)
+        chip.isUserInteractionEnabled = false
+        label.text = String(localized: "Open Whiteboard")
+        let style = UIFontDescriptor.preferredFontDescriptor(withTextStyle: .subheadline)
+        label.font = UIFont(descriptor: style.withSymbolicTraits(.traitBold) ?? style, size: 0)
+        label.adjustsFontForContentSizeCategory = true
+        label.numberOfLines = 0
+        label.textAlignment = .center
+        label.textColor = .ink
+        symbol.tintColor = .ink
+        let row = UIStackView(arrangedSubviews: [symbol, label])
+        row.spacing = Space.x2
+        row.alignment = .center
+        row.translatesAutoresizingMaskIntoConstraints = false
+        chip.translatesAutoresizingMaskIntoConstraints = false
+        chip.addSubview(row)
+        addSubview(chip)
+        NSLayoutConstraint.activate([
+            row.leadingAnchor.constraint(equalTo: chip.leadingAnchor, constant: Space.x4),
+            row.trailingAnchor.constraint(equalTo: chip.trailingAnchor, constant: -Space.x4),
+            row.topAnchor.constraint(equalTo: chip.topAnchor, constant: Space.x2),
+            row.bottomAnchor.constraint(equalTo: chip.bottomAnchor, constant: -Space.x2),
+            chip.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
+            chip.centerXAnchor.constraint(equalTo: centerXAnchor),
+            chip.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -Space.x5),
+            chip.widthAnchor.constraint(lessThanOrEqualTo: widthAnchor, constant: -Space.x4),
+        ])
+        addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(open)))
+        addInteraction(UIPointerInteraction())
+        isAccessibilityElement = true
+        accessibilityTraits = .button
+        accessibilityHint = String(localized: "Opens the whiteboard")
+        registerForTraitChanges([UITraitUserInterfaceStyle.self, UITraitAccessibilityContrast.self]) { (self: Self, _) in
+            self.chip.layer.borderColor = UIColor.hairline.resolvedColor(with: self.traitCollection).cgColor
+        }
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        chip.layer.cornerRadius = chip.bounds.height / 2
+    }
+
+    @objc private func open() { onOpen?() }
+
+    override func accessibilityActivate() -> Bool {
+        onOpen?()
+        return true
+    }
+}
+
 final class PageSlotView: UIView {
     var page: NotebookPage
     var paper: PagePaperView?
+    var card: BoardCardView?
     weak var canvas: PageCanvasView?
     var findView: FindHighlightView?
     private(set) var itemViews: [UUID: PageItemView] = [:]
@@ -256,7 +363,11 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     private lazy var itemTap = UITapGestureRecognizer(target: self, action: #selector(tappedPage))
     private lazy var itemHold = UILongPressGestureRecognizer(target: self, action: #selector(heldPage))
     private lazy var tapeTap = UITapGestureRecognizer(target: self, action: #selector(tappedTape))
-    private var zoomBeforePresenting: CGFloat?
+    /// The whiteboard that is open on its own, the zoom the stack of pages was left at, and where each board was left.
+    private var soloID: UUID?
+    private var stackZoom: CGFloat = 1
+    private var boardViews: [UUID: (center: CGPoint, zoom: CGFloat)] = [:]
+    private var isSolo: Bool { layout.solo != nil }
     private var lastSafeTop: CGFloat = 0
     private var firstInkPage: UUID?
     private var firstInkReported = false
@@ -282,6 +393,8 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     required init?(coder: NSCoder) { fatalError() }
 
     var liveCanvasCount: Int { canvases.count }
+    /// The whiteboard that is open on its own, if one is.
+    var openBoardID: UUID? { soloID }
     var paperPixelCount: Int { slots.values.reduce(0) { $0 + ($1.paper?.pixelCount ?? 0) } }
     var isPaperDrawn: Bool { slots.values.allSatisfy { $0.paper?.isDrawn ?? false } }
 
@@ -392,17 +505,26 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         // While presenting or replaying, the page being shown is the session's: a panel comes in beside the pages,
         // and the scroll position is mid-change when the view resizes.
         let page = isFirst ? session.currentPage : isPresenting || replay != nil ? pendingPage ?? session.currentPage : currentPage
+        let middle = isFirst || !isSolo ? nil : boardMiddle(of: lastBounds.size)
         lastBounds = bounds
-        fitScale = bounds.width / layout.size.width
-        let tallest = layout.frames.map(\.height).max() ?? 1
-        minimumZoom = min(1, bounds.height / (tallest + PageStackLayout.margin * 2) / fitScale)
         if isFirst {
             firstInkPage = pages.indices.contains(page) ? pages[page].id : nil
             lastSafeTop = view.safeAreaInsets.top
+            if pages.indices.contains(page), pages[page].isBoard {
+                soloID = pages[page].id
+                layout = PageStackLayout(pages: pages, solo: page)
+            }
         }
+        measure()
         layoutZoomPanel()
         bake(zoom: zoom)
-        scrollToPage(page, animated: false)
+        if let middle {
+            center(on: middle)
+        } else if isSolo {
+            placeBoard()
+        } else {
+            scrollToPage(page, animated: false)
+        }
         updateWindow(force: true)
         if isPresenting { present(page: page) }
         resizeZoomWindow()
@@ -423,8 +545,8 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
             UIKeyCommand(title: String(localized: "Last Page"), action: #selector(lastPage), input: UIKeyCommand.inputDownArrow, modifierFlags: .command),
             UIKeyCommand(title: String(localized: "First Page"), action: #selector(firstPage), input: UIKeyCommand.inputHome),
             UIKeyCommand(title: String(localized: "Last Page"), action: #selector(lastPage), input: UIKeyCommand.inputEnd),
-            UIKeyCommand(title: String(localized: "Fit Width"), action: #selector(fitWidth), input: "0", modifierFlags: .command),
-            UIKeyCommand(title: String(localized: "Fit Page"), action: #selector(fitWholePage), input: "9", modifierFlags: .command),
+            UIKeyCommand(title: isSolo ? String(localized: "Actual Size") : String(localized: "Fit Width"), action: #selector(fitWidth), input: "0", modifierFlags: .command),
+            UIKeyCommand(title: isSolo ? String(localized: "Show Everything") : String(localized: "Fit Page"), action: #selector(fitWholePage), input: "9", modifierFlags: .command),
         ]
         let presenting = !isPresenting ? [] : [
             UIKeyCommand(title: String(localized: "Next Page"), action: #selector(nextPage), input: UIKeyCommand.inputRightArrow),
@@ -530,6 +652,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     /// The page under a line 30% down the viewport, or the last page once the scroll can't go further,
     /// so a short last page can still become current.
     var currentPage: Int {
+        if let solo = layout.solo { return solo }
         guard effectiveScale > 0, !pages.isEmpty else { return 0 }
         let inset = scrollView.adjustedContentInset
         let maxY = scrollView.contentSize.height + inset.bottom - scrollView.bounds.height
@@ -540,6 +663,12 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     func setZoom(_ newZoom: CGFloat) {
         guard !pages.isEmpty else { return }
         let page = currentPage
+        if isSolo {
+            let middle = boardMiddle()
+            bake(zoom: newZoom)
+            center(on: middle)
+            return updateWindow(force: true)
+        }
         bake(zoom: newZoom)
         let frame = layout.frames[page]
         scrollView.contentOffset = clamped(CGPoint(x: (frame.minX + 40) * bakedScale - scrollView.contentInset.left,
@@ -559,6 +688,11 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     /// The zoom that fits the current page, not the widest one, so a small page can fill the screen.
     func fitZoom(_ fit: PageFit, page index: Int) -> CGFloat {
         guard layout.frames.indices.contains(index), fitScale > 0 else { return 1 }
+        if layout.solo == index {
+            guard fit == .page else { return 1 }
+            let frame = boardFrame(index), area = readableArea
+            return max(min(area.width / (frame.width * fitScale), area.height / (frame.height * fitScale)), minimumZoom)
+        }
         let frame = layout.frames[index], area = readableArea, margin = PageStackLayout.margin
         let width = area.width / ((frame.width + margin * 2) * fitScale)
         return fit == .width ? width : min(width, area.height / ((frame.height + margin * 2) * fitScale))
@@ -567,6 +701,15 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     func fit(_ fit: PageFit) {
         guard !pages.isEmpty, fitScale > 0 else { return }
         let index = pendingPage ?? currentPage, frame = layout.frames[index], area = readableArea
+        if layout.solo == index {
+            // A whiteboard has no width to fit: it goes to its actual size about the same middle, or shows all that is on it.
+            let shown = boardFrame(index), middle = fit == .page ? CGPoint(x: shown.midX, y: shown.midY) : boardMiddle()
+            pendingPage = nil
+            bake(zoom: min(fitZoom(fit, page: index), maximumZoom))
+            center(on: middle)
+            updateWindow(force: true)
+            return session.pageDidChange(index)
+        }
         let line = scrollView.bounds.height * 0.3
         let anchor = (scrollView.contentOffset.y + scrollView.adjustedContentInset.top + line) / effectiveScale
         let target = min(fitZoom(fit, page: index), maximumZoom)
@@ -591,7 +734,10 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     private var pendingPage: Int?
 
     func scrollToPage(_ index: Int, animated: Bool = false) {
-        guard layout.frames.indices.contains(index) else { return }
+        guard layout.frames.indices.contains(index), pages.indices.contains(index) else { return }
+        if pages[index].isBoard { return openBoard(index) }
+        let animated = animated && !isSolo
+        closeBoard()
         let y = (layout.frames[index].minY - PageStackLayout.margin / 2) * effectiveScale - scrollView.contentInset.top
         let target = clamped(CGPoint(x: scrollView.contentOffset.x, y: y))
         let moves = animated && abs(target.y - scrollView.contentOffset.y) > 0.5
@@ -618,7 +764,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     private func updateWindow(force: Bool = false) {
         guard isViewLoaded, !isBaking, let visible = visibleRange() else { return }
         let count = pages.count
-        let window = max(0, visible.lowerBound - 1)...min(count - 1, visible.upperBound + 1)
+        let window = layout.solo.map { $0...$0 } ?? max(0, visible.lowerBound - 1)...min(count - 1, visible.upperBound + 1)
         if force || window != canvasWindow {
             canvasWindow = window
             let keep = Set(pages[window].map(\.id))
@@ -626,17 +772,17 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
             for index in window {
                 let page = pages[index]
                 let slot = slots[page.id] ?? makeSlot(page, at: index)
-                if slot.canvas == nil { attachCanvas(page, to: slot) }
+                if slot.canvas == nil, slot.card == nil { attachCanvas(page, to: slot) }
             }
             document.pinInk(keep.union(zoomWindow.map { [$0.pageID] } ?? []))
-            let prefetch = max(0, visible.lowerBound - 3)...min(count - 1, visible.upperBound + 3)
+            let prefetch = isSolo ? window : max(0, visible.lowerBound - 3)...min(count - 1, visible.upperBound + 3)
             document.prefetchInk(pages[prefetch].map(\.id))
         }
         let density = paperDensity()
         for index in canvasWindow ?? window {
             guard let slot = slots[pages[index].id] else { continue }
             if let canvas = slot.canvas { place(canvas, in: slot) }
-            updatePaper(in: slot, density: density)
+            if slot.card == nil { updatePaper(in: slot, density: density) }
         }
         let page = currentPage
         if pendingPage == nil, page != session.currentPage { session.pageDidChange(page) }
@@ -665,14 +811,27 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
 
     private func makeSlot(_ page: NotebookPage, at index: Int) -> PageSlotView {
         let slot = PageSlotView(page: page)
-        slot.layer.borderWidth = 1 / max(traitCollection.displayScale, 1)
+        slot.layer.borderWidth = isSolo ? 0 : 1 / max(traitCollection.displayScale, 1)
         slot.layer.borderColor = UIColor.hairline.resolvedColor(with: traitCollection).cgColor
         position(slot, at: index)
         contentView.addSubview(slot)
         if let inkLasso { contentView.bringSubviewToFront(inkLasso) }
         if let zoomTarget { contentView.bringSubviewToFront(zoomTarget) }
         slots[page.id] = slot
-        if page.hasItems { syncItems(in: slot) }
+        if page.isBoard, !isSolo {
+            let card = BoardCardView(frame: slot.bounds)
+            card.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            card.onOpen = { [weak self] in
+                guard let self, let index = self.index(of: page.id) else { return }
+                self.session.go(to: index)
+            }
+            slot.addSubview(card)
+            slot.card = card
+            nameCard(in: slot, at: index)
+            drawCard(in: slot)
+        } else if page.hasItems {
+            syncItems(in: slot)
+        }
         showFind(in: slot)
         return slot
     }
@@ -751,7 +910,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         canvas.pageID = page.id
         canvas.overrideUserInterfaceStyle = page.effectivePaperColor.inkAppearance
         let number = (index(of: page.id) ?? 0) + 1
-        canvas.accessibilityLabel = DailyJournal.canvasLabel(page: number, day: page.day)
+        canvas.accessibilityLabel = canvasLabel(page, number: number)
         canvas.accessibilityIdentifier = "page.canvas.\(number)"
         place(canvas, in: slot)
         slot.addSubview(canvas)
@@ -938,6 +1097,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         if inkLasso != nil, !isMovingInk, !inkSelection.isEmpty { setInkSelection([:]) }
         guard let ink = document.loadedInk(pageID) else { return }
         if zoomWindow?.pageID == pageID, let zoomCanvas { showZoomInk(ink, in: zoomCanvas) }
+        if let slot = slots[pageID], slot.card != nil { drawCard(in: slot) }
         guard let canvas = canvases[pageID] else { return }
         show(ink, in: canvas)
     }
@@ -989,7 +1149,12 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
             let page = pages[index]
             let changed = slot.page.extra["items"] != page.extra["items"]
             slot.page = page
-            if changed || (all && page.hasItems) { syncItems(in: slot) }
+            if let card = slot.card {
+                if all { card.shownKey = nil }
+                drawCard(in: slot)
+            } else if changed || (all && page.hasItems) {
+                syncItems(in: slot)
+            }
         }
         showSelection()
     }
@@ -1059,7 +1224,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     /// The topmost thing under a point in the scroll view: tape first, since it lies over the rest.
     private func item(at point: CGPoint, tapeOnly: Bool = false) -> ItemSelection? {
         guard bakedScale > 0 else { return nil }
-        for slot in slots.values where slot.page.hasItems {
+        for slot in slots.values where slot.page.hasItems && slot.card == nil {
             let local = contentView.convert(point, from: scrollView)
             guard slot.frame.contains(local) else { continue }
             let onPage = CGPoint(x: (local.x - slot.frame.minX) / bakedScale, y: (local.y - slot.frame.minY) / bakedScale)
@@ -1246,10 +1411,12 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     func dropInteraction(_ interaction: UIDropInteraction, performDrop session: UIDropSession) {
         let local = contentView.convert(session.location(in: view), from: view)
         guard effectiveScale > 0, let index = layout.frames.indices.first(where: {
-            layout.frames[$0].insetBy(dx: -PageStackLayout.margin, dy: -PageStackLayout.margin / 2).contains(CGPoint(x: local.x / bakedScale, y: local.y / bakedScale))
+            !layout.frames[$0].isEmpty && layout.frames[$0].insetBy(dx: -PageStackLayout.margin, dy: -PageStackLayout.margin / 2).contains(CGPoint(x: local.x / bakedScale, y: local.y / bakedScale))
         }) else { return }
         let frame = layout.frames[index]
-        let point = CGPoint(x: min(max(local.x / bakedScale - frame.minX, 0), frame.width), y: min(max(local.y / bakedScale - frame.minY, 0), frame.height))
+        // Dropped on a whiteboard's card, a picture goes to the middle of what the board shows once it opens.
+        let point = layout.isLaidOut(index, in: pages)
+            ? CGPoint(x: min(max(local.x / bakedScale - frame.minX, 0), frame.width), y: min(max(local.y / bakedScale - frame.minY, 0), frame.height)) : nil
         session.loadObjects(ofClass: UIImage.self) { [weak self] objects in
             self?.place(objects.compactMap { $0 as? UIImage }, onPage: index, at: point)
         }
@@ -1277,7 +1444,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
 
     /// The middle of what's showing of a page, in page points: where a new picture or sticker lands.
     func visibleCenter(ofPage index: Int) -> CGPoint? {
-        guard pages.indices.contains(index), effectiveScale > 0 else { return nil }
+        guard layout.isLaidOut(index, in: pages), effectiveScale > 0 else { return nil }
         let frame = layout.frames[index]
         let area = readableArea
         let visible = CGRect(x: (scrollView.contentOffset.x + area.minX) / effectiveScale, y: (scrollView.contentOffset.y + area.minY) / effectiveScale,
@@ -1300,14 +1467,23 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     private func relayout(_ updated: [NotebookPage], changed: Set<UUID>) {
         let anchorID = pages.indices.contains(currentPage) ? pages[currentPage].id : nil
         let anchorOffset = anchorID.flatMap { id in index(of: id).map { scrollView.contentOffset.y - layout.frames[$0].minY * effectiveScale } }
+        let wasSolo = layout.solo
         pages = updated
-        layout = PageStackLayout(pages: pages)
+        if let wasSolo, soloID.flatMap(index(of:)) == nil {
+            // The open whiteboard was deleted: the page that took its place is shown.
+            arrange(solo: nil)
+            bake(zoom: stackZoom)
+            if pages.isEmpty { return updateWindow(force: true) }
+            return session.go(to: min(wasSolo, pages.count - 1), animated: false)
+        }
+        layout = PageStackLayout(pages: pages, solo: soloID.flatMap(index(of:)))
         for id in changed where slots[id] != nil { removeSlot(id) }
         for (id, slot) in slots {
             guard let index = index(of: id) else { removeSlot(id); continue }
             position(slot, at: index)
-            slot.canvas?.accessibilityLabel = DailyJournal.canvasLabel(page: index + 1, day: pages[index].day)
+            slot.canvas?.accessibilityLabel = canvasLabel(pages[index], number: index + 1)
             slot.canvas?.accessibilityIdentifier = "page.canvas.\(index + 1)"
+            nameCard(in: slot, at: index)
         }
         contentView.frame = CGRect(x: 0, y: 0, width: layout.size.width * effectiveScale, height: layout.size.height * effectiveScale)
         scrollView.contentSize = contentView.frame.size
@@ -1318,6 +1494,161 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         }
         updateInsets()
         updateWindow(force: true)
+    }
+
+    // MARK: Whiteboards
+
+    private func measure() {
+        let bounds = view.bounds
+        // A tap on the status bar would send a board to its far corner, and its scroll bars would say nothing.
+        scrollView.scrollsToTop = !isSolo
+        scrollView.showsVerticalScrollIndicator = !isSolo
+        scrollView.showsHorizontalScrollIndicator = !isSolo
+        if isSolo {
+            fitScale = bounds.width / (PageStackLayout.sheetWidth(pages) + PageStackLayout.margin * 2)
+            minimumZoom = Whiteboard.minimumZoom
+        } else {
+            fitScale = bounds.width / layout.size.width
+            let tallest = layout.frames.map(\.height).max() ?? 1
+            minimumZoom = min(1, bounds.height / (tallest + PageStackLayout.margin * 2) / fitScale)
+        }
+    }
+
+    /// The point of the open whiteboard in the middle of what can be read.
+    private func boardMiddle(of size: CGSize? = nil) -> CGPoint {
+        var area = readableArea
+        if let size {
+            area.size.width += size.width - view.bounds.width
+            area.size.height += size.height - view.bounds.height
+        }
+        guard effectiveScale > 0 else { return Whiteboard.center }
+        return CGPoint(x: (scrollView.contentOffset.x + area.midX) / effectiveScale, y: (scrollView.contentOffset.y + area.midY) / effectiveScale)
+    }
+
+    private func center(on point: CGPoint) {
+        let area = readableArea
+        scrollView.contentOffset = clamped(CGPoint(x: point.x * bakedScale - area.midX, y: point.y * bakedScale - area.midY))
+    }
+
+    /// What stands in for the whole of a whiteboard: its ink and what is placed on it, with room round them.
+    private func boardFrame(_ index: Int) -> CGRect {
+        Whiteboard.frame(of: pages[index], ink: document.loadedInk(pages[index].id) ?? PKDrawing())
+    }
+
+    /// The part of the stack a presented page takes up.
+    private func presentedFrame(_ index: Int) -> CGRect {
+        layout.solo == index ? boardFrame(index) : layout.frames[index]
+    }
+
+    /// Keeps where the open whiteboard was left, or the zoom the pages were at, for coming back to.
+    private func rememberView(evenPresenting: Bool = false) {
+        guard lastBounds != .zero, effectiveScale > 0, evenPresenting || !isPresenting else { return }
+        if let soloID { boardViews[soloID] = (boardMiddle(), zoom) } else { stackZoom = zoom }
+    }
+
+    /// Lays out one whiteboard alone, or the stack of pages again. Whatever was on show is built afresh.
+    private func arrange(solo id: UUID?) {
+        rememberView()
+        if zoomPanel != nil {
+            closeZoomWindow()
+            session.zoomWindowDidClose()
+        }
+        select(nil)
+        if inkLasso != nil { setInkSelection([:]) }
+        scrollView.setContentOffset(scrollView.contentOffset, animated: false)
+        if lastBounds != .zero, view.window != nil {
+            let fade = CATransition()
+            fade.type = .fade
+            fade.duration = 0.18
+            scrollView.layer.add(fade, forKey: "board")
+        }
+        for slot in Array(slots.keys) { removeSlot(slot) }
+        soloID = id
+        layout = PageStackLayout(pages: pages, solo: id.flatMap(index(of:)))
+        canvasWindow = nil
+        pendingPage = nil
+        if lastBounds != .zero { measure() }
+    }
+
+    private func openBoard(_ index: Int) {
+        pendingPage = nil
+        guard soloID != pages[index].id else { return }
+        arrange(solo: pages[index].id)
+        guard lastBounds != .zero else { return }
+        placeBoard()
+        updateWindow(force: true)
+        UIAccessibility.post(notification: .screenChanged, argument: nil)
+    }
+
+    private func closeBoard() {
+        guard soloID != nil else { return }
+        arrange(solo: nil)
+        if lastBounds != .zero { bake(zoom: stackZoom) }
+    }
+
+    /// Shows a page among the others, or on its own if it is a whiteboard, without choosing where in it to look.
+    private func bring(_ index: Int) {
+        guard pages.indices.contains(index) else { return }
+        if pages[index].isBoard {
+            openBoard(index)
+        } else if isSolo {
+            scrollToPage(index, animated: false)
+        }
+    }
+
+    /// Where an opened whiteboard starts: where it was left, or on everything that is on it, or its middle while it is empty.
+    private func placeBoard() {
+        guard let id = soloID, let index = layout.solo else { return }
+        if let left = boardViews[id] {
+            bake(zoom: left.zoom)
+            return center(on: left.center)
+        }
+        bake(zoom: 1)
+        if let ink = document.loadedInk(id) { return showContent(of: index, ink: ink) }
+        center(on: Whiteboard.contentBounds(of: pages[index], ink: PKDrawing()).map { CGPoint(x: $0.midX, y: $0.midY) } ?? Whiteboard.center)
+        let placed = scrollView.contentOffset
+        Task { [weak self] in
+            guard let self else { return }
+            let ink = await document.ink(id)
+            guard soloID == id, zoom == 1, scrollView.contentOffset == placed, !isPresenting, let index = self.index(of: id) else { return }
+            showContent(of: index, ink: ink)
+            updateWindow(force: true)
+        }
+    }
+
+    private func showContent(of index: Int, ink: PKDrawing) {
+        guard Whiteboard.contentBounds(of: pages[index], ink: ink) != nil else { return center(on: Whiteboard.center) }
+        let frame = Whiteboard.frame(of: pages[index], ink: ink), area = readableArea
+        let fits = min(area.width / (frame.width * fitScale), area.height / (frame.height * fitScale))
+        bake(zoom: min(max(fits, minimumZoom), 1))
+        center(on: CGPoint(x: frame.midX, y: frame.midY))
+    }
+
+    private func canvasLabel(_ page: NotebookPage, number: Int) -> String {
+        page.isBoard ? String(localized: "Whiteboard, page \(number), handwriting") : DailyJournal.canvasLabel(page: number, day: page.day)
+    }
+
+    private func nameCard(in slot: PageSlotView, at index: Int) {
+        slot.card?.accessibilityLabel = String(localized: "Whiteboard, page \(index + 1)")
+        slot.card?.accessibilityIdentifier = "page.board.\(index + 1)"
+    }
+
+    /// Draws what is on a whiteboard onto its card, off the main thread, when it has changed.
+    private func drawCard(in slot: PageSlotView) {
+        guard let card = slot.card else { return }
+        let page = slot.page, id = page.id, assets = document.package.assetsDirectory, titles = linkTitles
+        let width = min(max(slot.bounds.width, 320), 1100), scale = max(traitCollection.displayScale, 1)
+        Task { [weak self, weak card] in
+            guard let self else { return }
+            let ink = await document.ink(id)
+            let key = "\(page.appearanceKey)-\(NotebookFind.fingerprint(ink))"
+            guard let card, card.shownKey != key else { return }
+            card.shownKey = key
+            let image = await Task.detached(priority: .userInitiated) {
+                SharedSlide(image: PageRenderer.image(of: page, ink: ink, assets: assets, width: width, scale: scale, links: titles))
+            }.value.image
+            if card.shownKey == key { card.image = image }
+        }
     }
 
     // MARK: EditorCanvasControlling
@@ -1372,7 +1703,9 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     // MARK: Selecting ink across pages
 
     private var stackFrames: [UUID: CGRect] {
-        Dictionary(zip(pages.map(\.id), layout.frames), uniquingKeysWith: { first, _ in first })
+        var frames: [UUID: CGRect] = [:]
+        for (index, page) in pages.enumerated() where layout.isLaidOut(index, in: pages) { frames[page.id] = layout.frames[index] }
+        return frames
     }
 
     /// The ink of the pages that have a canvas: the pages a lasso can reach and a drag can land on.
@@ -1586,7 +1919,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     }
 
     private func showFind(in slot: PageSlotView) {
-        let rects = findRects[slot.page.id] ?? []
+        let rects = slot.card == nil ? findRects[slot.page.id] ?? [] : []
         guard isFinding, !rects.isEmpty else {
             slot.findView?.removeFromSuperview()
             slot.findView = nil
@@ -1603,13 +1936,14 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
 
     private func reveal(_ match: FindMatch) {
         guard let index = index(of: match.pageID) else { return }
+        bring(index)
         session.pageDidChange(index)
         reveal(match.rect, onPage: index, margin: 56)
     }
 
     /// Scrolls just far enough to bring part of a page into what can be seen, clear of the keyboard and the zoom window.
     private func reveal(_ rect: CGRect, onPage index: Int, margin: CGFloat) {
-        guard layout.frames.indices.contains(index), effectiveScale > 0 else { return }
+        guard layout.isLaidOut(index, in: pages), effectiveScale > 0 else { return }
         let frame = layout.frames[index], scale = effectiveScale
         let target = CGRect(x: (frame.minX + rect.minX) * scale, y: (frame.minY + rect.minY) * scale, width: rect.width * scale, height: rect.height * scale)
         var area = readableArea
@@ -1636,6 +1970,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         guard !isLocked, !document.isReadOnly, !pages.isEmpty else { return session.zoomWindowDidClose() }
         select(nil)
         let index = pendingPage ?? currentPage
+        if !layout.isLaidOut(index, in: pages) { bring(index) }
         let panel = ZoomWindowPanel()
         panel.onAction = { [weak self] in self?.zoomAction($0) }
         view.insertSubview(panel, belowSubview: laser)
@@ -1698,7 +2033,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     /// What the window covers at the current zoom level: the shape of the strip, as wide as that level's share of the page.
     private func zoomSize(onPage index: Int) -> CGSize? {
         guard let area = zoomPanel?.canvasArea.bounds.size, area.width > 0, area.height > 0, pages.indices.contains(index) else { return nil }
-        let width = pages[index].size.width * ZoomWindow.widths[zoomLevel]
+        let width = pages[index].sheetSize.width * ZoomWindow.widths[zoomLevel]
         return CGSize(width: width, height: area.height * width / area.width)
     }
 
@@ -1788,7 +2123,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
 
     private func layoutZoomTarget() {
         guard let target = zoomTarget else { return }
-        guard let window = zoomWindow, let index = index(of: window.pageID) else { return target.isHidden = true }
+        guard let window = zoomWindow, let index = index(of: window.pageID), layout.isLaidOut(index, in: pages) else { return target.isHidden = true }
         let frame = layout.frames[index], scale = bakedScale
         target.isHidden = false
         target.frame = CGRect(x: (frame.minX + window.rect.minX) * scale, y: (frame.minY + window.rect.minY) * scale,
@@ -1811,7 +2146,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         case .newLine: moveZoomWindow(orTurnPage: true) { $0.newLine() }
         case .here:
             let index = pendingPage ?? currentPage
-            placeZoomWindow(onPage: index, center: visibleCenter(ofPage: index))
+            if layout.isLaidOut(index, in: pages) { placeZoomWindow(onPage: index, center: visibleCenter(ofPage: index)) }
         case .closer, .further:
             zoomLevel = min(max(zoomLevel + (action == .closer ? -1 : 1), 0), ZoomWindow.widths.count - 1)
             resizeZoomWindow()
@@ -1829,7 +2164,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         if change(&window) {
             zoomWindow = window
             showZoomWindow()
-        } else if orTurnPage, window.isAtPageEnd, let index = index(of: window.pageID), pages.indices.contains(index + 1) {
+        } else if orTurnPage, window.isAtPageEnd, let index = index(of: window.pageID), layout.isLaidOut(index + 1, in: pages) {
             let size = window.rect.size
             placeZoomWindow(onPage: index + 1, center: CGPoint(x: window.lineStart + size.width / 2, y: size.height / 2 + window.lineHeight))
         } else {
@@ -1904,7 +2239,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     private func seekReplay(to point: CGPoint) {
         guard let replay, bakedScale > 0 else { return }
         let local = contentView.convert(point, from: scrollView)
-        for slot in slots.values where slot.frame.contains(local) {
+        for slot in slots.values where slot.frame.contains(local) && slot.card == nil {
             let onPage = CGPoint(x: (local.x - slot.frame.minX) / bakedScale, y: (local.y - slot.frame.minY) / bakedScale)
             guard let ink = document.loadedInk(slot.page.id), let stroke = ReplayInk.stroke(at: onPage, in: ink),
                   let time = replay.timeline.time(ofStroke: stroke, onPage: slot.page.id) else { return }
@@ -1937,15 +2272,18 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         updateScrollTouches()
         guard isViewLoaded, lastBounds != .zero else { return }
         if presenting {
-            zoomBeforePresenting = zoom
+            rememberView(evenPresenting: true)
             updateInsets()
             present(page: currentPage)
         } else {
             let page = currentPage
             updateInsets()
-            if let zoomBeforePresenting { bake(zoom: zoomBeforePresenting) }
-            zoomBeforePresenting = nil
-            scrollToPage(page, animated: false)
+            if isSolo {
+                placeBoard()
+            } else {
+                bake(zoom: stackZoom)
+                scrollToPage(page, animated: false)
+            }
             updateWindow(force: true)
         }
     }
@@ -1953,6 +2291,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     /// Shows one whole page, the way a slide is shown.
     func present(page index: Int) {
         guard pages.indices.contains(index) else { return }
+        bring(index)
         pendingPage = index
         fit(.page)
     }
@@ -1986,7 +2325,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     /// A point in the laser's view as a fraction of the presented page.
     private func onPresentedPage(_ point: CGPoint) -> CGPoint {
         guard let index = presentedPage, effectiveScale > 0 else { return .zero }
-        let frame = layout.frames[index], local = contentView.convert(point, from: laser)
+        let frame = presentedFrame(index), local = contentView.convert(point, from: laser)
         return CGPoint(x: (local.x / bakedScale - frame.minX) / frame.width, y: (local.y / bakedScale - frame.minY) / frame.height)
     }
 
@@ -2002,7 +2341,9 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     /// Keeps a second screen on the page being presented, and on the part of it the iPad is zoomed in on.
     private func mirrorPresentation() {
         guard let index = presentedPage, effectiveScale > 0, let pixels = ExternalDisplay.shared.pixelSize(for: self) else { return }
-        let page = pages[index], frame = layout.frames[index], area = readableArea
+        let frame = presentedFrame(index), area = readableArea
+        // A whiteboard is shown as the part of it that has something on it.
+        let page = layout.solo == index ? Whiteboard.piece(of: pages[index], in: frame) : pages[index]
         let visible = CGRect(x: (scrollView.contentOffset.x + area.minX) / effectiveScale, y: (scrollView.contentOffset.y + area.minY) / effectiveScale,
                              width: area.width / effectiveScale, height: area.height / effectiveScale).intersection(frame)
         let whole = CGRect(x: 0, y: 0, width: 1, height: 1)
@@ -2011,7 +2352,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
             width: visible.width / frame.width, height: visible.height / frame.height), by: self)
         let lifted = session.liftedTapes
         let liftedKey = page.hasItems ? page.items.filter { lifted.contains($0.id) }.map(\.id.uuidString).joined() : ""
-        let key = "\(page.id)-\(page.thumbnailKey)-\(Int(pixels.width))x\(Int(pixels.height))-\(liftedKey)"
+        let key = "\(page.id)-\(page.thumbnailKey)-\(Int(pixels.width))x\(Int(pixels.height))-\(liftedKey)-\(page.inkRect)"
         guard key != mirrored else { return }
         mirrored = key
         let assets = document.package.assetsDirectory, titles = linkTitles

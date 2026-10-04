@@ -430,7 +430,7 @@ final class NotebookDocument {
     /// and otherwise uses the notebook's defaults.
     func newPage(after index: Int?, template: PaperTemplate? = nil) -> NotebookPage {
         var page = manifest.defaults.newPage()
-        if let index, manifest.pages.indices.contains(index), manifest.pages[index].template != nil {
+        if let index, manifest.pages.indices.contains(index), manifest.pages[index].template != nil, !manifest.pages[index].isBoard {
             let anchor = manifest.pages[index]
             page.size = anchor.size
             page.paperColor = anchor.paperColor

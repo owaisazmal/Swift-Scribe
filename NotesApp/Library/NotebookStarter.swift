@@ -2,7 +2,7 @@ import Foundation
 
 /// One-tap combinations of cover and paper in New Notebook. Everything they set stays editable.
 enum NotebookStarter: String, CaseIterable, Identifiable {
-    case journal, lecture, sketchbook, planner, music, plain
+    case journal, lecture, sketchbook, planner, music, whiteboard, plain
 
     var id: String { rawValue }
 
@@ -13,6 +13,7 @@ enum NotebookStarter: String, CaseIterable, Identifiable {
         case .sketchbook: String(localized: "Sketchbook")
         case .planner: String(localized: "Planner")
         case .music: String(localized: "Music")
+        case .whiteboard: String(localized: "Whiteboard")
         case .plain: String(localized: "Plain")
         }
     }
@@ -27,13 +28,14 @@ enum NotebookStarter: String, CaseIterable, Identifiable {
         case .sketchbook: .blank
         case .planner: .weekPlanner
         case .music: .music
+        case .whiteboard: .dotted
         case .plain: UserDefaults.standard.string(forKey: SettingsKey.defaultTemplate).flatMap(PaperTemplate.init(rawValue:)) ?? .narrowRuled
         }
     }
 
     var paperColor: PaperColor {
         switch self {
-        case .lecture, .sketchbook: .white
+        case .lecture, .sketchbook, .whiteboard: .white
         case .journal, .planner, .music: .ivory
         case .plain: UserDefaults.standard.string(forKey: SettingsKey.defaultPaperColor).flatMap(PaperColor.init(rawValue:)) ?? .white
         }
@@ -48,9 +50,13 @@ enum NotebookStarter: String, CaseIterable, Identifiable {
         case .lecture: .navy
         case .planner: .mustard
         case .music: .oxblood
+        case .whiteboard: .slate
         case .sketchbook, .plain: nil
         }
     }
+
+    /// The notebook opens on a whiteboard rather than a page, while its paper is one a board can have.
+    func startsWithBoard(template: PaperTemplate) -> Bool { self == .whiteboard && Whiteboard.templates.contains(template) }
 
     var inks: (RisoInk, RisoInk) { self == .sketchbook ? (.pink, .yellow) : RisoInk.pairs[0] }
 
