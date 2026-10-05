@@ -206,6 +206,26 @@ final class ToolPresetTests: XCTestCase {
         XCTAssertEqual(canvas.drawingPolicy, .anyInput)
     }
 
+    func testEveryKindOfInkWritesALineOfItsOwnBroaderAsThePenIsSet() throws {
+        func inked(_ image: UIImage) throws -> [UInt8] {
+            let cg = try XCTUnwrap(image.cgImage)
+            var pixels = [UInt8](repeating: 0, count: cg.width * cg.height * 4)
+            let context = try XCTUnwrap(CGContext(data: &pixels, width: cg.width, height: cg.height, bitsPerComponent: 8, bytesPerRow: cg.width * 4,
+                                                  space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+            context.draw(cg, in: CGRect(x: 0, y: 0, width: cg.width, height: cg.height))
+            return stride(from: 3, to: pixels.count, by: 4).map { pixels[$0] }
+        }
+        var lines: Set<[UInt8]> = []
+        for kind in ToolPreset.kinds {
+            let name = ToolPreset.name(of: kind), image = InkSample.image(of: kind, breadth: 0)
+            XCTAssertEqual(image.size, InkSample.size)
+            let narrow = try inked(image), broad = try inked(InkSample.image(of: kind, breadth: 1))
+            XCTAssertGreaterThan(narrow.count { $0 > 60 }, 300, "\(name) leaves a mark at its narrowest")
+            XCTAssertGreaterThan(broad.count { $0 > 60 }, narrow.count { $0 > 60 } * 2, "\(name) writes broader as the pen is set broader")
+            XCTAssertTrue(lines.insert(narrow).inserted, "\(name) writes a line unlike the others")
+        }
+    }
+
     private func makeDocument() throws -> NotebookDocument {
         let root = StorageRoot(url: FileManager.default.temporaryDirectory.appending(path: "tool-tests-\(UUID().uuidString)", directoryHint: .isDirectory))
         let defaults = PageDefaults(template: .blank, paperColor: .white, pageSize: .letter)

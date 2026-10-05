@@ -23,6 +23,90 @@ final class ToolTrayUITests: XCTestCase {
         wait(for: [expectation(for: NSPredicate(format: "isSelected == true"), evaluatedWith: element)], timeout: 5)
     }
 
+    /// The tray and what opens from it, at night and at an accessibility text size.
+    func testTheTrayAndItsOptionsAtNightAndInLargeText() throws {
+        continueAfterFailure = true
+        XCUIDevice.shared.orientation = .portrait
+        addTeardownBlock { @MainActor in XCUIDevice.shared.appearance = .light }
+        let modes: [(name: String, appearance: XCUIDevice.Appearance, size: String?, checks: XCUIAccessibilityAuditType)] = [
+            ("dark", .dark, nil, .all),
+            ("large", .light, "UICTContentSizeCategoryAccessibilityL", [.dynamicType, .textClipped, .contrast]),
+            ("largest", .light, "UICTContentSizeCategoryAccessibilityXXXL", [.dynamicType, .textClipped])]
+        for mode in modes {
+            XCUIDevice.shared.appearance = mode.appearance
+            let app = XCUIApplication()
+            app.launchArguments = ["-storageRoot", "tools", "-resetStorage", "-seedLibrary", "3", "-drawingInput", "anyInput", "-freshToolPresets"]
+                + (mode.size.map { ["-UIPreferredContentSizeCategoryName", $0] } ?? [])
+            app.launch()
+            let notebook = app.buttons["notebook.Studio Notes 2"]
+            XCTAssertTrue(notebook.waitForExistence(timeout: 30))
+            notebook.tap()
+            let black = app.buttons["editor.tools.1"], eraser = app.buttons["editor.tools.eraser"]
+            XCTAssertTrue(black.waitForExistence(timeout: 20))
+            let canvas = app.element("page.canvas.1"), tray = app.element("editor.tools.tray"), large = mode.size != nil
+            func close(_ element: XCUIElement) {
+                canvas.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.1)).tap()
+                XCTAssertTrue(element.waitForNonExistence(timeout: 5))
+            }
+            attach(app, "\(mode.name)-tray")
+            try audit(app, mode.checks, screen: "\(mode.name) tool tray", largeText: large, bar: tray)
+
+            black.tap()
+            let remove = app.buttons["editor.tools.pen.remove"]
+            XCTAssertTrue(remove.waitForExistence(timeout: 5))
+            XCTAssertTrue(remove.isHittable, "the options fit on the screen")
+            app.buttons["Fountain Pen"].tap()
+            attach(app, "\(mode.name)-pen-options")
+            try audit(app, mode.checks, screen: "\(mode.name) pen options", popover: true, largeText: large)
+            close(remove)
+
+            eraser.tap()
+            eraser.tap()
+            let part = app.buttons["Part of a Stroke"]
+            XCTAssertTrue(part.waitForExistence(timeout: 5))
+            part.tap()
+            XCTAssertTrue(app.sliders["editor.tools.eraser.width"].waitForExistence(timeout: 5))
+            attach(app, "\(mode.name)-eraser-options")
+            try audit(app, mode.checks, screen: "\(mode.name) eraser options", popover: true, largeText: large)
+            close(part)
+
+            app.buttons["editor.tools.customise"].tap()
+            let zoom = app.buttons["editor.tools.shortcut.zoomWindow"]
+            XCTAssertTrue(zoom.waitForExistence(timeout: 5))
+            XCTAssertTrue(zoom.isHittable, "every tag fits on the screen")
+            attach(app, "\(mode.name)-shortcut-tags")
+            try audit(app, mode.checks, screen: "\(mode.name) shortcut tags", popover: true, largeText: large)
+            close(zoom)
+
+            // On its side the screen is at its shortest: what doesn't fit scrolls, and nothing is cut short.
+            if mode.name == "largest" {
+                XCUIDevice.shared.orientation = .landscapeLeft
+                defer { XCUIDevice.shared.orientation = .portrait }
+                let window = app.windows.firstMatch
+                wait(for: [expectation(for: NSPredicate { _, _ in window.frame.width > window.frame.height }, evaluatedWith: nil)], timeout: 10)
+                sleep(2)
+                black.tap()
+                black.tap()
+                XCTAssertTrue(remove.waitForExistence(timeout: 5))
+                sleep(2)
+                if remove.exists, !remove.isHittable { app.element("editor.tools.pen.kind").swipeUp() }
+                sleep(2)
+                XCTAssertTrue(remove.isHittable, "the end of the options is reached on a screen on its side")
+                try audit(app, mode.checks, screen: "largest pen options on its side", popover: true, largeText: true)
+                close(remove)
+                app.buttons["editor.tools.customise"].tap()
+                XCTAssertTrue(app.buttons["editor.tools.shortcut.picture"].waitForExistence(timeout: 5))
+                sleep(2)
+                try audit(app, mode.checks, screen: "largest shortcut tags on its side", popover: true, largeText: true)
+                if !zoom.isHittable { app.buttons["editor.tools.shortcut.sticker"].swipeUp() }
+                sleep(2)
+                XCTAssertTrue(zoom.isHittable, "the last tag is reached on a screen on its side")
+                close(zoom)
+            }
+            app.terminate()
+        }
+    }
+
     func testThePensTheEraserAndTheShortcutsStandInTheTray() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-storageRoot", "tools", "-resetStorage", "-seedLibrary", "3", "-drawingInput", "anyInput", "-freshToolPresets"]
@@ -82,6 +166,15 @@ final class ToolTrayUITests: XCTestCase {
         lasso.tap()
         waitUntilSelected(lasso)
 
+        // Touch and hold takes a pen up and opens it in one go.
+        let remove = app.buttons["editor.tools.pen.remove"]
+        black.press(forDuration: 0.8)
+        XCTAssertTrue(remove.waitForExistence(timeout: 5), "a held pen opens")
+        XCTAssertTrue(black.isSelected)
+        XCTAssertFalse(app.buttons["editor.tools.pen.left"].isEnabled, "the first pen has nowhere to go on the left")
+        canvas.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.2)).tap()
+        XCTAssertTrue(remove.waitForNonExistence(timeout: 5))
+
         // Tapped while in hand, a pen opens: its colour and its width are changed where it stands.
         cobalt.tap()
         waitUntilSelected(cobalt)
@@ -90,6 +183,15 @@ final class ToolTrayUITests: XCTestCase {
         XCTAssertTrue(green.waitForExistence(timeout: 5), "the pen's options")
         XCTAssertTrue(app.buttons["Blue"].isSelected)
         green.tap()
+        wait(for: [expectation(for: NSPredicate(format: "label == 'Pen, Green'"), evaluatedWith: cobalt)], timeout: 5)
+        // Its kind is chosen from the tools standing in the roll.
+        let pencil = app.buttons["Pencil"], plain = app.buttons["Pen"]
+        XCTAssertTrue(plain.isSelected)
+        pencil.tap()
+        wait(for: [expectation(for: NSPredicate(format: "label == 'Pencil, Green'"), evaluatedWith: cobalt)], timeout: 5)
+        XCTAssertTrue(pencil.isSelected)
+        attach(app, "pen-kind")
+        plain.tap()
         wait(for: [expectation(for: NSPredicate(format: "label == 'Pen, Green'"), evaluatedWith: cobalt)], timeout: 5)
         let width = app.sliders["editor.tools.pen.width"]
         let thin = width.value as? String
@@ -108,22 +210,33 @@ final class ToolTrayUITests: XCTestCase {
         XCTAssertTrue(fifth.waitForExistence(timeout: 5))
         XCTAssertEqual(fifth.label, "Pen, Grey")
         XCTAssertTrue(fifth.isSelected)
-        let remove = app.buttons["editor.tools.pen.remove"]
         XCTAssertTrue(remove.waitForExistence(timeout: 5), "the new pen opens")
+        // From its options it is moved along the tray, and taken off it.
+        XCTAssertFalse(app.buttons["editor.tools.pen.right"].isEnabled, "the last pen has nowhere to go on the right")
+        app.buttons["editor.tools.pen.left"].tap()
+        wait(for: [expectation(for: NSPredicate(format: "label == 'Pen, Grey'"), evaluatedWith: highlighter)], timeout: 5)
+        attach(app, "pen-moved")
+        app.buttons["editor.tools.pen.right"].tap()
+        wait(for: [expectation(for: NSPredicate(format: "label == 'Pen, Grey'"), evaluatedWith: fifth)], timeout: 5)
         remove.tap()
         XCTAssertTrue(fifth.waitForNonExistence(timeout: 5))
         waitUntilSelected(highlighter)
 
-        // The shortcuts beside the tools are chosen from the tray's own menu.
+        // The shortcuts beside the tools are tags, tied on and taken off from the end of the tray.
         XCTAssertFalse(app.buttons["editor.tools.extra.ruler"].exists)
         app.buttons["editor.tools.customise"].tap()
-        let ruler = app.buttons["Ruler"].firstMatch
+        let ruler = app.buttons["editor.tools.shortcut.ruler"], text = app.buttons["editor.tools.shortcut.text"]
         XCTAssertTrue(ruler.waitForExistence(timeout: 5))
-        attach(app, "customise")
-        // The menu stays open, so more than one can be changed.
+        XCTAssertFalse(ruler.isSelected)
+        XCTAssertTrue(text.isSelected)
+        // The tags stay open, so more than one can be changed.
         ruler.tap()
-        app.buttons["Text Box"].firstMatch.tap()
+        text.tap()
+        XCTAssertTrue(ruler.isSelected)
+        attach(app, "customise")
+        try audit(app, screen: "shortcut tags", popover: true)
         canvas.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.2)).tap()
+        XCTAssertTrue(ruler.waitForNonExistence(timeout: 5))
         let rulerButton = app.buttons["editor.tools.extra.ruler"]
         XCTAssertTrue(rulerButton.waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["editor.tools.extra.text"].exists)

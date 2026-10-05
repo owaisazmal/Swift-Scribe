@@ -6323,28 +6323,6 @@
         }
       }
     },
-    "Change Pen…" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Stift ändern …"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cambiar bolígrafo…"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Modifier le stylo…"
-          }
-        }
-      }
-    },
     "Change Tags" : {
       "localizations" : {
         "de" : {
