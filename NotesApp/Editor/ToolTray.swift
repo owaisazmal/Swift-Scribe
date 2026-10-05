@@ -227,7 +227,9 @@ private struct ShortcutOptions: View {
 
     var body: some View {
         // At the largest text sizes the tags are a list, each the whole width, so no name is cut short.
+        // At the very largest the card is wider too, or a word as short as "Imagen" is split over two lines.
         let list = textSize.isAccessibilitySize
+        let width: CGFloat = textSize > .accessibility2 ? 440 : 328
         let layout = list ? AnyLayout(VStackLayout(alignment: .leading, spacing: Space.x2)) : AnyLayout(FlowLayout(spacing: Space.x2))
         VStack(alignment: .leading, spacing: Space.x2) {
             Text("Shortcuts in the Tray")
@@ -245,7 +247,7 @@ private struct ShortcutOptions: View {
             }
         }
         .padding(Space.x4)
-        .frame(width: 328, alignment: .leading)
+        .frame(minWidth: 328, idealWidth: width, maxWidth: width, alignment: .leading)
     }
 }
 

@@ -1,4 +1,7 @@
 import XCTest
+#if canImport(FoundationModels)
+import FoundationModels
+#endif
 @testable import NotesApp
 
 /// Study guides: how notes are cut into pieces the model can take, and how the pieces' answers are put together.
@@ -118,9 +121,27 @@ final class StudyGuideTests: XCTestCase {
         XCTAssertEqual(quiz.map(\.question), ["What do the notes say about Mitochondria make?", "What do the notes say about Ribosomes build?"])
     }
 
+    /// Why the machine's model can't answer even a plain request, if it can't. CI's simulators report a model and then fail every request.
+    private func modelFault() async -> String? {
+        #if canImport(FoundationModels)
+        if #available(iOS 26, *) {
+            do {
+                _ = try await LanguageModelSession().respond(to: "Reply with the one word yes.")
+                return nil
+            } catch {
+                return String(describing: error)
+            }
+        }
+        #endif
+        return "no model"
+    }
+
     func testTheModelOnThisMachineWritesAboutNotes() async throws {
         guard StudyGuide.status == .ready, let model = StudyGuide.model() else {
             throw XCTSkip("no on-device language model here: \(StudyGuide.status)")
+        }
+        if let fault = await modelFault() {
+            throw XCTSkip("the language model here is reported ready but answers nothing: \(fault)")
         }
         let notes = """
             Mitochondria make ATP, the cell's energy.

@@ -107,7 +107,7 @@ struct InkLabel: View {
     }
 }
 
-/// The kinds of ink a pen can have, as tools standing tip up in a roll of cloth, a stitched pocket for each.
+/// The kinds of ink a pen can have, as tools standing tip up in a roll of cloth, a pocket for each.
 /// They wear the pen's colour. The pen's own kind stands out of its pocket, over a check mark on the cloth.
 struct PenRoll: View {
     @Binding var kind: PKInkingTool.InkType
@@ -147,16 +147,26 @@ struct PenRoll: View {
         .accessibilityLabel(Text("Kind"))
     }
 
-    /// The front of the pockets: cloth with a hem and a seam between each two, sewn in the cover's thread.
+    /// The front of the pockets: cloth that swells a little between its seams, piped in mustard along its top edge.
     private func pocket(_ kinds: [PKInkingTool.InkType]) -> some View {
         Rectangle()
             .fill(Color.primaryCloth)
             .overlay { if contrast != .increased { Rectangle().fill(ImagePaint(image: ClothWeave.tile, scale: 1)) } }
-            .overlay { LinearGradient(colors: [.white.opacity(0.1), .black.opacity(0.1)], startPoint: .top, endPoint: .bottom) }
-            .overlay(alignment: .top) { Rectangle().fill(.black.opacity(0.25)).frame(height: 1) }
+            .overlay { LinearGradient(colors: [.white.opacity(0.08), .black.opacity(0.12)], startPoint: .top, endPoint: .bottom) }
             .overlay {
-                Stitching(pockets: kinds.count)
-                    .stroke(Color.onPrimaryCloth.opacity(0.8), style: StrokeStyle(lineWidth: 1.2, lineCap: .round, dash: [3.5, 3]))
+                HStack(spacing: 0) {
+                    ForEach(Array(kinds.enumerated()), id: \.element) { index, _ in
+                        LinearGradient(stops: Self.swell, startPoint: .leading, endPoint: .trailing)
+                            .overlay(alignment: .leading) { if index > 0 { Rectangle().fill(.black.opacity(0.22)).frame(width: 1) } }
+                    }
+                }
+            }
+            .overlay(alignment: .top) {
+                Rectangle()
+                    .fill(Color.mustard)
+                    .overlay(alignment: .top) { Rectangle().fill(.white.opacity(0.35)).frame(height: 1) }
+                    .frame(height: Self.piping)
+                    .shadow(color: .black.opacity(0.35), radius: 0.5, y: 1)
             }
             .overlay {
                 HStack(spacing: 0) {
@@ -170,7 +180,7 @@ struct PenRoll: View {
                             .frame(maxWidth: .infinity)
                     }
                 }
-                .padding(.top, 6)
+                .padding(.top, Self.piping)
                 .animation(Motion.quick, value: kind)
             }
             .frame(height: Self.pocket)
@@ -179,21 +189,11 @@ struct PenRoll: View {
             .accessibilityHidden(true)
     }
 
-    private struct Stitching: Shape {
-        let pockets: Int
-
-        func path(in rect: CGRect) -> Path {
-            var path = Path()
-            path.move(to: CGPoint(x: rect.minX + 6, y: rect.minY + 5))
-            path.addLine(to: CGPoint(x: rect.maxX - 6, y: rect.minY + 5))
-            for seam in 1..<max(pockets, 1) {
-                let x = rect.minX + rect.width * CGFloat(seam) / CGFloat(pockets)
-                path.move(to: CGPoint(x: x, y: rect.minY + 9))
-                path.addLine(to: CGPoint(x: x, y: rect.maxY - 4))
-            }
-            return path
-        }
-    }
+    private static let piping: CGFloat = 3
+    /// Shade at a pocket's seams and a little light on its middle.
+    private static let swell: [Gradient.Stop] = [.init(color: .black.opacity(0.2), location: 0), .init(color: .black.opacity(0), location: 0.22),
+                                                 .init(color: .white.opacity(0.09), location: 0.5), .init(color: .black.opacity(0), location: 0.78),
+                                                 .init(color: .black.opacity(0.2), location: 1)]
 
     /// A tool sits low in its pocket, comes up a little under a finger, and stands out of it when it is the pen's kind.
     private struct PocketButtonStyle: ButtonStyle {
