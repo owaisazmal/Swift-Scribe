@@ -45,7 +45,8 @@ final class ToolTrayUITests: XCTestCase {
         for mode in modes {
             XCUIDevice.shared.appearance = mode.appearance
             let app = XCUIApplication()
-            app.launchArguments = ["-storageRoot", "tools", "-resetStorage", "-seedLibrary", "3", "-drawingInput", "anyInput", "-freshToolPresets"]
+            app.launchArguments = ["-storageRoot", "tools", "-resetStorage", "-seedLibrary", "3", "-drawingInput", "anyInput", "-freshToolPresets",
+                                   "-fakePencilSqueeze"]
                 + (mode.size.map { ["-UIPreferredContentSizeCategoryName", $0] } ?? [])
             app.launch()
             let notebook = app.buttons["notebook.Studio Notes 2"]
@@ -90,6 +91,15 @@ final class ToolTrayUITests: XCTestCase {
             try audit(app, mode.checks, screen: "\(mode.name) shortcut tags", popover: true, largeText: large)
             close(zoom)
 
+            canvas.twoFingerTap()
+            let dish = app.element("editor.dish")
+            XCTAssertTrue(dish.waitForExistence(timeout: 5))
+            sleep(1)
+            attach(app, "\(mode.name)-dish")
+            try audit(app, mode.checks, screen: "\(mode.name) ink dish", largeText: large)
+            app.buttons["editor.dish.eraser"].tap()
+            XCTAssertTrue(dish.waitForNonExistence(timeout: 5))
+
             // On its side the screen is at its shortest: what doesn't fit scrolls, and nothing is cut short.
             if mode.name == "largest" {
                 XCUIDevice.shared.orientation = .landscapeLeft
@@ -101,7 +111,13 @@ final class ToolTrayUITests: XCTestCase {
                 black.tap()
                 XCTAssertTrue(remove.waitForExistence(timeout: 5))
                 sleep(2)
-                if remove.exists, !remove.isHittable { app.element("editor.tools.pen.kind").swipeUp() }
+                // An element's own swipe finds no visible frame in a popover on a screen on its side; the window's points do.
+                func scrollUp(from element: XCUIElement) {
+                    let x = element.frame.midX / window.frame.width
+                    window.coordinate(withNormalizedOffset: CGVector(dx: x, dy: element.frame.midY / window.frame.height))
+                        .press(forDuration: 0.05, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: x, dy: 0.04)))
+                }
+                if remove.exists, !remove.isHittable { scrollUp(from: app.element("editor.tools.pen.kind")) }
                 sleep(2)
                 XCTAssertTrue(remove.isHittable, "the end of the options is reached on a screen on its side")
                 try audit(app, mode.checks, screen: "largest pen options on its side", popover: true, largeText: true)
@@ -110,13 +126,149 @@ final class ToolTrayUITests: XCTestCase {
                 XCTAssertTrue(app.buttons["editor.tools.shortcut.picture"].waitForExistence(timeout: 5))
                 sleep(2)
                 try audit(app, mode.checks, screen: "largest shortcut tags on its side", popover: true, largeText: true)
-                if !zoom.isHittable { app.buttons["editor.tools.shortcut.sticker"].swipeUp() }
+                if !zoom.isHittable { scrollUp(from: app.buttons["editor.tools.shortcut.sticker"]) }
                 sleep(2)
                 XCTAssertTrue(zoom.isHittable, "the last tag is reached on a screen on its side")
                 close(zoom)
             }
             app.terminate()
         }
+    }
+
+    /// A pen is made faint from its options, and with Handwriting to Text on, what is written is set as type.
+    func testAPenIsMadeFaintAndHandwritingIsSetAsType() throws {
+        XCUIDevice.shared.orientation = .portrait
+        let app = XCUIApplication()
+        app.launchArguments = ["-storageRoot", "tools", "-resetStorage", "-seedLibrary", "3", "-drawingInput", "anyInput", "-freshToolPresets",
+                               "-scriptedInkText", "Hello", "-inkTypingPause", "4"]
+        app.launch()
+        let notebook = app.buttons["notebook.Studio Notes 2"]
+        XCTAssertTrue(notebook.waitForExistence(timeout: 30))
+        notebook.tap()
+        let black = app.buttons["editor.tools.1"], canvas = app.element("page.canvas.1")
+        XCTAssertTrue(black.waitForExistence(timeout: 20))
+        func close(_ element: XCUIElement) {
+            canvas.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.1)).tap()
+            XCTAssertTrue(element.waitForNonExistence(timeout: 5))
+        }
+        func draw(atHeight y: CGFloat) {
+            canvas.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: y))
+                .press(forDuration: 0.05, thenDragTo: canvas.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: y)), withVelocity: 600, thenHoldForDuration: 0.05)
+        }
+
+        // The pen in hand opens; its opacity is a bar of its own under the width.
+        XCTAssertEqual(black.value as? String, "Width 2.7")
+        black.tap()
+        let opacity = app.sliders["editor.tools.pen.opacity"]
+        XCTAssertTrue(opacity.waitForExistence(timeout: 5))
+        XCTAssertEqual(opacity.value as? String, "100%")
+        opacity.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5))
+            .press(forDuration: 0.1, thenDragTo: opacity.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.5)))
+        let faint = try XCTUnwrap(opacity.value as? String)
+        XCTAssertNotEqual(faint, "100%", "the knob slides along the wash")
+        XCTAssertTrue(faint.hasSuffix("0%") || faint.hasSuffix("5%"), "in steps of a twentieth: \(faint)")
+        XCTAssertEqual(black.value as? String, "Width 2.7, opacity \(faint)")
+        attach(app, "pen-opacity")
+        try audit(app, screen: "pen options with opacity", popover: true)
+        // Another colour is as faint as the last, and is still told as the chosen one.
+        app.buttons["Blue"].tap()
+        wait(for: [expectation(for: NSPredicate(format: "label == 'Pen, Blue'"), evaluatedWith: black)], timeout: 5)
+        XCTAssertEqual(opacity.value as? String, faint)
+        XCTAssertTrue(app.buttons["Blue"].isSelected)
+        close(opacity)
+
+        // Handwriting to Text is tied on from the tags, and turned on where it then stands.
+        app.buttons["editor.tools.customise"].tap()
+        let tag = app.buttons["editor.tools.shortcut.typing"]
+        XCTAssertTrue(tag.waitForExistence(timeout: 5))
+        tag.tap()
+        XCTAssertTrue(tag.isSelected)
+        close(tag)
+        let typing = app.buttons["editor.tools.extra.typing"]
+        XCTAssertTrue(typing.waitForExistence(timeout: 5))
+        XCTAssertFalse(typing.isSelected)
+
+        // Off, writing stays ink.
+        draw(atHeight: 0.6)
+        XCTAssertEqual(strokeCount(canvas), 1)
+        typing.tap()
+        waitUntilSelected(typing)
+        draw(atHeight: 0.3)
+        draw(atHeight: 0.34)
+        XCTAssertEqual(strokeCount(canvas), 3, "nothing is read while the writing goes on")
+        let text = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Hello'")).firstMatch
+        XCTAssertTrue(text.waitForExistence(timeout: 15), "the handwriting is set as type once the pen has rested")
+        XCTAssertEqual(strokeCount(canvas), 1, "it takes the handwriting's place; ink from before is left")
+        XCTAssertEqual(text.frame.minY, canvas.frame.minY + canvas.frame.height * 0.3, accuracy: 60, "where the handwriting was")
+        attach(app, "handwriting-as-type")
+
+        // One undo gives the handwriting back, and it stays ink.
+        app.buttons.matching(identifier: "editor.undo").firstMatch.tap()
+        XCTAssertTrue(text.waitForNonExistence(timeout: 5))
+        XCTAssertEqual(strokeCount(canvas), 3)
+        sleep(6)
+        XCTAssertEqual(strokeCount(canvas), 3, "what Undo gave back is not read again")
+        typing.tap()
+        XCTAssertFalse(typing.isSelected)
+    }
+
+    /// A squeeze of the Pencil brings the ink dish to its tip; a UI test taps with two fingers instead.
+    func testASqueezeBringsTheInkDishToThePencilsTip() throws {
+        XCUIDevice.shared.orientation = .portrait
+        let app = XCUIApplication()
+        app.launchArguments = ["-storageRoot", "tools", "-resetStorage", "-seedLibrary", "3", "-drawingInput", "pencilOnly", "-freshToolPresets",
+                               "-fakePencilSqueeze"]
+        app.launch()
+        let notebook = app.buttons["notebook.Studio Notes 2"]
+        XCTAssertTrue(notebook.waitForExistence(timeout: 30))
+        notebook.tap()
+        let black = app.buttons["editor.tools.1"], cobalt = app.buttons["editor.tools.2"], eraser = app.buttons["editor.tools.eraser"]
+        XCTAssertTrue(black.waitForExistence(timeout: 20))
+        let canvas = app.element("page.canvas.1"), window = app.windows.firstMatch, dish = app.element("editor.dish")
+        XCTAssertFalse(dish.exists)
+
+        canvas.twoFingerTap()
+        XCTAssertTrue(dish.waitForExistence(timeout: 5), "the dish comes out")
+        sleep(1)
+        XCTAssertTrue(window.frame.contains(dish.frame), "all of it is on the screen")
+        XCTAssertEqual(dish.frame.midX, canvas.frame.midX, accuracy: 30, "where the Pencil was")
+        XCTAssertTrue(app.buttons["editor.dish.1"].isSelected, "the pen in hand is marked")
+        XCTAssertEqual(app.buttons["editor.dish.2"].label, "Pen, Blue")
+        XCTAssertTrue(app.buttons["editor.dish.4"].exists)
+        XCTAssertFalse(app.buttons["editor.dish.5"].exists, "a well for each pen on the shelf")
+        XCTAssertFalse(app.buttons["editor.dish.undo"].isEnabled, "nothing to undo yet")
+        attach(app, "dish")
+        try audit(app, screen: "ink dish")
+
+        // A well takes its pen up and puts the dish away.
+        app.buttons["editor.dish.2"].tap()
+        XCTAssertTrue(dish.waitForNonExistence(timeout: 5))
+        waitUntilSelected(cobalt)
+        canvas.twoFingerTap()
+        XCTAssertTrue(dish.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["editor.dish.2"].isSelected)
+        app.buttons["editor.dish.eraser"].tap()
+        XCTAssertTrue(dish.waitForNonExistence(timeout: 5))
+        waitUntilSelected(eraser)
+
+        // A tap off it puts it away with nothing changed; so does a second squeeze.
+        canvas.twoFingerTap()
+        XCTAssertTrue(dish.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["editor.dish.eraser"].isSelected)
+        window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.12)).tap()
+        XCTAssertTrue(dish.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(eraser.isSelected)
+
+        // It comes out with the tray put away too.
+        app.buttons["Hide Tools"].firstMatch.tap()
+        XCTAssertTrue(app.element("editor.tools.tray").waitForNonExistence(timeout: 5))
+        canvas.twoFingerTap()
+        XCTAssertTrue(dish.waitForExistence(timeout: 5))
+        app.buttons["editor.dish.1"].tap()
+        XCTAssertTrue(dish.waitForNonExistence(timeout: 5))
+        app.buttons["Show Tools"].firstMatch.tap()
+        XCTAssertTrue(black.waitForExistence(timeout: 5))
+        XCTAssertTrue(black.isSelected)
     }
 
     func testThePensTheEraserAndTheShortcutsStandInTheTray() throws {

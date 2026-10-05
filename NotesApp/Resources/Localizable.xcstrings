@@ -10486,6 +10486,72 @@
         }
       }
     },
+    "Handwriting to Text" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Handschrift zu Text"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escritura a texto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Écriture en texte"
+          }
+        }
+      }
+    },
+    "Handwriting to Text off" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Handschrift zu Text aus"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escritura a texto desactivada"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Écriture en texte désactivée"
+          }
+        }
+      }
+    },
+    "Handwriting to Text on. What you write with a pen is set as text when you pause." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Handschrift zu Text ein. Was du mit einem Stift schreibst, wird zu Text, sobald du absetzt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escritura a texto activada. Lo que escribes con una pluma se convierte en texto cuando haces una pausa."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Écriture en texte activée. Ce que vous écrivez au stylo devient du texte dès que vous marquez une pause."
+          }
+        }
+      }
+    },
     "has files that couldn't be read" : {
       "localizations" : {
         "de" : {
@@ -14998,6 +15064,28 @@
         }
       }
     },
+    "Opacity" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deckkraft"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opacidad"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opacité"
+          }
+        }
+      }
+    },
     "Open" : {
       "localizations" : {
         "de" : {
@@ -19436,6 +19524,28 @@
         }
       }
     },
+    "Set as text: %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Als Text gesetzt: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Convertido en texto: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Converti en texte : %@"
+          }
+        }
+      }
+    },
     "Sets the first page's paper" : {
       "localizations" : {
         "de" : {
@@ -23814,6 +23924,50 @@
         }
       }
     },
+    "Tool Palette" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Werkzeugpalette"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paleta de herramientas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Palette d’outils"
+          }
+        }
+      }
+    },
+    "Tool Palette at the Pencil" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Werkzeugpalette am Pencil"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paleta de herramientas junto al Pencil"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Palette d’outils près du Pencil"
+          }
+        }
+      }
+    },
     "Tools" : {
       "localizations" : {
         "de" : {
@@ -25108,6 +25262,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Épaisseur %@"
+          }
+        }
+      }
+    },
+    "Width %@, opacity %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stärke %1$@, Deckkraft %2$@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grosor %1$@, opacidad %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Épaisseur %1$@, opacité %2$@"
           }
         }
       }

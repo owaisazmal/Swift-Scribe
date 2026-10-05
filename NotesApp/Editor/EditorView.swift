@@ -69,6 +69,8 @@ final class EditorSession {
     var inkIsLight = false
     /// How far the zoom window stands above the foot of the editor's safe area, for the tray to stand on it.
     var zoomPanelLift: CGFloat = 0
+    /// Where the ink dish is out, in the page view's points: at the Pencil's tip when it was squeezed. Nil while it is put away.
+    var dish: CGPoint?
     /// The words selected on a PDF page, while its text is being selected. The canvas owns the selection.
     var selectedText: String?
     /// The page a link was followed from, while the page it opened is still showing.
@@ -686,8 +688,14 @@ fileprivate struct EditorContent: View {
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
+            .overlay {
+                if let point = session.dish, session.mode == .writing || session.mode == .focus, !isCovered {
+                    InkDish(session: session, point: point)
+                }
+            }
             .animation(Motion.adaptive(Motion.standard, reduceMotion: reduceMotion), value: session.showsToolTray)
             .onChange(of: session.showsToolTray) { session.canvas?.toolTrayDidChange() }
+            .onChange(of: session.mode) { session.dish = nil }
     }
 
     /// A shortcut in the tool tray: the same things the Add and More menus do.
@@ -701,6 +709,11 @@ fileprivate struct EditorContent: View {
         case .link: pickingLink = true
         case .tape: session.addTape()
         case .ruler: Toolbox.shared.isRulerActive.toggle()
+        case .typing:
+            Toolbox.shared.typesHandwriting.toggle()
+            AccessibilityNotification.Announcement(Toolbox.shared.typesHandwriting
+                ? String(localized: "Handwriting to Text on. What you write with a pen is set as text when you pause.")
+                : String(localized: "Handwriting to Text off")).post()
         case .zoomWindow: session.setZoomWindow(!session.isZoomWindowOpen)
         }
     }

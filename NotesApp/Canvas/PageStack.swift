@@ -337,6 +337,12 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     private var lastBounds: CGRect = .zero
     private var isModalShowing = false
     private var keepsAnchor = false
+    /// Handwriting to Text: the strokes written since the pen last rested, by page, each known by when it was begun.
+    private var unreadWriting: [UUID: Set<Date>] = [:]
+    private var typingTimer: Task<Void, Never>?
+    /// Counts up when writing goes on, so a reading that was under way is dropped and done again with the rest.
+    private var typingPass = 0
+    private var lastTyped: InkTyping.Last?
     private let laser = LaserTrailView()
     private lazy var laserGesture = UILongPressGestureRecognizer(target: self, action: #selector(pointLaser))
     private(set) var isPresenting = false
@@ -456,6 +462,11 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         view.addGestureRecognizer(laserGesture)
         view.addInteraction(UIDropInteraction(delegate: self))
         view.addInteraction(UIPencilInteraction(delegate: self))
+        if PencilGestures.squeezeIsScripted {
+            let squeeze = UITapGestureRecognizer(target: self, action: #selector(scriptedSqueeze))
+            squeeze.numberOfTouchesRequired = 2
+            view.addGestureRecognizer(squeeze)
+        }
         itemTap.allowedTouchTypes = [NSNumber(value: UITouch.TouchType.direct.rawValue)]
         itemHold.minimumPressDuration = 0.45
         for recognizer in [itemTap, itemHold, strokeHold, tapeTap] {
@@ -516,6 +527,8 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         super.viewWillDisappear(animated)
         keepsAnchor = false
         endTextEditing()
+        typingTimer?.cancel()
+        session.dish = nil
         ExternalDisplay.shared.end(for: self)
         anchor.resignFirstResponder()
         UIApplication.shared.isIdleTimerDisabled = false
@@ -1042,16 +1055,99 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         canvas.strokeCount = nil
         let before = document.loadedInk(id)
         let rest = canvas === zoomCanvas ? nil : strokeHold.takeHold()
-        if pencilGesture(on: canvas, pageID: id, before: before, rest: rest) { return }
+        if pencilGesture(on: canvas, pageID: id, before: before, rest: rest) {
+            // What a scribble left of handwriting that was waiting to be read still is.
+            if !unreadWriting.isEmpty { readWritingAfterARest() }
+            return
+        }
         document.canvasDidChangeInk(id, to: canvas.drawing)
         mirrorInk(from: canvas, pageID: id)
+        // Writing that is to become type isn't straightened into shapes on the way.
+        let typing = noteWriting(on: canvas, pageID: id, before: before)
         let straighten = { [weak self, weak canvas] in
-            guard let self, let canvas, canvas !== zoomCanvas else { return }
+            guard let self, let canvas, canvas !== zoomCanvas, !typing else { return }
             straightenLastStroke(on: canvas, pageID: id, before: before, rest: rest)
         }
         let readingText = snapHighlighter(on: canvas, pageID: id, before: before, otherwise: straighten)
         if canvas === zoomCanvas { return zoomStrokeEnded(canvas, before: before) }
         if !readingText { straighten() }
+    }
+
+    // MARK: Handwriting to Text
+
+    /// With Handwriting to Text on, a stroke of a pen waits to be read once the pen has rested. Returns whether it does.
+    private func noteWriting(on canvas: PageCanvasView, pageID: UUID, before: PKDrawing?) -> Bool {
+        guard toolbox.typesHandwriting, PencilGestures.writes(canvas.tool), !canvas.isRulerActive, !document.isReadOnly,
+              let before, canvas.drawing.strokes.count == before.strokes.count + 1, let drawn = canvas.drawing.strokes.last else { return false }
+        unreadWriting[pageID, default: []].insert(drawn.path.creationDate)
+        readWritingAfterARest()
+        return true
+    }
+
+    private func readWritingAfterARest() {
+        typingTimer?.cancel()
+        typingTimer = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(InkTyping.pause))
+            guard !Task.isCancelled else { return }
+            self?.typeUnreadWriting()
+        }
+    }
+
+    /// Reads the handwriting written since the pen last rested. If writing goes on meanwhile, the reading is dropped
+    /// and what was written waits for the next rest.
+    private func typeUnreadWriting() {
+        typingTimer?.cancel()
+        typingTimer = nil
+        typingPass += 1
+        let pass = typingPass
+        for (pageID, stamps) in unreadWriting {
+            let written = document.loadedInk(pageID)?.strokes.filter { stamps.contains($0.path.creationDate) } ?? []
+            guard !written.isEmpty else {
+                unreadWriting[pageID] = nil
+                continue
+            }
+            let piece = PKDrawing(strokes: written)
+            Task { [weak self] in
+                let text = await Task.detached(priority: .userInitiated) { InkText.recognize([piece]) }.value
+                guard let self, pass == typingPass else { return }
+                setType(text, inPlaceOf: stamps, onPage: pageID)
+            }
+        }
+    }
+
+    /// Takes the handwriting off the page and types what it read as where it stood, as one undo step: Undo gives the
+    /// handwriting back, and it then stays ink. Writing that carries on the text made just before is added to that.
+    /// Ink that reads as nothing is left as it is.
+    private func setType(_ text: String?, inPlaceOf stamps: Set<Date>, onPage pageID: UUID) {
+        unreadWriting[pageID]?.subtract(stamps)
+        if unreadWriting[pageID]?.isEmpty == true { unreadWriting[pageID] = nil }
+        let trimmed = (text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !document.isReadOnly, let ink = document.loadedInk(pageID), let page = pages.first(where: { $0.id == pageID }) else { return }
+        let written = ink.strokes.filter { stamps.contains($0.path.creationDate) }
+        guard !written.isEmpty else { return }
+        let bounds = PKDrawing(strokes: written).bounds, action = String(localized: "Handwriting to Text")
+        guard document.updateInk([pageID: PKDrawing(strokes: ink.strokes.filter { !stamps.contains($0.path.creationDate) })], actionName: action) else { return }
+        let lineHeight = bounds.height / CGFloat(max(trimmed.split(separator: "\n").count, 1))
+        var typed = InkTyping.Last(pageID: pageID, itemID: UUID(), written: bounds, lineHeight: lineHeight)
+        document.updateItems(onPage: pageID, actionName: action) { items in
+            if let last = lastTyped, last.pageID == pageID, let index = items.firstIndex(where: { $0.id == last.itemID }),
+               let join = InkTyping.join(bounds, after: last.written, lineHeight: last.lineHeight),
+               let grown = InkTyping.extended(items[index], with: trimmed, join, pageSize: page.size) {
+                items[index] = grown
+                typed = InkTyping.Last(pageID: pageID, itemID: grown.id, written: last.written.union(bounds), lineHeight: last.lineHeight)
+            } else {
+                var item = InkText.box(for: trimmed, replacing: bounds, pageSize: page.size)
+                if case .text(var box) = item.content, let colour = written.first?.ink.color {
+                    box.tint = InkTyping.tint(for: colour)
+                    item.content = .text(box)
+                }
+                items.append(item)
+                typed.itemID = item.id
+            }
+        }
+        lastTyped = typed
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        AccessibilityNotification.Announcement(String(localized: "Set as text: \(trimmed)")).post()
     }
 
     /// Circle and hold to select, and scribble to erase. Neither stroke reaches the document: the loop leaves nothing
@@ -1146,6 +1242,10 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     /// Writing anywhere puts a selected picture down.
     func canvasViewDidBeginUsingTool(_ canvasView: PKCanvasView) {
         if session.selection != nil { select(nil) }
+        if !unreadWriting.isEmpty {
+            typingTimer?.cancel()
+            typingPass += 1
+        }
         guard canvasView === zoomCanvas else { return }
         zoomAdvance?.cancel()
         session.onTouchDown?()
@@ -1749,6 +1849,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     func setModalShowing(_ showing: Bool) {
         guard showing != isModalShowing else { return }
         isModalShowing = showing
+        if showing { session.dish = nil }
         if !showing, textView == nil { anchor.becomeFirstResponder() }
     }
 
@@ -2594,21 +2695,28 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     /// Every canvas takes the tool in hand, the ones waiting to be reused as well.
     @objc private func toolChanged() {
         for canvas in allCanvases + pool { syncTool(canvas) }
+        // Handwriting still waiting when the pen is put down, or the helper turned off, is read there and then.
+        if !unreadWriting.isEmpty, !(toolbox.typesHandwriting && PencilGestures.writes(toolbox.tool)) { typeUnreadWriting() }
     }
 
     // MARK: UIPencilInteractionDelegate
 
     func pencilInteraction(_ interaction: UIPencilInteraction, didReceiveTap tap: UIPencilInteraction.Tap) {
-        pencil(.setting(SettingsKey.pencilDoubleTap), preferred: UIPencilInteraction.preferredTapAction)
+        pencil(.setting(SettingsKey.pencilDoubleTap), preferred: UIPencilInteraction.preferredTapAction, at: tap.hoverPose?.location)
     }
 
     func pencilInteraction(_ interaction: UIPencilInteraction, didReceiveSqueeze squeeze: UIPencilInteraction.Squeeze) {
         guard squeeze.phase == .ended else { return }
-        pencil(.setting(SettingsKey.pencilSqueeze), preferred: UIPencilInteraction.preferredSqueezeAction)
+        pencil(.setting(SettingsKey.pencilSqueeze), preferred: UIPencilInteraction.preferredSqueezeAction, at: squeeze.hoverPose?.location)
+    }
+
+    @objc private func scriptedSqueeze(_ gesture: UITapGestureRecognizer) {
+        pencil(.palette, preferred: .ignore, at: gesture.location(in: view))
     }
 
     /// A double-tap or a squeeze: the action chosen in Settings, or what the system's own setting asks for.
-    private func pencil(_ action: PencilAction, preferred: UIPencilPreferredAction) {
+    /// `point` is where the Pencil's tip was over the pages, if it was near enough to tell.
+    private func pencil(_ action: PencilAction, preferred: UIPencilPreferredAction, at point: CGPoint?) {
         guard view.window != nil, session.isActivePane(), !isModalShowing, textView == nil, !document.isReadOnly else { return }
         let mode = session.mode, writing = mode == .writing || mode == .focus
         switch action {
@@ -2617,8 +2725,8 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
             switch preferred {
             case .switchEraser: toolbox.switchEraser()
             case .switchPrevious: toolbox.switchPrevious()
-            // The system's palettes are the tool picker's; the tray stands in for them.
-            case .showColorPalette, .showInkAttributes, .showContextualPalette: if !session.showsTools { session.toggleTools() }
+            // The system's palettes were the tool picker's; the ink dish stands in for them.
+            case .showColorPalette, .showInkAttributes, .showContextualPalette: toggleDish(at: point)
             default: break
             }
         case .eraser:
@@ -2632,9 +2740,19 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
                                                            : String(localized: "Back to writing")).post()
         case .toggleTools:
             if writing { session.toggleTools() }
+        case .palette:
+            if writing { toggleDish(at: point) }
         case .zoomWindow:
             if writing { session.setZoomWindow(!session.isZoomWindowOpen) }
         }
+    }
+
+    /// Brings the ink dish out at the Pencil's tip, or in the middle of the pages when the tip was too far off to
+    /// place; with the dish out already, puts it away.
+    private func toggleDish(at point: CGPoint?) {
+        if session.dish != nil { return session.dish = nil }
+        session.dish = point ?? CGPoint(x: view.bounds.midX, y: view.bounds.midY)
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
     // MARK: UIScrollViewDelegate

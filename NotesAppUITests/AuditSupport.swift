@@ -97,6 +97,12 @@ extension XCTestCase {
                 print("AUDIT [\(screen)] ignored behind modal: \(issue.compactDescription)")
                 return true
             }
+            // With a popover open the audit reads what it covers, which VoiceOver can't reach until it closes, and now and
+            // then a drawing in it (the ruled lines under the opacity wash) as text. It names no element for either.
+            if popover, issue.auditType == .elementDetection, element == nil {
+                print("AUDIT [\(screen)] ignored, text with no element by a popover: \(issue.compactDescription)")
+                return true
+            }
             print("AUDIT FAIL [\(screen)] \(issue.detailedDescription)")
             return false
         }

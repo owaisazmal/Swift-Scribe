@@ -157,8 +157,9 @@ final class PencilGestureTests: XCTestCase {
         XCTAssertEqual(memory.eraserSwitch(eraser: "eraser"), "eraser")
 
         XCTAssertEqual(PencilAction.setting("pencil.test.unset"), .system)
-        XCTAssertEqual(PencilAction.allCases.count, 6)
-        XCTAssertEqual(Set(PencilAction.allCases.map(\.displayName)).count, 6)
+        XCTAssertEqual(PencilAction.allCases.count, 7)
+        XCTAssertEqual(Set(PencilAction.allCases.map(\.displayName)).count, 7)
+        XCTAssertEqual(PencilAction(rawValue: "palette")?.displayName, "Tool Palette at the Pencil")
     }
 
     private func pause(_ seconds: Double) async {

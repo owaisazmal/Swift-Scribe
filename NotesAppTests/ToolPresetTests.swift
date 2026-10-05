@@ -55,6 +55,57 @@ final class ToolPresetTests: XCTestCase {
         XCTAssertEqual(ToolPreset(ink: .marker, color: 0xE8B0_23FF, width: 20).name, "Highlighter, Mustard")
     }
 
+    func testAPenIsAsFaintAsItIsSetWhateverItsColour() throws {
+        var pen = ToolPreset(ink: .pen, color: 0x2747_B8FF, width: 3)
+        XCTAssertEqual(pen.opacity, 1)
+        XCTAssertEqual(pen.opacityName, "100%")
+        pen.opacity = 0.6
+        XCTAssertEqual(pen.color, 0x2747_B899, "the opacity is the colour's last byte, so pens saved before it are at full strength")
+        XCTAssertEqual(pen.tint, 0x2747_B8FF)
+        XCTAssertEqual(pen.opacity, 0.6, accuracy: 0.001)
+        XCTAssertEqual(pen.opacityName, "60%")
+        XCTAssertEqual(pen.name, "Pen, Blue", "a faint pen is called what it was")
+        var alpha: CGFloat = 0
+        try XCTUnwrap(pen.tool).color.getRed(nil, green: nil, blue: nil, alpha: &alpha)
+        XCTAssertEqual(alpha, 0.6, accuracy: 0.01, "the canvas writes as faintly")
+        XCTAssertEqual(ToolPreset(try XCTUnwrap(pen.tool))?.color, pen.color)
+
+        pen.setTint(0xE8B0_23FF)
+        XCTAssertEqual(pen.color, 0xE8B0_2399, "another colour is as faint as the last")
+        XCTAssertEqual(pen.colorName, "Mustard")
+        pen.opacity = 0
+        XCTAssertEqual(pen.opacity, ToolPreset.leastOpacity, accuracy: 0.005, "a pen never writes nothing")
+        pen.opacity = 4
+        XCTAssertEqual(pen.color, 0xE8B0_23FF)
+        XCTAssertFalse(ToolPreset(ink: .pen, color: 0x2747_B8FF, width: 3).isSameTool(as: ToolPreset(ink: .pen, color: 0x2747_B899, width: 3)))
+
+        let back = try JSONDecoder().decode(ToolPreset.self, from: JSONEncoder().encode(ToolPreset(ink: .pencil, color: 0x1B22_3080, width: 4)))
+        XCTAssertEqual(back.opacity, 0.5, accuracy: 0.005)
+    }
+
+    func testANewPenIsAsFaintAsTheOneInHandAndAHelperOffTheTrayIsPutAway() throws {
+        let toolbox = Toolbox(defaults: try freshDefaults())
+        let first = try XCTUnwrap(toolbox.pen)
+        toolbox.changePen(first.id) { $0.opacity = 0.4 }
+        XCTAssertEqual(try XCTUnwrap(toolbox.pen).opacity, 0.4, accuracy: 0.005)
+        let new = try XCTUnwrap(toolbox.addPen().flatMap { id in toolbox.shelf.usable.first { $0.id == id } })
+        XCTAssertEqual(new.opacity, 0.4, accuracy: 0.005)
+        XCTAssertEqual(new.tint, 0x6E73_7CFF, "black, blue and red are taken, however faint the black is")
+
+        XCTAssertFalse(toolbox.typesHandwriting)
+        toolbox.setExtra(.typing, shown: true)
+        toolbox.setExtra(.ruler, shown: true)
+        toolbox.typesHandwriting = true
+        toolbox.isRulerActive = true
+        toolbox.setExtra(.typing, shown: false)
+        XCTAssertFalse(toolbox.typesHandwriting, "with its tag off the tray there would be nothing to turn it off with")
+        XCTAssertTrue(toolbox.isRulerActive)
+        toolbox.setExtra(.ruler, shown: false)
+        XCTAssertFalse(toolbox.isRulerActive)
+        XCTAssertEqual(ToolExtra.typing.title, "Handwriting to Text")
+        XCTAssertEqual(Set(ToolExtra.allCases.map(\.symbol)).count, ToolExtra.allCases.count)
+    }
+
     func testANewShelfStartsWithTheAppsInksAndKeepsWhatIsSaved() throws {
         let defaults = try freshDefaults()
         let shelf = ToolShelf(defaults: defaults)

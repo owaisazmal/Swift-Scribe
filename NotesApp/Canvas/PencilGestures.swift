@@ -132,6 +132,15 @@ enum PencilGestures {
         #endif
     }
 
+    /// `-fakePencilSqueeze` lets a UI test, which has no Pencil to squeeze, tap the page with two fingers instead.
+    static var squeezeIsScripted: Bool {
+        #if DEBUG
+        return LaunchOptions.arguments.contains("-fakePencilSqueeze")
+        #else
+        return false
+        #endif
+    }
+
     /// Pens write; the marker, watercolour and crayon shade, and shading goes back and forth over ink all the time.
     static func writes(_ tool: PKTool) -> Bool {
         guard let ink = (tool as? PKInkingTool)?.inkType else { return false }
@@ -165,7 +174,7 @@ enum PencilGestures {
 
 /// What a double-tap or a squeeze of the Pencil does.
 enum PencilAction: String, CaseIterable, Identifiable {
-    case system, eraser, undo, selectInk, toggleTools, zoomWindow
+    case system, eraser, undo, selectInk, toggleTools, palette, zoomWindow
     var id: String { rawValue }
 
     var displayName: String {
@@ -175,6 +184,7 @@ enum PencilAction: String, CaseIterable, Identifiable {
         case .undo: String(localized: "Undo")
         case .selectInk: String(localized: "Select Ink")
         case .toggleTools: String(localized: "Show or Hide Tools")
+        case .palette: String(localized: "Tool Palette at the Pencil")
         case .zoomWindow: String(localized: "Zoom Window")
         }
     }

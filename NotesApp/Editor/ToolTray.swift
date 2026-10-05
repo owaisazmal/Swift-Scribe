@@ -46,15 +46,18 @@ struct ToolTray: View {
         let pens = toolbox.shelf.usable
         let extras = ToolExtra.allCases.filter(toolbox.extras.contains)
         let plan = Self.plan(pens: pens.count, extras: extras.count, room: room)
+        // Pens that all fit have no edge to fade at, whatever the scroll view last said: its word on a first
+        // layout, when the tray has no width yet, isn't always taken back.
+        let scrolls = plan.pens < CGFloat(pens.count + (toolbox.shelf.isFull ? 0 : 1)) * Self.slot - 0.5
         HStack(spacing: 0) {
             penRow(pens)
                 .frame(width: plan.pens, height: Self.button)
                 .mask {
                     HStack(spacing: 0) {
-                        LinearGradient(colors: [.black.opacity(hidden.contains(.leading) ? 0 : 1), .black], startPoint: .leading, endPoint: .trailing)
+                        LinearGradient(colors: [.black.opacity(scrolls && hidden.contains(.leading) ? 0 : 1), .black], startPoint: .leading, endPoint: .trailing)
                             .frame(width: Self.fade)
                         Color.black
-                        LinearGradient(colors: [.black, .black.opacity(hidden.contains(.trailing) ? 0 : 1)], startPoint: .leading, endPoint: .trailing)
+                        LinearGradient(colors: [.black, .black.opacity(scrolls && hidden.contains(.trailing) ? 0 : 1)], startPoint: .leading, endPoint: .trailing)
                             .frame(width: Self.fade)
                     }
                 }
@@ -126,7 +129,8 @@ struct ToolTray: View {
         }
         .simultaneousGesture(LongPressGesture(minimumDuration: 0.4).onEnded { _ in change(pen) })
         .accessibilityLabel(Text(pen.name))
-        .accessibilityValue(Text("Width \(pen.width.formatted(.number.precision(.fractionLength(0...1))))"))
+        .accessibilityValue(pen.opacity < 1 ? Text("Width \(pen.width.formatted(.number.precision(.fractionLength(0...1)))), opacity \(pen.opacityName)")
+                                            : Text("Width \(pen.width.formatted(.number.precision(.fractionLength(0...1))))"))
         .accessibilityAddTraits(inHand ? .isSelected : [])
         .accessibilityActions {
             Button("Change Pen") { change(pen) }
@@ -199,6 +203,7 @@ struct ToolTray: View {
         let isOn = switch extra {
         case .ruler: toolbox.isRulerActive
         case .zoomWindow: session.isZoomWindowOpen
+        case .typing: toolbox.typesHandwriting
         default: false
         }
         return Button { use(extra) } label: { Label(extra.title, systemImage: extra.symbol) }
@@ -291,7 +296,7 @@ private struct ShortcutTag: View {
     }
 }
 
-/// A pen's kind, colour and width, changed where it stands in the tray.
+/// A pen's kind, colour, width and opacity, changed where it stands in the tray.
 private struct PenOptions: View {
     let id: UUID
     let toolbox: Toolbox
@@ -313,7 +318,9 @@ private struct PenOptions: View {
     private func content(_ pen: ToolPreset, _ ink: PKInkingTool.InkType) -> some View {
         let width = pen.width.formatted(.number.precision(.fractionLength(0...1)))
         let night = scheme == .dark && !onDark
-        let colour = ToolSwatch.ink(pen, onDark: onDark), paper = ToolSwatch.paper(onDark: onDark, night: night)
+        // The label shows the ink as faint as it is set; the tools of the roll and the bars are drawn at full strength.
+        let colour = ToolSwatch.ink(pen, onDark: onDark, night: night), solid = ToolSwatch.ink(pen, onDark: onDark, solid: true)
+        let paper = ToolSwatch.paper(onDark: onDark, night: night), faintest = ToolPreset.leastOpacity
         // At the largest text sizes the name goes under the label, where it has the whole width.
         let stacked = textSize.isAccessibilitySize
         let header = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: Space.x2)) : AnyLayout(HStackLayout(spacing: Space.x3))
@@ -322,7 +329,7 @@ private struct PenOptions: View {
                 InkLabel(kind: ink, breadth: pen.widthTravel, ink: colour, paper: paper, night: night)
                 VStack(alignment: .leading, spacing: 0) {
                     Text(pen.kindName).font(.headline).foregroundStyle(Color.ink)
-                    Text(pen.colorName).font(.footnote).foregroundStyle(Color.textSecondary)
+                    Text(pen.opacity < 1 ? "\(pen.colorName), \(pen.opacityName)" : pen.colorName).font(.footnote).foregroundStyle(Color.textSecondary)
                 }
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -331,12 +338,12 @@ private struct PenOptions: View {
             .accessibilityAddTraits(.isHeader)
             PenRoll(kind: Binding(get: { ink }, set: { kind in
                 toolbox.changePen(id) { $0.ink = kind.rawValue; $0.width = Double(kind.defaultWidth) }
-            }), ink: colour, paper: paper, night: night)
+            }), ink: solid, paper: paper, night: night)
                 .accessibilityIdentifier("editor.tools.pen.kind")
             LazyVGrid(columns: Self.columns, spacing: 0) {
-                ForEach(ToolPreset.palette(for: ink), id: \.self) { color in colourButton(color, chosen: pen.color == color) }
-                ColorPicker("Custom Colour", selection: Binding(get: { Color(uiColor: pen.uiColor) }, set: { color in
-                    toolbox.changePen(id) { $0.color = ToolPreset.bytes(of: UIColor(color)) }
+                ForEach(ToolPreset.palette(for: ink), id: \.self) { color in colourButton(color, chosen: pen.tint == color) }
+                ColorPicker("Custom Colour", selection: Binding(get: { Color(uiColor: ToolPreset.uiColor(pen.tint)) }, set: { color in
+                    toolbox.changePen(id) { $0.setTint(ToolPreset.bytes(of: UIColor(color))) }
                 }), supportsOpacity: false)
                     .labelsHidden()
                     .frame(maxWidth: .infinity, minHeight: Self.cell)
@@ -346,7 +353,11 @@ private struct PenOptions: View {
             .accessibilityLabel(Text("Colour"))
             WidthBar(travel: Binding(get: { pen.widthTravel }, set: { travel in
                 toolbox.changePen(id) { $0.width = ToolPreset.width(at: travel, of: ink) }
-            }), ink: colour, paper: paper, night: night, value: width, identifier: "editor.tools.pen.width")
+            }), ink: solid, paper: paper, night: night, value: width, identifier: "editor.tools.pen.width")
+            // Opacity moves in steps of a twentieth, so the figure beside it is a round one.
+            WidthBar(measure: .opacity, travel: Binding(get: { (pen.opacity - faintest) / (1 - faintest) }, set: { travel in
+                toolbox.changePen(id) { $0.opacity = ((faintest + (1 - faintest) * travel) * 20).rounded() / 20 }
+            }), ink: solid, paper: paper, night: night, value: pen.opacityName, identifier: "editor.tools.pen.opacity")
             place(pen)
         }
         .padding(Space.x4)
@@ -373,7 +384,7 @@ private struct PenOptions: View {
     }
 
     private func colourButton(_ color: UInt32, chosen: Bool) -> some View {
-        Button { toolbox.changePen(id) { $0.color = color } } label: {
+        Button { toolbox.changePen(id) { $0.setTint(color) } } label: {
             Circle()
                 .fill(Color(uiColor: ToolPreset.uiColor(color)))
                 .overlay { Circle().strokeBorder(Color.ink.opacity(scheme == .dark ? 0.45 : 0.25), lineWidth: 1) }
@@ -418,9 +429,13 @@ private struct EraserOptions: View {
     }
 }
 
-/// A width, as a stroke that swells along a strip of paper with a knob to slide on it. The knob holds a blot as
-/// large as the stroke is where it stands. Like the pens' labels, the paper stays cream at night.
+/// A width, as a stroke that swells along a strip of paper with a knob to slide on it; the knob holds a blot as
+/// large as the stroke is where it stands. An opacity is a wash over ruled lines that covers more of them as it
+/// goes, and the knob's blot is as faint as the ink is set.
 private struct WidthBar: View {
+    enum Measure { case width, opacity }
+
+    var measure = Measure.width
     /// How far along the knob is, from 0 to 1.
     @Binding var travel: Double
     let ink: Color
@@ -437,27 +452,46 @@ private struct WidthBar: View {
     private static let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
 
     var body: some View {
-        VStack(spacing: Space.x2) {
-            HStack {
-                Text("Width").font(.subheadline.weight(.semibold)).foregroundStyle(Color.ink)
-                Spacer(minLength: Space.x2)
-                Text(value).font(.subheadline.monospacedDigit()).foregroundStyle(Color.textSecondary)
+        let name = title.font(.subheadline.weight(.semibold)).foregroundStyle(Color.ink)
+        let figure = Text(value).font(.subheadline.monospacedDigit()).foregroundStyle(Color.textSecondary)
+        return VStack(spacing: Space.x2) {
+            // At the largest text sizes "Opacity" and its figure don't fit side by side; the figure goes under it.
+            ViewThatFits(in: .horizontal) {
+                HStack {
+                    name.lineLimit(1)
+                    Spacer(minLength: Space.x2)
+                    figure.lineLimit(1)
+                }
+                VStack(alignment: .leading, spacing: 0) {
+                    name
+                    figure
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .accessibilityHidden(true)
             strip
         }
     }
 
+    private var title: Text { measure == .width ? Text("Width") : Text("Opacity") }
+
     private var strip: some View {
         GeometryReader { proxy in
             let run = max(proxy.size.width - Self.knob - Space.x2 * 2, 1)
             ZStack(alignment: .leading) {
                 Self.shape.fill(paper)
-                Swell()
-                    .fill(ink)
-                    .overlay { if night { Swell().stroke(ToolSwatch.rim(contrast), lineWidth: 1) } }
-                    .frame(height: 20)
-                    .padding(.horizontal, Space.x2 + Self.knob / 2)
+                Group {
+                    switch measure {
+                    case .width:
+                        Swell()
+                            .fill(ink)
+                            .overlay { if night { Swell().stroke(ToolSwatch.rim(contrast), lineWidth: 1) } }
+                            .frame(height: 20)
+                    case .opacity:
+                        wash
+                    }
+                }
+                .padding(.horizontal, Space.x2 + Self.knob / 2)
                 knob.offset(x: Space.x2 + run * travel)
             }
             .overlay { Self.shape.strokeBorder(Color.hairline, lineWidth: 1) }
@@ -472,20 +506,45 @@ private struct WidthBar: View {
         .frame(height: Self.height)
         .accessibilityRepresentation {
             Slider(value: $travel)
-                .accessibilityLabel(Text("Width"))
+                .accessibilityLabel(title)
                 .accessibilityValue(Text(value))
                 .accessibilityIdentifier(identifier)
         }
     }
 
+    /// The ink at `strength`. At night it isn't paper it lies on, so it is as pale as it would be on a page.
+    private func faint(_ strength: Double) -> Color {
+        night ? ToolSwatch.onPaper(UIColor(ink), at: strength) : ink.opacity(strength)
+    }
+
+    /// The lines of a page with the ink washed over them, from as faint as a pen can be to full strength: the
+    /// stronger the ink, the less of the lines shows through.
+    private var wash: some View {
+        let band = Capsule()
+        let lines = VStack(spacing: 5) {
+            ForEach(0..<3, id: \.self) { _ in Rectangle().fill(night ? Color.black.opacity(0.4) : Color.ink.opacity(0.35)).frame(height: 1) }
+        }
+        return ZStack {
+            if !night { lines }
+            band.fill(LinearGradient(colors: [faint(ToolPreset.leastOpacity), ink], startPoint: .leading, endPoint: .trailing))
+            if night { lines.mask(LinearGradient(colors: [.black, .clear], startPoint: .leading, endPoint: .trailing)) }
+        }
+        .frame(height: 16)
+        .clipShape(band)
+        .overlay { band.strokeBorder(night ? ToolSwatch.rim(contrast) : Color.ink.opacity(0.18), lineWidth: 1) }
+        .frame(height: 20)
+    }
+
     private var knob: some View {
-        let blot = 4 + 16 * travel
+        let blot = measure == .width ? 4 + 16 * travel : 16
+        let strength = measure == .width ? 1 : ToolPreset.leastOpacity + (1 - ToolPreset.leastOpacity) * travel
         return Circle()
             .fill(night ? Color.surface : paper)
+            .overlay { if measure == .opacity { Rectangle().fill(Color.ink.opacity(night ? 0.5 : 0.35)).frame(width: 22, height: 1) } }
             .overlay {
                 Circle()
-                    .fill(ink)
-                    .overlay { if night { Circle().strokeBorder(ToolSwatch.rim(contrast), lineWidth: 1) } }
+                    .fill(faint(strength))
+                    .overlay { if night || measure == .opacity { Circle().strokeBorder(ToolSwatch.rim(contrast).opacity(night ? 1 : 0.5), lineWidth: 1) } }
                     .frame(width: blot, height: blot)
             }
             .overlay { Circle().strokeBorder(Color.accentColor, lineWidth: 2) }
@@ -531,8 +590,20 @@ struct ToolSwatch: View {
     /// The light rim that tells ink from the dark it is shown on at night.
     static func rim(_ contrast: ColorSchemeContrast) -> Color { Color.ink.opacity(contrast == .increased ? 0.9 : 0.55) }
 
-    static func ink(_ preset: ToolPreset, onDark: Bool) -> Color {
-        Color(uiColor: onDark ? PKInkingTool.convertColor(preset.uiColor, from: .light, to: .dark) : preset.uiColor)
+    /// The ink as it is on the page, as faint as the pen is set unless `solid` asks for it at full strength. At
+    /// `night` a faint ink lies on a dark well, not on paper, so it is shown as pale as a page would make it.
+    static func ink(_ preset: ToolPreset, onDark: Bool, solid: Bool = false, night: Bool = false) -> Color {
+        if night, !onDark, !solid, preset.opacity < 1 { return onPaper(ToolPreset.uiColor(preset.tint), at: preset.opacity) }
+        let color = solid ? ToolPreset.uiColor(preset.tint) : preset.uiColor
+        return Color(uiColor: onDark ? PKInkingTool.convertColor(color, from: .light, to: .dark) : color)
+    }
+
+    /// A colour as it shows on white paper at `opacity`, with nothing left to show through it.
+    static func onPaper(_ color: UIColor, at opacity: Double) -> Color {
+        var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+        color.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        let rest = 1 - opacity
+        return Color(red: red * opacity + rest, green: green * opacity + rest, blue: blue * opacity + rest)
     }
 
     var body: some View {
@@ -544,7 +615,7 @@ struct ToolSwatch: View {
         ZStack {
             shape.fill(Self.paper(onDark: onDark, night: night))
             Circle()
-                .fill(Self.ink(preset, onDark: onDark))
+                .fill(Self.ink(preset, onDark: onDark, night: night))
                 .overlay { Circle().strokeBorder(rim, lineWidth: 1) }
                 .frame(width: blot, height: blot)
                 .offset(x: 3, y: 3)
@@ -582,7 +653,7 @@ private struct ToolSwatchButtonStyle: ButtonStyle {
 }
 
 /// An icon in the tray. The tool in hand, and a helper that is on, wears the frame the pen in hand does.
-private struct TrayIconStyle: ButtonStyle {
+struct TrayIconStyle: ButtonStyle {
     var isOn = false
 
     func makeBody(configuration: Configuration) -> some View {

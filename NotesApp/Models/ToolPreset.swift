@@ -34,6 +34,26 @@ struct ToolPreset: Codable, Hashable, Identifiable, Sendable {
 
     var inkType: PKInkingTool.InkType? { PKInkingTool.InkType(rawValue: ink) }
 
+    /// The faintest a pen can be set, so it never writes nothing.
+    static let leastOpacity = 0.1
+
+    /// The colour as the palette lists it, at full strength.
+    var tint: UInt32 { color | 0xFF }
+
+    /// How much of the paper the ink covers: the colour's last byte, from `leastOpacity` to 1.
+    var opacity: Double {
+        get { Double(color & 0xFF) / 255 }
+        set { color = color & 0xFFFF_FF00 | UInt32((min(max(newValue, Self.leastOpacity), 1) * 255).rounded()) }
+    }
+
+    /// Another colour, as faint as the pen was.
+    mutating func setTint(_ tint: UInt32) {
+        color = tint & 0xFFFF_FF00 | color & 0xFF
+    }
+
+    /// "60%".
+    var opacityName: String { opacity.formatted(.percent.precision(.fractionLength(0))) }
+
     var uiColor: UIColor { Self.uiColor(color) }
 
     static func uiColor(_ color: UInt32) -> UIColor {
@@ -119,7 +139,7 @@ struct ToolPreset: Codable, Hashable, Identifiable, Sendable {
 
     /// The palette's colours that share a hue with another have names of their own; the rest are named by hue.
     static func colorName(_ color: UInt32) -> String {
-        switch color {
+        switch color | 0xFF {
         case 0xE8B0_23FF: return String(localized: "Mustard")
         case 0x3D8F_D9FF: return String(localized: "Sky Blue")
         case 0x7A3E_9DFF: return String(localized: "Plum")
@@ -262,7 +282,7 @@ struct Eraser: Codable, Hashable, Sendable {
 
 /// Something from the Add menu or the page's helpers that can be kept in the tray, beside the tools.
 enum ToolExtra: String, Codable, CaseIterable, Identifiable, Sendable {
-    case picture, text, sticker, link, tape, ruler, zoomWindow
+    case picture, text, sticker, link, tape, ruler, zoomWindow, typing
     var id: String { rawValue }
 
     static let starters: [ToolExtra] = [.picture, .text]
@@ -276,6 +296,7 @@ enum ToolExtra: String, Codable, CaseIterable, Identifiable, Sendable {
         case .tape: String(localized: "Study Tape")
         case .ruler: String(localized: "Ruler")
         case .zoomWindow: String(localized: "Zoom Window")
+        case .typing: String(localized: "Handwriting to Text")
         }
     }
 
@@ -288,6 +309,7 @@ enum ToolExtra: String, Codable, CaseIterable, Identifiable, Sendable {
         case .tape: "rectangle.dashed"
         case .ruler: "ruler"
         case .zoomWindow: "plus.magnifyingglass"
+        case .typing: "character.cursor.ibeam"
         }
     }
 }
@@ -314,6 +336,11 @@ final class Toolbox {
     private(set) var extras: Set<ToolExtra>
     var isRulerActive = false {
         didSet { if isRulerActive != oldValue { post() } }
+    }
+    /// While this is on, what a pen writes is read after a pause and set as typed text in its place. Like the ruler,
+    /// it lasts as long as the app does.
+    var typesHandwriting = false {
+        didSet { if typesHandwriting != oldValue { post() } }
     }
     @ObservationIgnored private var memory = PencilToolMemory<ToolChoice>()
     /// The pen that was last in hand, for a new pen to be like while the eraser or the lasso is.
@@ -378,9 +405,10 @@ final class Toolbox {
     func addPen() -> UUID? {
         let pens = shelf.usable
         guard let like = pen ?? pens.first(where: { $0.id == lastPen }) ?? pens.first, let ink = like.inkType else { return nil }
-        let taken = Set(shelf.usable.filter { $0.ink == like.ink }.map(\.color))
+        let taken = Set(shelf.usable.filter { $0.ink == like.ink }.map(\.tint))
         guard let color = ToolPreset.palette(for: ink).first(where: { !taken.contains($0) }) else { return nil }
-        let new = ToolPreset(ink: ink, color: color, width: like.width)
+        var new = ToolPreset(ink: ink, color: color, width: like.width)
+        new.opacity = like.opacity
         guard shelf.add(new) else { return nil }
         take(.pen(new.id))
         return new.id
@@ -404,6 +432,9 @@ final class Toolbox {
     func setExtra(_ extra: ToolExtra, shown: Bool) {
         guard extras.contains(extra) != shown else { return }
         if shown { extras.insert(extra) } else { extras.remove(extra) }
+        // A helper taken off the tray is put away, or it would stay on with nothing to turn it off.
+        if !shown, extra == .ruler { isRulerActive = false }
+        if !shown, extra == .typing { typesHandwriting = false }
         save()
     }
 

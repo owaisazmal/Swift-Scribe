@@ -5,6 +5,10 @@ import PencilKit
 enum InkText {
     /// Each piece is the ink picked on one page, top page first. Nil when the recogniser failed.
     static func recognize(_ pieces: [PKDrawing]) -> String? {
+        #if DEBUG
+        // A UI test can only drag straight lines; `-scriptedInkText` says what they read as.
+        if let scripted = LaunchOptions.value("-scriptedInkText") { return pieces.contains { !$0.strokes.isEmpty } ? scripted : "" }
+        #endif
         var lines: [String] = []
         for piece in pieces {
             guard let image = image(of: piece) else { continue }
