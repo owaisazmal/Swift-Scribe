@@ -145,7 +145,7 @@ struct NewNotebookView: View {
                 .scribeField(focused: titleFocused) { titleFocused = true }
                 .focused($titleFocused)
                 .submitLabel(.done)
-                .onSubmit { Task { await create() } }
+                .onSubmit { titleFocused = false }
                 .accessibilityLabel("Title")
 
             label("Start from")
