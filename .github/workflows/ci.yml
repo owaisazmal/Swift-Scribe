@@ -49,8 +49,8 @@ jobs:
         run: |
           set -o pipefail
           xcodebuild build-for-testing \
-            -project NotesApp.xcodeproj \
-            -scheme NotesApp \
+            -project OwlLuna.xcodeproj \
+            -scheme OwlLuna \
             -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
             2>&1 | tee "$RUNNER_TEMP/build.log" \
             | xcbeautify --renderer github-actions
@@ -62,12 +62,12 @@ jobs:
         run: |
           set -o pipefail
           xcodebuild test-without-building \
-            -project NotesApp.xcodeproj \
-            -scheme NotesApp \
+            -project OwlLuna.xcodeproj \
+            -scheme OwlLuna \
             -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
-            -only-testing:NotesAppTests \
+            -only-testing:OwlLunaTests \
             -parallel-testing-enabled NO \
-            -resultBundlePath "$RUNNER_TEMP/NotesApp.xcresult" \
+            -resultBundlePath "$RUNNER_TEMP/OwlLuna.xcresult" \
             2>&1 | tee "$RUNNER_TEMP/test.log" \
             | xcbeautify --renderer github-actions
 
@@ -78,4 +78,4 @@ jobs:
           path: |
             ${{ runner.temp }}/build.log
             ${{ runner.temp }}/test.log
-            ${{ runner.temp }}/NotesApp.xcresult
+            ${{ runner.temp }}/OwlLuna.xcresult

@@ -16,7 +16,7 @@ struct WidgetSnapshot: Codable, Equatable, Sendable {
     var pagesByDay: [String: Int] = [:]
     var hasJournal = false
 
-    static let appGroup = "group.com.owais.NotesApp"
+    static let appGroup = "group.com.owais.OwlLuna"
     static let coverFile = "widget-cover.png"
 
     static var directory: URL? {

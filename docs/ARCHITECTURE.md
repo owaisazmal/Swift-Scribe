@@ -1,4 +1,4 @@
-# Swift Scribe architecture
+# OwlLuna architecture
 
 ## Editor: one canvas per page, in a UIKit page stack
 
@@ -112,7 +112,7 @@ A's one weakness is simulator footprint at 5×. We addressed it with the measure
 - **Links name themselves.** `LinkTitles` maps every page to its bookmark name or "Page N"; a link with no label shows that, so it stays right when pages move, and the page stack refreshes link views whenever the map changes. A link whose page was deleted greys out and says so. Thumbnails render without the map and show the label or a plain "Page".
 - **Following.** A finger tap on a link opens its page when fingers don't draw, and always while presenting; touch and hold picks it up instead. VoiceOver's double tap opens it. `EditorSession.follow` remembers the page it came from until the linked page is left, and the editor offers "Back to Page N".
 - **In a PDF.** An export registers a named destination at the top of every linked page and a link rectangle over each tab (`addDestination`, `setDestinationWithName`; both take PDF coordinates, which run up the page).
-- **Links out of the notebook.** A link's `destination` is a page, another notebook (with an optional page and the title it had when the link was made) or a web address. They are written under different keys (`target`, `notebook` and `page`, `url`), so an older build keeps one it can't read rather than showing a missing page. Only `http` and `https` addresses are read. The editor looks up the titles of the notebooks it links to (`EditorSession.notebookTitles`), so those links follow a rename and grey out when the notebook is deleted. Following one asks the window (`EditorWindow.openNotebook`) to save and close this editor and open the other notebook, which then offers "Back to" the page it came from. In a PDF a web link is a URL annotation, and a link to a notebook is a `swiftscribe://notebook/<id>?page=<id>` address that opens the app.
+- **Links out of the notebook.** A link's `destination` is a page, another notebook (with an optional page and the title it had when the link was made) or a web address. They are written under different keys (`target`, `notebook` and `page`, `url`), so an older build keeps one it can't read rather than showing a missing page. Only `http` and `https` addresses are read. The editor looks up the titles of the notebooks it links to (`EditorSession.notebookTitles`), so those links follow a rename and grey out when the notebook is deleted. Following one asks the window (`EditorWindow.openNotebook`) to save and close this editor and open the other notebook, which then offers "Back to" the page it came from. In a PDF a web link is a URL annotation, and a link to a notebook is a `owlluna://notebook/<id>?page=<id>` address that opens the app.
 - **Your own stickers.** `StickerCutout` lifts a photo's subject with `VNGenerateForegroundInstanceMaskRequest`, grows its shape in white (`CIMorphologyMaximum`) for the die-cut edge, and caps it at 900 px. They are kept as PNGs in `Stickers/` beside the library, not in a notebook. Placing one copies it into the notebook's assets as an ordinary picture marked with its `source`, and placing it again reuses that file, so a notebook stays self-contained. Where Vision finds no subject (and in the simulator, where the request can't run) the drawer offers the whole photo with a white edge instead.
 
 ## Study tape
@@ -252,11 +252,11 @@ A's one weakness is simulator footprint at 5×. We addressed it with the measure
 
 ## Widgets and shortcuts
 
-- **Routing.** A widget link (`swiftscribe://today`, `quicknote`, `continue`, `notebook/<id>`) or an App Intent becomes an `AppAction`. The front window's `LibraryRootView` carries it out: it puts sheets away, asks an editor showing another notebook to save and close (`scribeCloseEditor`, the same path as the back button), then opens the target.
+- **Routing.** A widget link (`owlluna://today`, `quicknote`, `continue`, `notebook/<id>`) or an App Intent becomes an `AppAction`. The front window's `LibraryRootView` carries it out: it puts sheets away, asks an editor showing another notebook to save and close (`owlLunaCloseEditor`, the same path as the back button), then opens the target.
 - **Shortcuts** (`AppActions.swift`): Open Today's Journal Page, New Quick Note, Continue Writing and Open Notebook (with a notebook picker and search), offered to Siri and Spotlight through `AppShortcutsProvider`.
 - **Control Center.** `QuickNoteControl` and `TodayPageControl` are `ControlWidget`s whose buttons run an App Intent that opens the app. The intents live in `Shared/` so both targets have them; all they do is leave the request in the App Group's defaults (`ControlRelay`), and the app takes it when it comes to the front and turns it into the same `AppAction` a widget link does. A Quick Note widget does the same from the Home Screen and the Lock Screen.
 - **Spotlight.** `SpotlightIndexer` hands iPadOS one item per notebook: its title, its cover as the thumbnail, and up to 30,000 characters of what is written, typed or printed in it. It runs a few seconds after any change to the library index and only sends notebooks whose title, pages, cover or words changed, by a stamp kept in the caches folder. Trashed and locked notebooks are taken out. A result opens its notebook through the same `AppAction`. Settings › Search turns it off and empties the index. UI-test libraries never reach it.
-- **Widgets** (`ScribeWidgets`): the app writes a `WidgetSnapshot` and the last notebook's cover image into the App Group container when it becomes ready and when it leaves the foreground (`WidgetBridge`), and reloads the timelines only when something changed. The widgets never open the library themselves. Timelines turn over at midnight so the week strip and date stay right. UI-test libraries (`-storageRoot`) never write a snapshot.
+- **Widgets** (`OwlLunaWidgets`): the app writes a `WidgetSnapshot` and the last notebook's cover image into the App Group container when it becomes ready and when it leaves the foreground (`WidgetBridge`), and reloads the timelines only when something changed. The widgets never open the library themselves. Timelines turn over at midnight so the week strip and date stay right. UI-test libraries (`-storageRoot`) never write a snapshot.
 
 ## Tags and smart shelves
 
@@ -283,9 +283,9 @@ A's one weakness is simulator footprint at 5×. We addressed it with the measure
 
 - **Tabs belong to the window.** `EditorWindow.tabs` is the notebooks open in the first pane, in the order of the bar, and `selected` the one on show. A notebook on its own is one tab and shows no bar; the bar (`TabStrip`) appears from two.
 - **One editor on show, every document open.** Only the tab on show has an `EditorScreen`. The documents of the tabs looked at since the editor opened stay open in `EditorWindow.documents` (the registry itself holds documents weakly), so coming back to a tab finds the same document, with its undo history and anything not yet saved, and the one-editor-per-notebook rule covers every tab. The session (mode, selection, zoom) is made afresh, at the manifest's current page. A recording stops when its tab is left, as it does when an editor closes.
-- **Closing.** The tab on show is closed by its own editor (`scribeCloseEditor`, with `EditorWindow.closing` set to `.tab`), which can say so if saving fails. A tab behind the bar is saved and closed by `EditorScreen.putAway`, the same path a window that goes away takes: a document that can't be saved is kept and retried. Back to Library saves and closes the notebook beside, every tab's document and then the editor on show, so nothing stays open, or busy for a sync, behind the library.
+- **Closing.** The tab on show is closed by its own editor (`owlLunaCloseEditor`, with `EditorWindow.closing` set to `.tab`), which can say so if saving fails. A tab behind the bar is saved and closed by `EditorScreen.putAway`, the same path a window that goes away takes: a document that can't be saved is kept and retried. Back to Library saves and closes the notebook beside, every tab's document and then the editor on show, so nothing stays open, or busy for a sync, behind the library.
 - **What waits in the library.** Two or more tabs are remembered and shown again when a notebook is next opened, which joins them; a notebook on its own leaves nothing behind. `WindowMemory` keeps the tabs with the window's notebook, so the app reopens with them.
-- **Opening.** The title menu and the bar's plus choose from the notebooks not already open in the window. With tabs open, a link to another notebook, a widget link or a shortcut shows that notebook in a tab; with a single notebook it replaces it, as before. A notebook that has a tab in another window brings that window forward and shows the tab (`scribeSelectTab`).
+- **Opening.** The title menu and the bar's plus choose from the notebooks not already open in the window. With tabs open, a link to another notebook, a widget link or a shortcut shows that notebook in a tab; with a single notebook it replaces it, as before. A notebook that has a tab in another window brings that window forward and shows the tab (`owlLunaSelectTab`).
 - **Shortcuts.** ⇧⌘] and ⇧⌘[, or ⌃Tab and ⇧⌃Tab, step along the bar. ⌘W closes the tab on show while there are tabs and goes back to the library otherwise.
 - The bar goes with the rest of the chrome in focus mode, while presenting and in the other modes.
 
@@ -301,9 +301,14 @@ A's one weakness is simulator footprint at 5×. We addressed it with the measure
 - Closing stops any recording, waits for imports, then saves. If saving keeps failing, the editor stays open and asks: try again, keep editing, or close anyway. Closing anyway keeps the document alive in the registry and retrying in the background; reopening the notebook picks up the same document.
 - Saves only update the library index when something the library shows changed (title, pages, cover, favourite, trash, folder, tags). Ink-only saves don't; closing indexes everything. The index record is only written, and SwiftData only saved, when a field actually differs.
 
+## Launch
+
+- `AppModel.start` runs once, and later callers wait for it: it adopts any `.scribe` packages an older build left (see Storage v2), seeds a test library in Debug builds, sweeps `Deleting/`, refreshes the index and loads the smart shelves, history and flashcards, then sets `phase` to `.ready`.
+- `OwlLunaRoot` asks `LaunchAnimation.isEnabled` before `start()`. When it is true, `LaunchOverlay` plays the owl over the library (the choreography is in `docs/DESIGN.md` › Launch), which stays at opacity 0 and hidden from VoiceOver until the overlay hands over: at 1.45 s, or when `phase` is ready, whichever is later. When it is false the library's opacity follows `phase`, as before. The gate is false under tests, with `-storageRoot` or `-skipLaunchAnimation`, and for any scene but the first of the process, so UI tests and a second window see the library at once.
+
 ## Storage v2
 
-Each notebook is a package at `Application Support/Library/<uuid>.scribe/`:
+Each notebook is a package at `Application Support/Library/<uuid>.owlluna/`. An older build named them `<uuid>.scribe`; `StorageRoot.adoptLegacyPackages` renames those in place (one that already has a `.owlluna` successor, and anything not named by a UUID, is left alone) and runs first thing in `AppModel.start` and on a restored backup, so a Library copied into the container by hand, or an old `.scribebackup` restored through Settings, opens as normal. A rename that fails is logged (`storage` category) and the package left where it was. `packageIDs()` lists `.owlluna` only. iCloud sync does not adopt them: the container is new under this name, and a `.scribe` there would never match `cloud.package(id)`; `SyncTests` pins down that one is neither pulled nor deleted.
 
 ```
 manifest.json          schemaVersion, title, cover, defaults, pages, recordings, library state
@@ -356,15 +361,16 @@ cards/                 clippings shown on flashcards (PNG)
 
 ### Backup and restore
 
-- **One file.** `LibraryBackup.create` writes `Library/` (every package, `folders.json`, `smart-shelves.json`, `activity.json`) and `Stickers/` into an Apple Archive compressed with LZFSE, named `Swift Scribe Backup <date>.scribebackup`, with a small `backup.json` (version, date, the daily journal's ID). Open notebooks are saved first. `thumbs/` folders are left out; they are a cache.
+- **One file.** `LibraryBackup.create` writes `Library/` (every package, `folders.json`, `smart-shelves.json`, `activity.json`) and `Stickers/` into an Apple Archive compressed with LZFSE, named `OwlLuna Backup <date>.owllunabackup`, with a small `backup.json` (version, date, the daily journal's ID). Open notebooks are saved first. `thumbs/` folders are left out; they are a cache.
 - **Restore only adds.** The archive is unpacked into a temporary folder (entries with absolute paths or `..` are skipped, and symbolic links are removed), then merged: a notebook the library doesn't have is moved in under its own ID; one that is identical (same modification date and pages) is left alone; one that differs is moved in under a new ID as "Title (from backup)", so nothing in the library is ever replaced. Folders and smart shelves the library lacks are appended, stickers are added by file name, and the writing history is merged day by day. The index is refreshed afterwards, which also reads the restored notebooks' search text.
 - A backup from a newer version is refused, not half-read.
+- **Old backups.** A `.scribebackup` is still a backup: the `com.owais.owlluna.backup` type in `Config/Info.plist` lists both extensions, so Files and the importer accept it, and its `.scribe` packages are adopted as `.owlluna` after the version check and before they are merged.
 
 ### iCloud sync
 
 Experimental: everything below is tested with a plain folder standing in for iCloud (`SyncTests` plays two devices against it, and `SyncUITests` launches the app twice with two storage roots and `-cloudFolder`). It has not run against a real iCloud container.
 
-- **The library never moves.** The app always works in `Application Support/Library`. Sync (`LibrarySync`) copies whole notebooks between that and a folder in the app's iCloud container (`<container>/Sync`), so the editor never reads a file that iCloud hasn't downloaded, and turning sync off changes nothing on the device. The default entitlements carry no iCloud keys; `Config/NotesApp-iCloud.entitlements` adds them. Without them the container doesn't resolve and Settings says so.
+- **The library never moves.** The app always works in `Application Support/Library`. Sync (`LibrarySync`) copies whole notebooks between that and a folder in the app's iCloud container (`<container>/Sync`), so the editor never reads a file that iCloud hasn't downloaded, and turning sync off changes nothing on the device. The default entitlements carry no iCloud keys; `Config/OwlLuna-iCloud.entitlements` adds them. Without them the container doesn't resolve and Settings says so.
 - **One rule per notebook.** A small file on the device (`sync-state.json`) remembers each notebook's modification date the last time both sides agreed. From the three dates (here, there, agreed): unchanged here and changed there is pulled; the reverse is pushed; changed on both is a conflict. In a conflict the newer version keeps the notebook's ID everywhere and the older is kept as a notebook of its own, "Title (conflicted copy)", so nothing written is lost. Nothing is merged inside a notebook.
 - **Deletes.** A notebook that was in step and is gone from the device was deleted here: a marker goes in `Deleted/` and the synced copy is removed. Another device removes its copy only if it hasn't changed since they agreed; one that has been written in since is uploaded again and the marker removed.
 - **Copying.** A push mirrors the package into the container: files that differ are copied (through a temporary name, then swapped in), files that are gone are removed, the manifest goes last, and `thumbs/` and files set aside as damaged stay behind. A pull assembles the notebook beside the library, checks its manifest reads, and swaps it in whole. Writes to the container go through `NSFileCoordinator`.
@@ -393,15 +399,15 @@ The converter for notebooks from the first version (`V1Migrator`) was removed on
   - thumbnails: an LRU of 120;
   - paper miniatures for the paper drawer and New Notebook: an LRU of 64;
   - loaded ink: 24 clean pages. Unsaved pages are never evicted.
-- **Signposts** (`OSSignposter`, subsystem `com.owais.NotesApp`):
+- **Signposts** (`OSSignposter`, subsystem `com.owais.OwlLuna`):
   - "Open to first ink", "Save", "Thumbnail", "OCR page", "Export", "Cover render", "Launch".
 
 ## v1 and v2, before and after
 
 Same run for both columns.
 
-- **Environment:** "Scribe Bench" iPad Pro 11-inch (M5) simulator, iOS 27.0, Debug build in Swift 6 language mode, on an Apple M4 Mac mini at load average 3–4.
-- **Method:** XCTest in-process timings (`NotesAppTests/PerformanceBaselineTests`, run with `SCRIBE_PERF=1`), medians unless noted. The v1 column was measured on the v1 code before it was removed in M6; the suite now runs the v2 cases only.
+- **Environment:** "OwlLuna Bench" iPad Pro 11-inch (M5) simulator, iOS 27.0, Debug build in Swift 6 language mode, on an Apple M4 Mac mini at load average 3–4.
+- **Method:** XCTest in-process timings (`OwlLunaTests/PerformanceBaselineTests`, run with `OWLLUNA_PERF=1`), medians unless noted. The v1 column was measured on the v1 code before it was removed in M6; the suite now runs the v2 cases only.
 - **Fixtures:** heavy is 100 Letter pages × 500 strokes with a 1,000-stroke first page for v2's stroke-end cases; typical is 20 × 400.
 
 None of these are device numbers. Pencil latency and hitches need the device checklist.
@@ -444,7 +450,7 @@ All three targets build in the Swift 6 language mode with no warnings. Two thing
 
 ## Languages
 
-- Every string the app shows goes through `String(localized:)`, a SwiftUI text literal or a `LocalizedStringResource`, and is translated in a string catalog: `NotesApp/Resources/Localizable.xcstrings` for the app, `InfoPlist.xcstrings` for the permission prompts and file type names, `AppShortcuts.xcstrings` for the Siri phrases, and `ScribeWidgets/Localizable.xcstrings` for the widgets. English is the source language; Spanish, French and German are filled in.
+- Every string the app shows goes through `String(localized:)`, a SwiftUI text literal or a `LocalizedStringResource`, and is translated in a string catalog: `OwlLuna/Resources/Localizable.xcstrings` for the app, `InfoPlist.xcstrings` for the permission prompts and file type names, `AppShortcuts.xcstrings` for the Siri phrases, and `OwlLunaWidgets/Localizable.xcstrings` for the widgets. English is the source language; Spanish, French and German are filled in.
 - Names stored in a notebook are never translated values: paper templates, colours, stickers and cover styles are stored by their raw values and only their display names are localized.
 - A count is one string with plural variations in the catalog ("%lld pages" has a form for one and a form for the rest), never a "1 page" string chosen in code, so a language with more plural forms only needs its forms filled in. A sentence with two counts, or a count beside other values, varies through substitutions, and each language picks the count its words agree with (in French "1 trait écrit sur 5" agrees with the strokes written, in German "1 von 5 Strichen" with the total). `PluralTests` reads the built tables and fails if a count is spelled out for one again.
 - `LocalizationUITests` launches the app in each language and checks a few known strings; the accessibility audit runs in English only.

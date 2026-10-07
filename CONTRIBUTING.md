@@ -1,4 +1,4 @@
-# Contributing to Swift Scribe
+# Contributing to OwlLuna
 
 Thanks for helping make a great free notes app.
 
@@ -20,7 +20,7 @@ Thanks for helping make a great free notes app.
 
 ## Privacy
 
-Swift Scribe collects no data. Please don't add analytics, tracking, ads, or network calls that send user content anywhere.
+OwlLuna collects no data. Please don't add analytics, tracking, ads, or network calls that send user content anywhere.
 
 ## Reporting bugs
 

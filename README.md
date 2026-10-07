@@ -1,10 +1,10 @@
-# Swift Scribe
+# OwlLuna
 
-[![CI](https://github.com/owaisazmal/Swift-Scribe/actions/workflows/ci.yml/badge.svg)](https://github.com/owaisazmal/Swift-Scribe/actions/workflows/ci.yml)
+[![CI](https://github.com/owaisazmal/OwlLuna/actions/workflows/ci.yml/badge.svg)](https://github.com/owaisazmal/OwlLuna/actions/workflows/ci.yml)
 
 **A free, open-source handwritten notes app for iPad. It is a Notability / GoodNotes alternative with no subscriptions, no ads, and no tracking.**
 
-Swift Scribe is built entirely on Apple frameworks (SwiftUI, PencilKit, PDFKit, Vision, SwiftData). Your notes stay on your device unless you turn on iCloud sync, which keeps a copy in your own private iCloud storage.
+OwlLuna is built entirely on Apple frameworks (SwiftUI, PencilKit, PDFKit, Vision, SwiftData). Your notes stay on your device unless you turn on iCloud sync, which keeps a copy in your own private iCloud storage.
 
 ## Features
 
@@ -109,7 +109,7 @@ Swift Scribe is built entirely on Apple frameworks (SwiftUI, PencilKit, PDFKit, 
 
 ## Privacy
 
-Swift Scribe has no accounts and no analytics. Handwriting and speech are recognised on the device: a recording is only transcribed when you ask, and only if the iPad can do it without sending it anywhere. Translation uses Apple's translator on the iPad. Study guides are written by Apple's language model on the iPad, from the words already read from your pages, and are never sent anywhere; without that model there is no study guide. Your calendar is read only when you ask for today's events, or when you have turned on printing them in the journal, and the events go nowhere but onto the page. The camera is used only while you scan. iCloud sync is off unless you turn it on; with it on, your notebooks, folders and stickers are copied to the app's private container in your own iCloud storage, which Apple syncs between your devices. The writing history is never synced. The writing history behind the week strip and calendar is a small file on your device (`Library/activity.json`) listing the days you wrote and which pages. It is never shared, and Settings › Writing History turns it off or clears it.
+OwlLuna has no accounts and no analytics. Handwriting and speech are recognised on the device: a recording is only transcribed when you ask, and only if the iPad can do it without sending it anywhere. Translation uses Apple's translator on the iPad. Study guides are written by Apple's language model on the iPad, from the words already read from your pages, and are never sent anywhere; without that model there is no study guide. Your calendar is read only when you ask for today's events, or when you have turned on printing them in the journal, and the events go nowhere but onto the page. The camera is used only while you scan. iCloud sync is off unless you turn it on; with it on, your notebooks, folders and stickers are copied to the app's private container in your own iCloud storage, which Apple syncs between your devices. The writing history is never synced. The writing history behind the week strip and calendar is a small file on your device (`Library/activity.json`) listing the days you wrote and which pages. It is never shared, and Settings › Writing History turns it off or clears it.
 
 The widgets read a small snapshot the app writes to its own shared container on the device (the last notebook's title, page and cover, and page counts for recent days). With writing history off, no days are written there. A locked notebook is never in that snapshot, nor in Spotlight's index, which iPadOS keeps on the device and which Settings › Search switches off.
 
@@ -118,44 +118,44 @@ A locked notebook is closed to anyone using the app without Face ID, Touch ID or
 ## Getting started
 
 ```bash
-git clone https://github.com/owaisazmal/Swift-Scribe.git
+git clone https://github.com/owaisazmal/OwlLuna.git
 ```
 
 ```bash
-open Swift-Scribe/NotesApp.xcodeproj
+open OwlLuna/OwlLuna.xcodeproj
 ```
 
-Select an iPad simulator and run. To run on a device, choose your team for both the `NotesApp` and `ScribeWidgets` targets; they share the App Group `group.com.owais.NotesApp`, which you may need to rename to one your team owns (it's set in `Config/*.entitlements` and `Shared/WidgetSnapshot.swift`). iCloud sync needs the iCloud capability, which a free developer account can't sign: with a paid team, set the NotesApp target's `CODE_SIGN_ENTITLEMENTS` to `Config/NotesApp-iCloud.entitlements` (or add iCloud › iCloud Documents under Signing & Capabilities) and rename the container `iCloud.com.owais.NotesApp` to one your team owns. Without it the app builds and runs as before and Settings says sync is unavailable. In the simulator you can draw with the mouse; on a device, choose **⋯ → Draw With** to switch between Apple Pencil only and finger drawing.
+Select an iPad simulator and run. To run on a device, choose your team for both the `OwlLuna` and `OwlLunaWidgets` targets; they share the App Group `group.com.owais.OwlLuna`, which you may need to rename to one your team owns (it's set in `Config/*.entitlements` and `Shared/WidgetSnapshot.swift`). iCloud sync needs the iCloud capability, which a free developer account can't sign: with a paid team, set the OwlLuna target's `CODE_SIGN_ENTITLEMENTS` to `Config/OwlLuna-iCloud.entitlements` (or add iCloud › iCloud Documents under Signing & Capabilities) and rename the container `iCloud.com.owais.OwlLuna` to one your team owns. Without it the app builds and runs as before and Settings says sync is unavailable. In the simulator you can draw with the mouse; on a device, choose **⋯ → Draw With** to switch between Apple Pencil only and finger drawing.
 
 Run the tests with ⌘U or:
 
 ```bash
-xcodebuild test -project NotesApp.xcodeproj -scheme NotesApp -destination 'platform=iOS Simulator,name=iPad Pro 11-inch (M5)'
+xcodebuild test -project OwlLuna.xcodeproj -scheme OwlLuna -destination 'platform=iOS Simulator,name=iPad Pro 11-inch (M5)'
 ```
 
 ## Architecture
 
 ```
-NotesApp/
-├── App/          App entry, launch (index refresh), test-only seeds and probes
+OwlLuna/
+├── App/          App entry, launch (index refresh, the owl's launch animation), test-only seeds and probes
 ├── Models/       Manifest types (NotebookManifest, NotebookPage, CoverSpec), paper types
 ├── Storage/      Notebook packages, tolerant manifest codec, SwiftData library index
 ├── Canvas/       Page stack (one PencilKit canvas per visible page), page rendering, undo proxy
 ├── Editor/       NotebookDocument (model, undo, autosave), editor chrome, navigator, recorder, second screen
 ├── Library/      Library views, covers, new-notebook sheet, library store, one-editor registry
-├── Design/       Colour tokens, typography (Fraunces, Bricolage Grotesque), cover renderer
+├── Design/       Colour tokens, typography (Fraunces, Bricolage Grotesque), cover renderer, the launch mark
 ├── Services/     PDF, image and video export, library backup, iCloud sync, handwriting and speech recognition,
 │                 scanning, translation, the calendar, notebook locks, Spotlight
 ├── Settings/     Settings and acknowledgements
 └── Resources/    Bundled fonts with their licences, privacy manifest, string catalogs
-ScribeWidgets/    The widget extension: Continue Writing, This Week, Today's Page, Quick Note, and the Control Center buttons
-Shared/           The snapshot the app writes and the widgets read, and what a Control Center button hands the app
+OwlLunaWidgets/   The widget extension: Continue Writing, This Week, Today's Page, Quick Note, and the Control Center buttons
+Shared/           The owl on its moon (the app icon and the launch mark), the snapshot the app writes and the widgets read, and what a Control Center button hands the app
 ```
 
 Key design decisions (details and measurements in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); visual system in [docs/DESIGN.md](docs/DESIGN.md)):
 
 - **One package per notebook.**
-  - Each notebook is `Library/<id>.scribe/`: a `manifest.json`, one ink file per page in page-local points, plus assets, thumbnails and recognised text.
+  - Each notebook is `Library/<id>.owlluna/`: a `manifest.json`, one ink file per page in page-local points, plus assets, thumbnails and recognised text. Packages and backups from before the rename (`.scribe`, `.scribebackup`) are still read and renamed on the way in.
   - Saves write only changed pages, each atomically, and the manifest last, all off the main thread.
   - Files that can't be read are set aside as `.corrupt` and never overwritten.
 - **One canvas per visible page.**
@@ -182,8 +182,8 @@ Contributions toward any of these are very welcome:
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Bug reports and feature requests go in [GitHub Issues](https://github.com/owaisazmal/Swift-Scribe/issues).
+See [CONTRIBUTING.md](CONTRIBUTING.md). Bug reports and feature requests go in [GitHub Issues](https://github.com/owaisazmal/OwlLuna/issues).
 
 ## License
 
-Swift Scribe is released under the [MIT License](LICENSE).
+OwlLuna is released under the [MIT License](LICENSE).

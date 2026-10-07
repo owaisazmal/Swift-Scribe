@@ -1,4 +1,4 @@
-# Swift Scribe design notes
+# OwlLuna design notes
 
 The visual system is **Clothbound**: a library that looks like a shelf of cloth-bound notebooks, and a quiet warm desk around the page. **Print** is a second cover style borrowed from riso printing. From the other audit directions, only Drafting Table's tabular numerals come along.
 
@@ -30,7 +30,7 @@ All tokens live in `Assets.xcassets` with light, dark, and Increase Contrast var
 | Hairline | Ink at 15% | Ink at 15% | Rules, page edges; 32% with Increase Contrast |
 | Board | `#FAF7F0` | `#2A2722` | Buttons, bars and tab thumbs (lighter than a dark sheet, so they lift at night) |
 | Well | `#5A4526` at 9% | Black at 38% | Fields and tab tracks, over any ground; 14% and 55% with Increase Contrast |
-| PrimaryCloth, OnPrimaryCloth | `#2747B8`, `#F1EDE4` | `#3A5BB8`, `#ECE6DA` | The finishing button. At night it is the dark app icon's cloth, not the bright tint |
+| PrimaryCloth, OnPrimaryCloth | `#2747B8`, `#F1EDE4` | `#3A5BB8`, `#ECE6DA` | The finishing button. At night it is a deeper cobalt cloth, not the bright tint |
 | DestructiveCloth, OnDestructiveCloth | `#C9452F`, `#FFFFFF` | `#A83E2B`, `#ECE6DA` | The stop-recording button |
 
 Every text pair is checked by `DesignTokenTests.testEveryTextPairReachesAA` in all four appearances. The lowest ratios:
@@ -69,16 +69,16 @@ Every button, bar, field and tab we draw comes from `Design/Controls.swift`, in 
 
 - **Board** (`.board(in:)`): Board fill, a Hairline edge, a lit top edge (white at 85%, 9% at night) and a two-layer umber shadow (`#2A2116`, 10% at 0.5 pt and 7% at 6 pt; black at night). Pressed, it sinks into the well and loses its shadow; disabled, it is an edgeless slab at half strength with secondary text, so the state shows by shape in dark mode and with Increase Contrast too. Increase Contrast drops the lit edge.
 - **Well** (`.well(in:)`): the Well colour with an umber inner shadow and a lit lower lip. Its edge is the Hairline, ink at 50% with Increase Contrast, and a 1.5 pt accent ring while it has focus.
-- **Cloth** (`.scribe(.primary)`): PrimaryCloth with the covers' own two-way weave (a 4 pt tile, white 6% and black 7%), the cover board's bevel (white 18% over black 20%) and an umber shadow. Disabled cloth is a plain Well fill with secondary text and no edge. Increase Contrast drops the weave and bevel.
+- **Cloth** (`.owlLuna(.primary)`): PrimaryCloth with the covers' own two-way weave (a 4 pt tile, white 6% and black 7%), the cover board's bevel (white 18% over black 20%) and an umber shadow. Disabled cloth is a plain Well fill with secondary text and no edge. Increase Contrast drops the weave and bevel.
 
 The pieces:
 
-- **Buttons.** `.scribe` is a board with Ink in the medium weight; `.scribe(.primary)` is cloth in semibold, for the one action that finishes a task (Done, Create, Save, Share); `.scribe(.destructive)` is tomato cloth, used only for the stop-recording button. Anything else that deletes is a tomato icon on a board, or an Ink word, and asks before it acts or can be undone. Shapes are 22 pt continuous rounded rectangles, so a one-line button is a capsule and a wrapped one stays a slab. `compact` draws 34 pt inside a 44 pt target. At accessibility sizes, buttons in content wrap to three lines.
+- **Buttons.** `.owlLuna` is a board with Ink in the medium weight; `.owlLuna(.primary)` is cloth in semibold, for the one action that finishes a task (Done, Create, Save, Share); `.owlLuna(.destructive)` is tomato cloth, used only for the stop-recording button. Anything else that deletes is a tomato icon on a board, or an Ink word, and asks before it acts or can be undone. Shapes are 22 pt continuous rounded rectangles, so a one-line button is a capsule and a wrapped one stays a slab. `compact` draws 34 pt inside a 44 pt target. At accessibility sizes, buttons in content wrap to three lines.
 - **Bars.** `BarGroup` puts a row of 44 pt icons (`.barIcon`, Ink, a small well while pressed, Tomato for a destructive role) on one board capsule; `.boardIcon` is a single icon on a round board. Toolbar items wear `.boardBackground()`, which removes the system glass on iPadOS 26 and later. Everything in a navigation bar stops growing at the largest standard text size and shows the Large Content Viewer, with its name, instead; the floating bars over the page grow with the text size, words and field alike. A bar keeps the colour of its ground when content scrolls under it (`barGround`), never the system's blurred band. The sidebar's bar tints whatever sits in it, so on iPadOS 26 and later the sidebar draws its title and buttons in a row of its own.
 - **Under the bar.** When a bar has no room for a field or a set of tabs (a narrow window, a long translation, text above the Large size), they take a row of their own under it: the navigator's go-to field, the link sheet's tabs, the library's search.
-- **Fields.** `ScribeSearchField` is a capsule well with a glyph, a 44 pt clear button and room for one more control (the navigator's Go arrow). Escape clears it, then leaves it. Sheet fields use `.scribeField(focused:)`, a rounded well.
+- **Fields.** `OwlLunaSearchField` is a capsule well with a glyph, a 44 pt clear button and room for one more control (the navigator's Go arrow). Escape clears it, then leaves it. Sheet fields use `.owlLunaField(focused:)`, a rounded well.
 - **The library bar.** A board with Sort, New and Select, then the search well (260 pt). When the bar has no room for the field (a narrow window, or a long translation beside the sidebar), it moves to a row of its own under the bar instead of into the system's overflow menu. The sidebar button is a round board like Settings beside it; it shows and hides the sidebar the way the system's did, over the shelves in portrait and beside them in landscape.
-- **Tabs.** `ScribeSegmentedPicker` lays its segments out in equal widths on a well, with one board thumb that slides to the chosen one (it jumps with Reduce Motion). The chosen label is Ink semibold, the others TextSecondary medium, so it never relies on colour alone. In dark mode the thumb carries a 10% ink wash, and with Increase Contrast an InkSecondary edge. VoiceOver reads the segments as tabs.
+- **Tabs.** `OwlLunaSegmentedPicker` lays its segments out in equal widths on a well, with one board thumb that slides to the chosen one (it jumps with Reduce Motion). The chosen label is Ink semibold, the others TextSecondary medium, so it never relies on colour alone. In dark mode the thumb carries a 10% ink wash, and with Increase Contrast an InkSecondary edge. VoiceOver reads the segments as tabs.
 - Boards never sit inside scrolling grids or lists, where their shadows would be drawn live.
 
 ## Covers
@@ -122,7 +122,7 @@ The styles:
 - The sidebar shows a cloth spine chip for each folder. A folder inside another is indented one step under it, and a folder that holds folders has a chevron on its trailing edge that folds them away.
 - **Tags** are paper labels, like a cover's label and the kraft tag sticker: a LabelCream capsule with a Hairline edge, a small punched hole (a ring) at its leading end, and the name in LabelInk, footnote semibold. Like covers and stickers they are content, so they stay cream at night. Each chip sits in a 44 pt target. In the tag sheet (Surface, with a well to type in and a cloth Done) the chips of the notebook or page carry a small cross and come off with a tap, and the library's other tags carry a plus. A chosen chip in the smart shelf sheet is Mustard with OnMustard text and a check mark, never colour alone. The sidebar gains Smart shelves and Tags once something is tagged; a tag's shelf is titled with the tag and stands its notebooks on their rows, then lists the tagged pages as page cards. A tagged page wears a small blank label at the foot of its navigator thumbnail.
 - **Locked notebooks.** The cover is blurred past reading (9% of its width) under a cream disc with an ink padlock, and its title is written beneath it, since the cover no longer says it. Behind the lock, the editor shows a padlock in a Surface circle, the notebook's name in the display face, and Unlock beside the way back.
-- **Covers are real buttons.** Each has a full VoiceOver description (title, page count, last edit, favourite, folder), a hover lift, and a typed drag payload (`com.owais.swiftscribe.notebook-reference`).
+- **Covers are real buttons.** Each has a full VoiceOver description (title, page count, last edit, favourite, folder), a hover lift, and a typed drag payload (`com.owais.owlluna.notebook-reference`).
 - At accessibility text sizes, the grid becomes a list, led by a Continue writing row.
 - **Empty states look like the library.** A new library shows a small illustrated shelf (ghost spines leaning on a cloth notebook) above "Your shelf is ready."; an empty folder says so by name and offers a new notebook there; empty Favourites shows the ribbon.
 
@@ -183,25 +183,20 @@ The styles:
 
 ## App icon
 
-The Home Screen icon is a Clothbound notebook on the desk. It's drawn in code by `Scripts/AppIcon` (Core Graphics, Core Text and ImageIO, no UIKit or AppKit), so every variant and alternate comes from one source.
+The Home Screen icon is the OwlLuna owl: a brown owl in round black glasses perched on a crescent moon, a spiral pad under its left wing and a pencil in its right, with a sparkle above and an asterisk star below. It's drawn in code by `Shared/OwlLunaArt.swift` (Foundation and Core Graphics only, compiled into the app, the widget extension and the icon script), so the icon, its alternates, the Settings previews and the launch mark come from one source. `Scripts/AppIcon` renders it with ImageIO and sets the review sheet's labels with Core Text; no UIKit or AppKit.
 
-- **Light.** A cobalt cloth notebook on the desk colour `#E7E2D7`.
-  - The cloth has the covers' faint two-way weave, a darker rounded spine and a hinge.
-  - A cream page block (`#F7F1E3`, three leaf lines) shows along the fore-edge and the tail.
-  - The cream label has the double hairline and a Fraunces "S" in `#1B2230`, set with the cloth-label instance (SOFT 50, WONK 1).
-  - A tomato ribbon with a cream edge hangs below the book, in its shadow.
-  - The primary PNG has no alpha channel.
-- **Dark.** Designed, not derived: a transparent background for the system's dark backdrop, lifted cloth (`#3A5BB8`), the label kept light (`#E9E1CE`) and the dark tomato ribbon (`#FF7B61`). No shadows.
-- **Tinted.** Grayscale on transparent, in the same reading order: label brightest, cloth mid-grey, the "S" near black.
-- **Alternates.** Settings › App Icon offers Cobalt (the primary icon), Tomato (mustard ribbon), Moss, Oxblood, Mustard and Print, each with its own dark and tinted art.
-  - Print is riso paper stock with a pink disc overprinted on a yellow halftone, a riso-blue ribbon, and a Bricolage "S" on a knockout.
+- **Composition, at 1024 px.** The moon is a crescent of radius 395 about (512, 506) with a 300 px circle about (590, 416) cut out of it, a 30 px highlight band along its outer edge and a 26 px shade band along the inner. The owl is laid out around (480, 580) and drawn 10% larger, so the glasses still read at 40 px. The sparkle sits at (772, 262) and the asterisk at (165, 845). The pencil leans 28° from the grip at the right wing's tip, with the wood and graphite of its point showing past the wing; at 58 px it still shows pink, orange and a dark tip. The feet are three capsule toes each, in front of the body's lower edge. The parts are listed in draw order (`OwlLunaLayer`), so the launch mark can move them in groups.
+- **Six skies.** Settings › App Icon offers Cobalt (the primary icon, violet `#4F2DD3` to `#3E20B5`), Tomato, Moss, Oxblood and Mustard, each a two-stop gradient in its cloth colour with the moon and stars warmed to suit, and Print: riso paper stock `#F7F4EC` under a riso-blue halftone, a riso-yellow moon and a pink star. The owl is the same in all six.
   - The alternates are listed in `ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES`, which puts them in the generated Info.plist; `AppIconTests` checks that they arrive there.
   - The tiles are 60 pt previews (`IconPreview-*`, light and dark) with the stitched selection and a check mark. They wrap onto more rows as text grows. iPadOS confirms the change itself.
-- **Geometry at 1024 px.**
-  - The book is laid out at 520 × 694 around (512, 470), then drawn 8% larger so it holds its own beside full-bleed icons.
-  - Spine 8% of the width with a gradient, hinge at 11%. Weave period 14 px, 6 px lines.
-  - Page block 22 px on the fore-edge and 14 px at the tail, so it survives the Home Screen's edge treatment at small sizes.
-  - Label from 17% to 91% of the width and 22% to 62% of the height; the "S" is set at 300 px and centred on its outline.
-  - Ribbon 72 × 320 px (`RibbonShape`'s 0.28 notch) at 70% of the width, hanging 110 px below the book.
-  - Book shadow blur 36 px at 22%, 18 px down (light only).
-- **Regenerating.** Run `swiftc -O Scripts/AppIcon/*.swift -o .build/make-icon && .build/make-icon NotesApp/Assets.xcassets docs`. It rewrites every icon set, the previews and `docs/icon-sheet.png`, a review sheet with each variant and the light icon at 152, 120, 80, 58 and 40 px. The output is deterministic and committed.
+- **Light.** The sky, a halo disc round the moon (the highlight colour at 14%) and two soft glows under the crescent (blur 46 and 22 px), then the owl. The glow stays 80 px inside the edge, so the Home Screen's mask never cuts it; Print has none. The primary PNG has no alpha channel.
+- **Dark.** The same owl, moon and glow on a transparent background, for the system's dark backdrop. With no sky, the six dark icons differ only in the tints of their moon and stars.
+- **Tinted.** Greyscale on transparent, by luminance, except that the moon drops to mid-grey (0.72, highlight 0.80, shade 0.60) and the stars (0.92), pad (0.95), belly (0.88) and face (0.82) lift, so the owl stands off the moon and the crescent stands off the system's wash.
+- **Regenerating.** Run `swiftc -O Scripts/AppIcon/*.swift Shared/OwlLunaArt.swift -o .build/make-icon && .build/make-icon OwlLuna/Assets.xcassets docs`. It rewrites every icon set, the previews and `docs/icon-sheet.png`, a review sheet with each theme in light, dark and tinted and the light icon at 152, 120, 80, 58 and 40 px. The output is deterministic and committed.
+
+### Launch
+
+- **The mark.** `OwlLunaMark` (`Design/OwlLunaMark.swift`) is the icon as a SwiftUI tile: a continuous 22.5%-corner gradient of the sky, then one `Canvas` for each group of parts that moves together (the moon with its halo and glow, each star, the owl, the eyes, the glasses, beak and pad, the pencil), converted once per palette from `OwlLunaArt.parts` (`OwlLunaMarkGroups.launchLight` and `launchDark`). By day it wears the primary icon's violet sky, at night a midnight navy-violet (`#1E1449` to `#140D33`). Settings › About shows it at 72 pt.
+- **The choreography** (`App/LaunchOverlay.swift`), each step timed from the one before, so a busy main thread at start-up delays the owl rather than skipping it ahead. At 0 s the tile fades in and grows from 0.94 (0.25 s ease-out); at 0.10 the moon swings from −14° to rest on a spring; at 0.35 the owl fades in and pops from 0.6 with a 5% drop on a looser spring, overshooting and settling; at 0.50 and 0.60 the two stars twinkle in; at 0.85 one blink (the eyes squash behind the glasses, 0.09 s in, 0.11 s out); from 0.90 to 1.30 the pencil wags +8°, −8°, +8°, −8° and springs home (`Motion.ribbon`) while the stars dip to 0.4 and back, out of phase. From 1.45 s, once the library is ready, the tile shrinks to 0.96 and fades out over 0.35 s as the library fades in; if it isn't ready yet the owl holds its final pose with the stars breathing until it is. The overlay takes no touches and is one VoiceOver element, "OwlLuna", an image; the library beneath is hidden from VoiceOver until the hand-over begins.
+- **Reduce Motion.** The owl starts at rest: the tile fades in (0.25 s), holds, and fades out (0.35 s). Nothing moves.
+- **When it plays.** `LaunchAnimation.isEnabled`: the first scene of the process only, never under tests, and not with `-storageRoot` or `-skipLaunchAnimation`. A second window, and every UI test, starts with the library as it is.

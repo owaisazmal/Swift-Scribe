@@ -9,7 +9,7 @@ enum ControlRelay {
 
     static func post(_ action: String, to defaults: UserDefaults? = ControlRelay.defaults) {
         defaults?.set(action, forKey: key)
-        NotificationCenter.default.post(name: .scribeControlAction, object: nil)
+        NotificationCenter.default.post(name: .owlLunaControlAction, object: nil)
     }
 
     /// The action waiting, if any. Taking it clears it, so it is carried out once.
@@ -21,7 +21,7 @@ enum ControlRelay {
 }
 
 extension Notification.Name {
-    static let scribeControlAction = Notification.Name("ScribeControlAction")
+    static let owlLunaControlAction = Notification.Name("OwlLunaControlAction")
 }
 
 struct QuickNoteControlIntent: AppIntent {

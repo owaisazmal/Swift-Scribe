@@ -3,46 +3,8 @@ import CoreGraphics
 import CoreText
 import ImageIO
 
-// Generates the app icon sets, the Settings previews and docs/icon-sheet.png.
-// swiftc -O Scripts/AppIcon/*.swift -o .build/make-icon && .build/make-icon NotesApp/Assets.xcassets docs
-
-/// The same variable instances as `ScribeFonts.coverLabel` and `printTitle` in the app.
-enum IconFonts {
-    private static let soft = 0x534F_4654 as UInt32
-    private static let wonk = 0x574F_4E4B as UInt32
-    private static let weight = 0x7767_6874 as UInt32
-    private static let width = 0x7764_7468 as UInt32
-    private static let opticalSize = 0x6F70_737A as UInt32
-
-    static func register(_ urls: [URL]) {
-        CTFontManagerRegisterFontURLs(urls as CFArray, .process, true) { errors, _ in
-            for error in (errors as? [CFError]) ?? [] { fail("font registration failed: \(error)") }
-            return true
-        }
-        for (font, family) in [(coverLabel(size: 100), "Fraunces"), (printTitle(size: 100), "Bricolage Grotesque")]
-        where CTFontCopyFamilyName(font) as String != family {
-            fail("\(family) isn't available")
-        }
-    }
-
-    static func coverLabel(size: CGFloat) -> CTFont {
-        variable("Fraunces-SemiBold", size: size, axes: [weight: 600, soft: 50, wonk: 1, opticalSize: min(max(size, 9), 144)])
-    }
-
-    static func printTitle(size: CGFloat) -> CTFont {
-        variable("BricolageGrotesque-96ptExtraBold", size: size, axes: [weight: 800, width: 75, opticalSize: min(max(size, 12), 96)])
-    }
-
-    static func interface(size: CGFloat) -> CTFont {
-        CTFontCreateUIFontForLanguage(.system, size, nil)!
-    }
-
-    private static func variable(_ name: String, size: CGFloat, axes: [UInt32: CGFloat]) -> CTFont {
-        let variations = Dictionary(uniqueKeysWithValues: axes.map { (NSNumber(value: $0.key), NSNumber(value: Double($0.value))) })
-        let attributes: [CFString: Any] = [kCTFontNameAttribute: name, kCTFontVariationAttribute: variations]
-        return CTFontCreateWithFontDescriptor(CTFontDescriptorCreateWithAttributes(attributes as CFDictionary), size, nil)
-    }
-}
+// Generates the app icon sets, the Settings previews and docs/icon-sheet.png from Shared/OwlLunaArt.swift.
+// swiftc -O Scripts/AppIcon/*.swift Shared/OwlLunaArt.swift -o .build/make-icon && .build/make-icon OwlLuna/Assets.xcassets docs
 
 func fail(_ message: String) -> Never {
     FileHandle.standardError.write(Data("make-icon: \(message)\n".utf8))
@@ -57,12 +19,6 @@ func bitmap(_ width: Int, _ height: Int, opaque: Bool = false) -> CGContext {
                               bitmapInfo: alpha.rawValue) else { fail("couldn't make a \(width)×\(height) bitmap") }
     ctx.interpolationQuality = .high
     return ctx
-}
-
-func icon(_ cloth: IconCloth, _ variant: IconVariant, size: Int = 1024) -> CGImage {
-    let ctx = bitmap(size, size, opaque: variant == .light)
-    IconArt.draw(in: ctx, size: CGFloat(size), variant: variant, cloth: cloth)
-    return ctx.makeImage()!
 }
 
 /// Halves until close, then draws at the target size, so fine texture averages out instead of aliasing.
@@ -134,19 +90,20 @@ func iconMask(_ rect: CGRect) -> CGPath {
     CGPath(roundedRect: rect, cornerWidth: rect.width * 0.225, cornerHeight: rect.height * 0.225, transform: nil)
 }
 
-func text(_ string: String, font: CTFont, color: CGColor, at point: CGPoint, in ctx: CGContext) {
+func text(_ string: String, size: CGFloat, bold: Bool = false, color: CGColor, at point: CGPoint, in ctx: CGContext) {
+    let font = CTFontCreateUIFontForLanguage(bold ? .emphasizedSystem : .system, size, nil)!
     let attributes = [kCTFontAttributeName: font, kCTForegroundColorAttributeName: color] as CFDictionary
     let line = CTLineCreateWithAttributedString(CFAttributedStringCreate(nil, string as CFString, attributes))
     ctx.textPosition = point
     CTLineDraw(line, ctx)
 }
 
-func sheet(_ icons: [IconCloth: [IconVariant: CGImage]]) -> CGImage {
+func sheet(_ icons: [OwlLunaTheme: [OwlLunaAppearance: CGImage]]) -> CGImage {
     let margin: CGFloat = 56, nameWidth: CGFloat = 180, large: CGFloat = 224, gap: CGFloat = 28
     let small: [CGFloat] = [152, 120, 80, 58, 40]
     let rowHeight = large + 48, header: CGFloat = 132
     let width = margin * 2 + nameWidth + (large + gap) * 3 + small.reduce(0, +) + CGFloat(small.count - 1) * 24
-    let height = margin * 2 + header + rowHeight * CGFloat(IconCloth.allCases.count)
+    let height = margin * 2 + header + rowHeight * CGFloat(OwlLunaTheme.allCases.count)
     let ctx = bitmap(Int(width), Int(height), opaque: true)
     ctx.setFillColor(rgb(0xF1EDE4))
     ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
@@ -161,26 +118,26 @@ func sheet(_ icons: [IconCloth: [IconVariant: CGImage]]) -> CGImage {
         ctx.restoreGState()
     }
 
-    text("Swift Scribe · Clothbound app icon", font: IconFonts.coverLabel(size: 44), color: ink, at: CGPoint(x: margin, y: height - margin - 44), in: ctx)
+    text("OwlLuna · app icon", size: 40, bold: true, color: ink, at: CGPoint(x: margin, y: height - margin - 40), in: ctx)
     let columns = ["Light", "Dark", "Tinted"]
     for (index, title) in columns.enumerated() {
-        text(title.uppercased(), font: IconFonts.interface(size: 17), color: secondary,
+        text(title.uppercased(), size: 17, color: secondary,
              at: CGPoint(x: margin + nameWidth + (large + gap) * CGFloat(index), y: height - margin - header + 22), in: ctx)
     }
-    text("HOME SCREEN SIZES, LIGHT (PX)", font: IconFonts.interface(size: 17), color: secondary,
+    text("HOME SCREEN SIZES, LIGHT (PX)", size: 17, color: secondary,
          at: CGPoint(x: margin + nameWidth + (large + gap) * 3, y: height - margin - header + 22), in: ctx)
 
-    for (row, cloth) in IconCloth.allCases.enumerated() {
+    for (row, theme) in OwlLunaTheme.allCases.enumerated() {
         let top = margin + header + rowHeight * CGFloat(row)
-        text(cloth.name, font: IconFonts.coverLabel(size: 34), color: ink, at: CGPoint(x: margin, y: height - top - large / 2 - 12), in: ctx)
-        guard let set = icons[cloth] else { continue }
+        text(theme.name, size: 30, bold: true, color: ink, at: CGPoint(x: margin, y: height - top - large / 2 - 10), in: ctx)
+        guard let set = icons[theme] else { continue }
         place(set[.light]!, size: large, x: margin + nameWidth, top: top)
         place(onDarkBackdrop(set[.dark]!), size: large, x: margin + nameWidth + large + gap, top: top)
         place(tinted(set[.tinted]!, tint: (0.93, 0.72, 0.36)), size: large, x: margin + nameWidth + (large + gap) * 2, top: top)
         var x = margin + nameWidth + (large + gap) * 3
         for size in small {
             place(set[.light]!, size: size, x: x, top: top + (large - size) / 2)
-            text("\(Int(size))", font: IconFonts.interface(size: 14), color: secondary, at: CGPoint(x: x, y: height - top - large - 22), in: ctx)
+            text("\(Int(size))", size: 14, color: secondary, at: CGPoint(x: x, y: height - top - large - 22), in: ctx)
             x += size + 24
         }
     }
@@ -193,32 +150,30 @@ let arguments = CommandLine.arguments
 guard arguments.count == 3 else { fail("usage: make-icon <Assets.xcassets> <docs folder>") }
 let catalog = URL(fileURLWithPath: arguments[1], isDirectory: true)
 let docs = URL(fileURLWithPath: arguments[2], isDirectory: true)
-let fonts = catalog.deletingLastPathComponent().appending(path: "Resources/Fonts")
-IconFonts.register([fonts.appending(path: "Fraunces[SOFT,WONK,opsz,wght].ttf"), fonts.appending(path: "BricolageGrotesque[opsz,wdth,wght].ttf")])
 
 let info: [String: Any] = ["author": "xcode", "version": 1]
-var rendered: [IconCloth: [IconVariant: CGImage]] = [:]
-for cloth in IconCloth.allCases {
-    let set = folder(catalog.appending(path: "\(cloth.setName).appiconset"))
+var rendered: [OwlLunaTheme: [OwlLunaAppearance: CGImage]] = [:]
+for theme in OwlLunaTheme.allCases {
+    let set = folder(catalog.appending(path: "\(theme.setName).appiconset"))
     var images: [[String: Any]] = []
-    for variant in IconVariant.allCases {
-        let image = icon(cloth, variant)
-        rendered[cloth, default: [:]][variant] = image
-        let file = variant == .light ? "\(cloth.setName).png" : "\(cloth.setName)-\(variant.rawValue.capitalized).png"
+    for appearance in OwlLunaAppearance.allCases {
+        let image = icon(theme, appearance)
+        rendered[theme, default: [:]][appearance] = image
+        let file = appearance == .light ? "\(theme.setName).png" : "\(theme.setName)-\(appearance.rawValue.capitalized).png"
         write(image, to: set.appending(path: file))
         var entry: [String: Any] = ["filename": file, "idiom": "universal", "platform": "ios", "size": "1024x1024"]
-        if variant != .light { entry["appearances"] = [["appearance": "luminosity", "value": variant.rawValue]] }
+        if appearance != .light { entry["appearances"] = [["appearance": "luminosity", "value": appearance.rawValue]] }
         images.append(entry)
     }
     writeJSON(["images": images, "info": info], to: set.appending(path: "Contents.json"))
 
-    let preview = "IconPreview-\(cloth.name)"
+    let preview = "IconPreview-\(theme.name)"
     let previews = folder(catalog.appending(path: "\(preview).imageset"))
-    write(downscale(rendered[cloth]![.light]!, to: 180, opaque: true), to: previews.appending(path: "\(preview).png"))
-    write(downscale(onDarkBackdrop(rendered[cloth]![.dark]!), to: 180, opaque: true), to: previews.appending(path: "\(preview)-Dark.png"))
+    write(downscale(rendered[theme]![.light]!, to: 180, opaque: true), to: previews.appending(path: "\(preview).png"))
+    write(downscale(onDarkBackdrop(rendered[theme]![.dark]!), to: 180, opaque: true), to: previews.appending(path: "\(preview)-Dark.png"))
     writeJSON(["images": [["filename": "\(preview).png", "idiom": "universal"],
                           ["appearances": [["appearance": "luminosity", "value": "dark"]], "filename": "\(preview)-Dark.png", "idiom": "universal"]],
                "info": info], to: previews.appending(path: "Contents.json"))
 }
 write(sheet(rendered), to: folder(docs).appending(path: "icon-sheet.png"))
-print("make-icon: wrote \(IconCloth.allCases.count) icon sets, previews and \(docs.lastPathComponent)/icon-sheet.png")
+print("make-icon: wrote \(OwlLunaTheme.allCases.count) icon sets, previews and \(docs.lastPathComponent)/icon-sheet.png")
