@@ -24,6 +24,10 @@ final class NotebookRecorder: NSObject {
     @ObservationIgnored private var player: AVAudioPlayer?
     @ObservationIgnored private var currentFile: String?
     @ObservationIgnored private var timer: Timer?
+    /// The playback being started, until its player exists. Stopping playback clears it, so a start that was
+    /// overtaken while the audio session switched gives up.
+    @ObservationIgnored private var startingPlayback: UUID?
+    private static var sessionChange: Task<Void, Error>?
     /// How far each transcription under way has got, by recording.
     private(set) var transcribing: [UUID: Double] = [:]
     @ObservationIgnored var transcriber: any SpeechTranscribing = Transcription.transcriber
@@ -59,9 +63,12 @@ final class NotebookRecorder: NSObject {
             }
             do {
                 stopPlayback()
-                let session = AVAudioSession.sharedInstance()
-                try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker])
-                try session.setActive(true)
+                try await Self.changeSession {
+                    try $0.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker])
+                    try $0.setActive(true)
+                }.value
+                guard recorder == nil else { return }
+                stopPlayback()
                 try FileManager.default.createDirectory(at: document.package.assetsDirectory, withIntermediateDirectories: true)
                 let file = "\(UUID().uuidString).m4a"
                 let settings: [String: Any] = [
@@ -96,23 +103,50 @@ final class NotebookRecorder: NSObject {
         entry.inkedPages = Array(inkedPages)
         recordingSince = nil
         document.addRecording(entry)
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        Self.changeSession { try $0.setActive(false, options: .notifyOthersOnDeactivation) }
+    }
+
+    /// Switching the shared audio session can block while the audio hardware answers, so it is done off the main
+    /// thread, one change at a time and in the order asked for.
+    @discardableResult
+    private static func changeSession(_ change: @escaping @Sendable (AVAudioSession) throws -> Void) -> Task<Void, Error> {
+        let previous = sessionChange
+        let task = Task.detached(priority: .userInitiated) {
+            _ = await previous?.result
+            try change(AVAudioSession.sharedInstance())
+        }
+        sessionChange = task
+        return task
+    }
+
+    /// A player wakes the audio session itself as it gets ready to play, so that is done off the main thread too.
+    @concurrent
+    private nonisolated static func readyPlayer(for url: URL) async throws -> AVAudioPlayer {
+        let player = try AVAudioPlayer(contentsOf: url)
+        player.prepareToPlay()
+        return player
     }
 
     /// Playback would switch the shared audio session away from recording, so it waits until recording stops.
     func togglePlayback(_ recording: RecordingEntry) {
         if playingID == recording.id { return stopPlayback() }
-        start(recording)
+        Task { await start(recording) }
     }
 
     @discardableResult
-    private func start(_ recording: RecordingEntry) -> Bool {
+    private func start(_ recording: RecordingEntry) async -> Bool {
         guard !isRecording else { return false }
         stopPlayback()
+        let request = UUID()
+        startingPlayback = request
         do {
-            try AVAudioSession.sharedInstance().setCategory(.playback)
-            try AVAudioSession.sharedInstance().setActive(true)
-            let player = try AVAudioPlayer(contentsOf: document.package.assetURL(recording.file))
+            try await Self.changeSession {
+                try $0.setCategory(.playback)
+                try $0.setActive(true)
+            }.value
+            let player = try await Self.readyPlayer(for: document.package.assetURL(recording.file))
+            guard startingPlayback == request, !isRecording else { return false }
+            startingPlayback = nil
             player.delegate = self
             player.play()
             self.player = player
@@ -120,14 +154,15 @@ final class NotebookRecorder: NSObject {
             startTimer()
             return true
         } catch {
+            if startingPlayback == request { startingPlayback = nil }
             errorMessage = String(localized: "This recording couldn't be played.")
             return false
         }
     }
 
     /// Plays a recording from its start and stays on it when it ends, for replaying it with its ink.
-    func beginReplay(_ recording: RecordingEntry) -> Bool {
-        guard start(recording) else { return false }
+    func beginReplay(_ recording: RecordingEntry) async -> Bool {
+        guard await start(recording) else { return false }
         holdsAtEnd = true
         return true
     }
@@ -162,6 +197,7 @@ final class NotebookRecorder: NSObject {
     func stopPlayback() {
         player?.stop()
         player = nil
+        startingPlayback = nil
         playingID = nil
         playbackProgress = 0
         currentTime = 0

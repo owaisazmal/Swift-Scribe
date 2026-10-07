@@ -187,7 +187,11 @@ final class EditorSession {
         let ids = recording.inkedPages?.filter { document.index(of: $0) != nil } ?? document.pages.map(\.id)
         var drawings: [UUID: PKDrawing] = [:]
         for id in ids { drawings[id] = await document.ink(id) }
-        guard mode != .presenting, mode != .replaying, recorder.beginReplay(recording) else { return false }
+        guard mode != .presenting, mode != .replaying, await recorder.beginReplay(recording) else { return false }
+        guard mode != .presenting, mode != .replaying else {
+            recorder.stopPlayback()
+            return false
+        }
         replay = ReplayTimeline(recording: recording, drawings: drawings)
         replayLines = recorder.transcript(for: recording)?.lines ?? []
         replayPage = nil

@@ -61,7 +61,12 @@ final class ScanTests: XCTestCase {
 
         // A page stamped before pictures were read is read again.
         try await package.writeText("#ink:none\n", pageID: pages[0].id)
-        let text = await HandwritingIndexer.shared.index(HandwritingIndexer.Job(package: package, pages: pages))
+        // Recognition runs at utility priority. Asked for from a test, which runs above that, it is a priority
+        // inversion; awaiting the task's value would only raise it to the test's priority, so it answers a continuation.
+        let job = HandwritingIndexer.Job(package: package, pages: pages)
+        let text = await withCheckedContinuation { continuation in
+            Task.detached(priority: .utility) { continuation.resume(returning: await HandwritingIndexer.shared.index(job)) }
+        }
         try XCTSkipIf(text.isEmpty, "text recognition isn't available on this simulator")
         XCTAssertTrue(text.localizedCaseInsensitiveContains("quarterly report"), "read as \(text)")
         XCTAssertTrue(text.localizedCaseInsensitiveContains("agenda"))
