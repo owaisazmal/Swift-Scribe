@@ -58,6 +58,7 @@ struct OwlLunaRoot: View {
             showsLaunch = enabled && app.phase != .ready
             #if DEBUG
             if LaunchOptions.arguments.contains("-framePacing") { FramePacingWindow.install() }
+            WindowButtons.shared.install()
             #endif
             await app.start()
             app.takeControlAction()

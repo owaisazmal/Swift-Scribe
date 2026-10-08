@@ -74,6 +74,28 @@ final class DocumentRegistryTests: XCTestCase {
         registry.unregister(manifest.id, document: first)
         XCTAssertNil(registry.document(for: manifest.id))
     }
+
+    func testANotebookOpenInAnotherWindowIsThatWindows() async throws {
+        let root = temporaryRoot(self)
+        let manifest = NotebookManifest(title: "Elsewhere", defaults: PageDefaults(template: .blank, paperColor: .white, pageSize: .letter),
+                                        pages: [.template(.blank, color: .white, size: .letter)])
+        try await NotebookPackage(root: root, id: manifest.id).create(manifest)
+        let document = try await NotebookDocument.open(manifest.id, root: root)
+        let registry = DocumentRegistry.shared
+        let session = try XCTUnwrap(UIApplication.shared.connectedScenes.first { $0 is UIWindowScene }, "the tests run inside the app, which has a window").session
+        XCTAssertNil(registry.otherWindow(with: manifest.id, than: "scene-b"), "a notebook no window has open is nobody's")
+
+        registry.register(document, scene: session.persistentIdentifier)
+        XCTAssertTrue(registry.otherWindow(with: manifest.id, than: "scene-b") === session)
+        XCTAssertNil(registry.otherWindow(with: manifest.id, than: session.persistentIdentifier), "the window that has it open is not another window")
+
+        registry.register(document, scene: "scene-a")
+        XCTAssertNil(registry.otherWindow(with: manifest.id, than: "scene-b"), "a window that has gone holds no notebook back")
+        XCTAssertFalse(registry.activateExistingEditor(for: manifest.id, from: "scene-b"))
+
+        registry.unregister(manifest.id, document: document)
+        XCTAssertNil(registry.otherWindow(with: manifest.id, than: "scene-b"))
+    }
 }
 
 final class PDFRoundTripV2Tests: XCTestCase {

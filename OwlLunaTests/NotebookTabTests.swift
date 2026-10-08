@@ -152,6 +152,74 @@ final class NotebookTabTests: XCTestCase {
         XCTAssertEqual(window.tabs.map(\.id), [ids[0], ids[1]], "tabs already there are never replaced")
     }
 
+    /// Registers a document under the window the tests run in, which stands for another window that has it open.
+    private func openElsewhere(_ document: NotebookDocument) throws {
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first { $0 is UIWindowScene }, "the tests run inside the app, which has a window")
+        DocumentRegistry.shared.register(document, scene: scene.session.persistentIdentifier)
+        addTeardownBlock { @MainActor in DocumentRegistry.shared.unregister(document.id, document: document) }
+    }
+
+    func testATabForANotebookAnotherWindowHasOpenIsNeverShown() throws {
+        let window = EditorWindow()
+        window.scene = "this-window"
+        let taken = makeDocument(), first = UUID(), last = UUID()
+        [first, taken.id, last].forEach { window.show(OpenNotebook(id: $0)) }
+        window.select(first)
+        try openElsewhere(taken)
+        window.select(taken.id)
+        XCTAssertEqual(window.selected, first, "the notebook is the other window's to show")
+        XCTAssertEqual(window.tabs.map(\.id), [first, taken.id, last])
+        window.step(1)
+        XCTAssertEqual(window.selected, last, "stepping along the bar passes it by")
+        XCTAssertEqual(window.tabs.map(\.id), [first, last], "and lets go of its tab")
+        window.show(OpenNotebook(id: taken.id))
+        XCTAssertEqual(window.tabs.map(\.id), [first, last], "nor does it get a new tab")
+        XCTAssertEqual(window.selected, last)
+
+        let unknown = EditorWindow()
+        unknown.show(OpenNotebook(id: taken.id))
+        XCTAssertEqual(unknown.selected, taken.id, "a window that doesn't know its scene yet calls nothing another window's")
+
+        DocumentRegistry.shared.unregister(taken.id, document: taken)
+        window.show(OpenNotebook(id: taken.id))
+        XCTAssertEqual(window.selected, taken.id, "once the other window has closed the notebook, it can have a tab here again")
+    }
+
+    func testClosingTheTabOnShowNeverLandsOnANotebookAnotherWindowHasOpen() throws {
+        let window = EditorWindow(), pair = EditorWindow()
+        window.scene = "this-window"
+        pair.scene = "third-window"
+        let taken = makeDocument(), first = UUID(), shown = UUID()
+        [first, taken.id, shown].forEach { window.show(OpenNotebook(id: $0)) }
+        [taken.id, shown].forEach { pair.show(OpenNotebook(id: $0)) }
+        try openElsewhere(taken)
+        window.removeTab(shown)
+        XCTAssertEqual(window.selected, first, "the tab that stood before it has gone to the other window")
+        XCTAssertEqual(window.tabs.map(\.id), [first])
+
+        pair.letGoOfTabsOpenElsewhere()
+        XCTAssertEqual(pair.tabs.map(\.id), [shown], "with no other tab this window can show, the one on show is its last")
+    }
+
+    func testANotebookAskedForGoesToTheWindowThatHasIt() throws {
+        let window = EditorWindow()
+        window.scene = "this-window"
+        let taken = makeDocument(), shown = UUID(), origin = UUID()
+        [taken.id, shown].forEach { window.show(OpenNotebook(id: $0)) }
+        XCTAssertFalse(window.goesToItsWindow(taken.id), "a notebook no window has open is this window's to show")
+        try openElsewhere(taken)
+        window.linkReturn = NotebookReturn(origin: origin, page: UUID(), title: "Origin", destination: shown)
+        XCTAssertTrue(window.goesToItsWindow(taken.id))
+        XCTAssertEqual(window.tabs.map(\.id), [shown], "this window lets go of the tab that waited for it")
+        XCTAssertEqual(window.selected, shown)
+        XCTAssertEqual(window.linkReturn?.destination, shown, "the way back from the notebook on show is still there")
+
+        window.linkReturn = NotebookReturn(origin: origin, page: UUID(), title: "Origin", destination: taken.id)
+        XCTAssertTrue(window.goesToItsWindow(taken.id))
+        XCTAssertNil(window.linkReturn, "a way back from a notebook this window isn't showing is forgotten")
+        XCTAssertFalse(window.goesToItsWindow(shown))
+    }
+
     func testAWindowRemembersItsTabs() {
         let scene = "test-\(UUID().uuidString)"
         let shown = UUID(), beside = UUID(), tabs = [UUID(), shown, UUID()]
@@ -169,5 +237,28 @@ final class NotebookTabTests: XCTestCase {
         XCTAssertEqual(WindowMemory.remembered(in: scene)?.tabs, [], "a notebook on its own has none")
         WindowMemory.keep(only: [])
         XCTAssertNil(WindowMemory.remembered(in: scene))
+    }
+
+    func testAReopeningThatCrashedIsSkippedOnceAndOnlyForItsWindow() {
+        let scene = "test-\(UUID().uuidString)", other = "test-\(UUID().uuidString)"
+        let shown = UUID(), beside = UUID(), tabs = [UUID(), shown]
+        for window in [scene, other] { WindowMemory.remember(shown, beside: beside, tabs: tabs, in: window) }
+        WindowMemory.setRestoring(true, in: scene)
+        XCTAssertFalse(WindowMemory.restoreCrashed(in: other), "a window reopening at the same moment isn't taken for a crash")
+        XCTAssertEqual(WindowMemory.remembered(in: other)?.notebook, shown, "so it keeps what it had open")
+        XCTAssertEqual(WindowMemory.remembered(in: other)?.beside, beside)
+        XCTAssertEqual(WindowMemory.remembered(in: other)?.tabs, tabs)
+
+        WindowMemory.setRestoring(true, in: other)
+        WindowMemory.setRestoring(false, in: other)
+        XCTAssertTrue(WindowMemory.restoreCrashed(in: scene), "the first window's mark outlasts the second's reopening")
+        XCTAssertNil(WindowMemory.remembered(in: scene)?.notebook, "a window that crashed reopening starts in the library")
+        XCTAssertEqual(WindowMemory.remembered(in: scene)?.tabs, [])
+        XCTAssertFalse(WindowMemory.restoreCrashed(in: scene), "and is skipped only once")
+
+        WindowMemory.setRestoring(true, in: scene)
+        WindowMemory.keep(only: [other])
+        XCTAssertFalse(WindowMemory.restoreCrashed(in: scene), "a window iPadOS no longer keeps leaves no mark behind")
+        WindowMemory.keep(only: [])
     }
 }

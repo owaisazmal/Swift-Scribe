@@ -165,6 +165,8 @@ struct LibrarySidebar: View {
         .background(Color.surface)
         .tint(Color.sidebarTint)
         .navigationTitle("OwlLuna")
+        // With a board button of its own, the system's is taken out here as well as over the shelves: iPadOS 27 keeps it otherwise.
+        .toolbar(removing: hideSidebar == nil ? nil : .sidebarToggle)
         .modifier(SidebarHeader {
             if let hideSidebar {
                 Button(action: hideSidebar) { Label("Hide Sidebar", systemImage: "sidebar.leading") }

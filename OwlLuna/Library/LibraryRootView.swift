@@ -99,7 +99,10 @@ struct LibraryRootView: View {
         } message: {
             Text(quickNoteError ?? "")
         }
-        .background(SceneReader { sceneID = $0 })
+        .background(SceneReader {
+            sceneID = $0
+            window.scene = $0
+        })
         .keyboardShortcut(for: { creating = true }, enabled: libraryInFront)
         .background {
             if libraryInFront {
@@ -191,6 +194,7 @@ struct LibraryRootView: View {
                 page = linked
             }
             if let current = shownID, current != id, window.beside?.id != id {
+                if window.goesToItsWindow(id, page: page) { return }
                 // With tabs open the notebook gets a tab; a notebook on its own makes way for it.
                 if window.tabs.count > 1 { return window.show(OpenNotebook(id: id, pageID: page)) }
                 window.closing = .library
@@ -234,27 +238,24 @@ struct LibraryRootView: View {
         WindowMemory.remember(shownID, beside: window.beside?.id, tabs: window.tabs.count > 1 ? window.tabs.map(\.id) : [], in: sceneID)
     }
 
-    /// Skipped once if the last restore crashed.
+    /// Skipped once if this window's last restore crashed.
     private func restoreOpenNotebook() async {
         guard app.phase == .ready, open == nil, !triedRestore, let sceneID else { return }
         triedRestore = true
         WindowMemory.keep(only: Set(UIApplication.shared.openSessions.map(\.persistentIdentifier)))
-        let defaults = UserDefaults.standard, flag = "owlluna.restoreInFlight"
-        if defaults.bool(forKey: flag) {
-            defaults.removeObject(forKey: flag)
+        if WindowMemory.restoreCrashed(in: sceneID) {
             restoredNotebook = ""
-            WindowMemory.remember(nil, beside: nil, in: sceneID)
             return
         }
         let remembered = WindowMemory.remembered(in: sceneID) ?? (UUID(uuidString: restoredNotebook), UUID(uuidString: restoredBeside), [])
         window.restore(remembered.tabs.filter { store.record($0).map { !$0.isTrashed } ?? false }.map { OpenNotebook(id: $0) })
-        guard let id = remembered.notebook, let record = store.record(id), !record.isTrashed else { return }
+        guard let id = remembered.notebook, let record = store.record(id), !record.isTrashed, !window.isOpenElsewhere(id) else { return }
         let beside = remembered.beside.flatMap(store.record)
-        defaults.set(true, forKey: flag)
+        WindowMemory.setRestoring(true, in: sceneID)
         openNotebook(id)
-        if let beside, beside.id != id, !beside.isTrashed, open?.id == id { window.beside = OpenNotebook(id: beside.id) }
+        if let beside, beside.id != id, !beside.isTrashed, open?.id == id, !window.isOpenElsewhere(beside.id) { window.beside = OpenNotebook(id: beside.id) }
         try? await Task.sleep(for: .seconds(3))
-        defaults.removeObject(forKey: flag)
+        WindowMemory.setRestoring(false, in: sceneID)
     }
 
     /// Library shortcuts only act when nothing else is in front of the library.
@@ -286,11 +287,7 @@ struct LibraryRootView: View {
     private func openNotebook(_ id: UUID, pageID: UUID? = nil, zoomSource: String? = nil) {
         guard open == nil else { return }
         if window.linkReturn?.destination != id { window.linkReturn = nil }
-        if DocumentRegistry.shared.activateExistingEditor(for: id, from: sceneID) {
-            NotificationCenter.default.post(name: .owlLunaSelectTab, object: id)
-            if let pageID { NotificationCenter.default.post(name: .owlLunaShowPage, object: id, userInfo: ["page": pageID]) }
-            return
-        }
+        if window.goesToItsWindow(id, page: pageID) { return }
         let notebook = OpenNotebook(id: id, pageID: pageID, zoomSource: zoomSource)
         // A locked notebook asks before it opens; the editor asks again if it is reached some other way.
         guard let record = store.record(id), record.isLocked, !NotebookLock.shared.isUnlocked(id), NotebookLock.shared.isAvailable else {
@@ -305,6 +302,7 @@ struct LibraryRootView: View {
 
     /// Opens the editor on a notebook. Tabs left open the last time take it in among them.
     private func show(_ notebook: OpenNotebook) {
+        guard !window.goesToItsWindow(notebook.id, page: notebook.pageID) else { return }
         window.show(notebook)
         open = notebook
     }
@@ -333,10 +331,16 @@ extension View {
 /// the background, so an app stopped straight after would otherwise reopen with what was open before.
 enum WindowMemory {
     private static let key = "owlluna.windowNotebooks"
+    private static let restoringKey = "owlluna.windowsRestoring"
 
     private static var all: [String: [String]] {
         get { UserDefaults.standard.dictionary(forKey: key) as? [String: [String]] ?? [:] }
         set { UserDefaults.standard.set(newValue, forKey: key) }
+    }
+
+    private static var restoring: [String] {
+        get { UserDefaults.standard.stringArray(forKey: restoringKey) ?? [] }
+        set { UserDefaults.standard.set(newValue, forKey: restoringKey) }
     }
 
     /// The notebook on show, the one beside it, then the tabs in their order when there are several.
@@ -351,10 +355,25 @@ enum WindowMemory {
         }
     }
 
+    /// Marks a window while it reopens what it had: a mark still there at the next launch means the reopening crashed.
+    static func setRestoring(_ isRestoring: Bool, in scene: String) {
+        restoring = restoring.filter { $0 != scene } + (isRestoring ? [scene] : [])
+    }
+
+    /// True once for a window whose last reopening crashed, which lets go of what it had open.
+    static func restoreCrashed(in scene: String) -> Bool {
+        guard restoring.contains(scene) else { return false }
+        setRestoring(false, in: scene)
+        remember(nil, beside: nil, in: scene)
+        return true
+    }
+
     /// Lets go of windows iPadOS no longer keeps.
     static func keep(only scenes: Set<String>) {
         let kept = all.filter { scenes.contains($0.key) }
         if kept.count != all.count { all = kept }
+        let marked = restoring.filter(scenes.contains)
+        if marked.count != restoring.count { restoring = marked }
     }
 }
 

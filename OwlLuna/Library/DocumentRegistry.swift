@@ -75,11 +75,18 @@ final class DocumentRegistry {
         }
     }
 
-    /// If `id` is open in another window, brings that window to the front and returns true.
-    func activateExistingEditor(for id: UUID, from scene: String?) -> Bool {
-        guard let owner = sceneIdentifier(for: id), owner != scene else { return false }
-        guard let session = UIApplication.shared.openSessions.first(where: { $0.persistentIdentifier == owner }) else { return false }
+    /// The window that has `id` open, when it isn't this one and is still there.
+    func otherWindow(with id: UUID, than scene: String?) -> UISceneSession? {
+        guard let owner = sceneIdentifier(for: id), owner != scene else { return nil }
+        return UIApplication.shared.openSessions.first { $0.persistentIdentifier == owner }
+    }
+
+    /// If `id` is open in another window, brings that window to the front with the notebook on show, at the page if one is given, and returns true.
+    func activateExistingEditor(for id: UUID, page: UUID? = nil, from scene: String?) -> Bool {
+        guard let session = otherWindow(with: id, than: scene) else { return false }
         UIApplication.shared.requestSceneSessionActivation(session, userActivity: nil, options: nil, errorHandler: nil)
+        NotificationCenter.default.post(name: .owlLunaSelectTab, object: id)
+        if let page { NotificationCenter.default.post(name: .owlLunaShowPage, object: id, userInfo: ["page": page]) }
         return true
     }
 

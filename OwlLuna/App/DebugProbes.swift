@@ -155,6 +155,71 @@ enum SecondScreenInset {
     }
 }
 
+/// `-windowButtons` stands a number and three buttons over each window and reads out only the window in front, so UI tests can open a second window and go between the two.
+@MainActor
+final class WindowButtons: NSObject {
+    static let shared = WindowButtons()
+
+    private var overlays: [String: UIWindow] = [:]
+
+    func install() {
+        guard LaunchOptions.arguments.contains("-windowButtons") else { return }
+        if overlays.isEmpty {
+            for name in [UIScene.didActivateNotification, UIScene.didEnterBackgroundNotification] {
+                NotificationCenter.default.addObserver(self, selector: #selector(readOutFront), name: name, object: nil)
+            }
+        }
+        for case let scene as UIWindowScene in UIApplication.shared.connectedScenes where scene.session.role == .windowApplication {
+            let id = scene.session.persistentIdentifier
+            guard overlays[id] == nil else { continue }
+            let window = PassThroughWindow(windowScene: scene)
+            window.windowLevel = .alert + 1
+            let controller = UIViewController()
+            controller.view.backgroundColor = .clear
+            let number = UILabel()
+            number.text = "\(overlays.count + 1)"
+            number.font = .systemFont(ofSize: 8)
+            number.accessibilityIdentifier = "debug.window.number"
+            let new = UIButton(type: .system, primaryAction: UIAction(title: "new") { _ in
+                UIApplication.shared.requestSceneSessionActivation(nil, userActivity: nil, options: nil, errorHandler: nil)
+            })
+            new.accessibilityIdentifier = "debug.window.new"
+            let other = UIButton(type: .system, primaryAction: UIAction(title: "other") { [unowned self] _ in
+                guard let session = others(than: id).first(where: { overlays[$0.persistentIdentifier] != nil }) else { return }
+                UIApplication.shared.requestSceneSessionActivation(session, userActivity: nil, options: nil, errorHandler: nil)
+            })
+            other.accessibilityIdentifier = "debug.window.other"
+            let close = UIButton(type: .system, primaryAction: UIAction(title: "close") { [unowned self] _ in
+                for session in others(than: id) {
+                    overlays[session.persistentIdentifier] = nil
+                    UIApplication.shared.requestSceneSessionDestruction(session, options: nil, errorHandler: nil)
+                }
+            })
+            close.accessibilityIdentifier = "debug.window.close"
+            let stack = UIStackView(arrangedSubviews: [number, new, other, close])
+            stack.alpha = 0.3
+            stack.spacing = 4
+            stack.frame = CGRect(x: 8, y: scene.coordinateSpace.bounds.height - 40, width: 200, height: 28)
+            stack.autoresizingMask = [.flexibleTopMargin]
+            controller.view.addSubview(stack)
+            window.rootViewController = controller
+            window.isHidden = false
+            overlays[id] = window
+        }
+        readOutFront()
+    }
+
+    private func others(than id: String) -> [UISceneSession] {
+        UIApplication.shared.openSessions.filter { $0.role == .windowApplication && $0.persistentIdentifier != id }
+    }
+
+    @objc private func readOutFront() {
+        for case let scene as UIWindowScene in UIApplication.shared.connectedScenes where scene.session.role == .windowApplication {
+            for window in scene.windows { window.accessibilityElementsHidden = scene.activationState != .foregroundActive }
+        }
+    }
+}
+
 private final class PassThroughWindow: UIWindow {
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
         let view = super.hitTest(point, with: event)

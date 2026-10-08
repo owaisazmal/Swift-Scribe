@@ -148,19 +148,42 @@ final class EditorModesUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["notebook.Physics II 3"].waitForExistence(timeout: 30))
 
-        app.open(URL(string: "owlluna://quicknote")!)
+        XCUIDevice.shared.system.open(URL(string: "owlluna://quicknote")!)
         let title = app.buttons["editor.title"]
         XCTAssertTrue(title.waitForExistence(timeout: 20), "a quick note opens straight into the editor")
         XCTAssertTrue(title.label.hasPrefix("Note "), title.label)
+        let canvas = app.descendants(matching: .any)["page.canvas.1"]
+        XCTAssertTrue(canvas.waitForExistence(timeout: 10))
+        drag(on: canvas, y: 0.3)
+        XCTAssertEqual(strokeCount(canvas), 1)
 
-        app.open(URL(string: "owlluna://today")!)
+        XCUIDevice.shared.system.open(URL(string: "owlluna://today")!)
         let journal = NSPredicate(format: "label BEGINSWITH %@", "Journal")
         wait(for: [expectation(for: journal, evaluatedWith: title)], timeout: 30)
-        XCTAssertEqual(app.buttons["editor.ribbon"].label, "Page 4 of 4", "the note is put away and the journal opens on today's new page")
+        XCTAssertEqual(app.buttons.matching(identifier: "editor.title").count, 1, "the note's editor has closed, not moved beside the journal")
+        XCTAssertFalse(app.buttons["tabs.add"].exists, "nor behind a tab")
+        let ribbon = app.buttons["editor.ribbon"]
+        XCTAssertEqual(ribbon.label, "Page 4 of 4", "the note is put away and the journal opens on today's new page")
 
-        app.open(URL(string: "owlluna://today")!)
-        sleep(2)
-        XCTAssertEqual(app.buttons["editor.ribbon"].label, "Page 4 of 4", "asking again adds nothing")
+        ribbon.tap()
+        let goTo = app.element("navigator.goto")
+        XCTAssertTrue(goTo.waitForExistence(timeout: 10))
+        goTo.tap()
+        goTo.typeText("1")
+        app.buttons["navigator.go"].firstMatch.tap()
+        wait(for: [expectation(for: NSPredicate(format: "label == %@", "Page 1 of 4"), evaluatedWith: ribbon)], timeout: 10)
+        XCUIDevice.shared.system.open(URL(string: "owlluna://today")!)
+        let today = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", "Page 4 of 4"), object: ribbon)
+        XCTAssertEqual(XCTWaiter.wait(for: [today], timeout: 10), .completed, "asking again turns back to today's page and adds nothing: \(ribbon.label)")
+
+        app.buttons["editor.back"].tap()
+        let note = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "notebook.Note ")).firstMatch
+        XCTAssertTrue(note.waitForExistence(timeout: 20), "the note is on the shelf")
+        note.tap()
+        XCTAssertTrue(title.waitForExistence(timeout: 20))
+        XCTAssertTrue(title.label.hasPrefix("Note "), title.label)
+        let written = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value BEGINSWITH %@", "1 "), object: canvas)
+        XCTAssertEqual(XCTWaiter.wait(for: [written], timeout: 20), .completed, "the note was saved with what was written in it")
     }
 
     func testAPictureFromPhotosLandsOnThePage() throws {

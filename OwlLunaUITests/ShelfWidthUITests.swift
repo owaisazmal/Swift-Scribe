@@ -44,6 +44,7 @@ final class ShelfWidthUITests: XCTestCase {
         toggleSidebar(app, "Hide Sidebar")
         let hidden = fit(app, "landscape, sidebar hidden")
         XCTAssertEqual(hidden.leading, 32, accuracy: 1)
+        XCTAssertEqual(app.buttons.matching(NSPredicate(format: "label == 'Show Sidebar'")).count, 1, "the board button stands in for the system's, not beside it")
         XCTAssertGreaterThan(hidden.columns, beside.columns, "the wider shelf holds more covers a row")
         toggleSidebar(app, "Show Sidebar")
         let again = fit(app, "landscape, sidebar shown again")

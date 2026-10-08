@@ -736,6 +736,7 @@ fileprivate struct EditorContent: View {
         }
         .sheet(isPresented: $pickingBeside) {
             BesidePicker(current: document.id, exclude: Set(window?.tabs.map(\.id) ?? [])) { id in
+                guard window?.goesToItsWindow(id) != true else { return }
                 window?.beside = OpenNotebook(id: id)
                 window?.active = id
             }
@@ -1814,7 +1815,7 @@ extension EditorContent {
             errorMessage = String(localized: "The notebook this link opened is no longer in your library.")
             return
         }
-        guard let window, let open = window.openNotebook else { return }
+        guard let window, let open = window.openNotebook, !window.goesToItsWindow(id, page: page) else { return }
         window.linkReturn = NotebookReturn(origin: document.id, page: origin, title: document.title, destination: id)
         open(id, page)
     }

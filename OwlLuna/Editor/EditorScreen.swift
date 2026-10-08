@@ -43,9 +43,12 @@ final class EditorWindow {
     /// Shows another notebook, at a page if one is given: in a tab when there are tabs, and otherwise in place of
     /// the editor that is open, once that has saved and closed.
     @ObservationIgnored var openNotebook: ((UUID, UUID?) -> Void)?
+    /// The window's scene, as the registry knows it. Until it is known, no notebook counts as another window's.
+    @ObservationIgnored var scene: String?
 
     /// Shows a notebook in the first pane: in its own tab if it has one, in a new tab otherwise.
     func show(_ notebook: OpenNotebook) {
+        guard !isOpenElsewhere(notebook.id) else { return }
         if notebook.id != selected { leaveTab() }
         if let index = tabs.firstIndex(where: { $0.id == notebook.id }) {
             tabs[index].pageID = notebook.pageID
@@ -60,13 +63,14 @@ final class EditorWindow {
     }
 
     func select(_ id: UUID) {
-        guard id != selected, tabs.contains(where: { $0.id == id }) else { return }
+        guard id != selected, tabs.contains(where: { $0.id == id }), !isOpenElsewhere(id) else { return }
         leaveTab()
         selected = id
     }
 
     /// One tab along the bar, coming round at the ends.
     func step(_ delta: Int) {
+        letGoOfTabsOpenElsewhere()
         guard tabs.count > 1, let index = tabs.firstIndex(where: { $0.id == selected }) else { return }
         select(tabs[(index + delta + tabs.count) % tabs.count].id)
     }
@@ -90,6 +94,7 @@ final class EditorWindow {
 
     /// Takes a tab off the bar. If it was the tab on show, the one that takes its place is shown.
     func removeTab(_ id: UUID) {
+        if id == selected { letGoOfTabsOpenElsewhere() }
         guard let index = tabs.firstIndex(where: { $0.id == id }) else { return }
         tabs.remove(at: index)
         if selected == id { selected = tabs.isEmpty ? nil : tabs[min(index, tabs.count - 1)].id }
@@ -131,6 +136,24 @@ final class EditorWindow {
         let kept = tabs.filter { $0.id == selected || isPresent($0.id) }
         if kept.count != tabs.count { tabs = kept }
     }
+
+    /// Whether another window has the notebook open. One editor writes each notebook, so it is never shown here.
+    func isOpenElsewhere(_ id: UUID) -> Bool {
+        scene.map { DocumentRegistry.shared.otherWindow(with: id, than: $0) != nil } ?? false
+    }
+
+    /// Lets go of the tabs of notebooks another window has opened since they were on show here: the notebook is that window's now.
+    func letGoOfTabsOpenElsewhere() {
+        keepTabs { !isOpenElsewhere($0) }
+    }
+
+    /// A notebook another window has open is shown there, at the page if one is given: that window comes forward, and this one lets go of the tab that waited for it.
+    func goesToItsWindow(_ id: UUID, page: UUID? = nil) -> Bool {
+        guard let scene, DocumentRegistry.shared.activateExistingEditor(for: id, page: page, from: scene) else { return false }
+        if linkReturn?.destination == id { linkReturn = nil }
+        letGoOfTabsOpenElsewhere()
+        return true
+    }
 }
 
 /// Whether an editor has the window to itself or shares it.
@@ -153,6 +176,7 @@ struct EditorPanes: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var size = CGSize.zero
     @State private var dragOrigin: CGFloat?
+    @State private var leaving: OpenNotebook?
 
     static let dividerWidth: CGFloat = 14
     /// Narrower than this a pane's bar keeps to the essentials, and a window has no room for a second pane.
@@ -160,8 +184,8 @@ struct EditorPanes: View {
     /// `-splitSideBySide` lets a test see the narrow panes of a landscape window while the simulator stays upright.
     private var stacked: Bool { size.height > size.width && !LaunchOptions.arguments.contains("-splitSideBySide") }
 
-    /// The tab on show; a notebook on its own is the one the library opened.
-    private var current: OpenNotebook { window.tabs.first { $0.id == window.selected } ?? primary }
+    /// The tab on show; a notebook on its own is the one the library opened. On the way out it is still the notebook that was on show.
+    private var current: OpenNotebook { leaving ?? window.tabs.first { $0.id == window.selected } ?? primary }
 
     private var showsTabs: Bool { window.tabs.count > 1 && !window.hidesChrome }
 
@@ -172,7 +196,7 @@ struct EditorPanes: View {
         @Bindable var window = window
         VStack(spacing: 0) {
             if showsTabs {
-                TabStrip(select: { window.select($0) }, close: closeTab, closeOthers: closeOtherTabs, openBeside: hasRoomBeside ? { openBeside($0) } : nil)
+                TabStrip(select: selectTab, close: closeTab, closeOthers: closeOtherTabs, openBeside: hasRoomBeside ? { openBeside($0) } : nil)
                     .disabled(window.isLeaving)
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
@@ -183,6 +207,7 @@ struct EditorPanes: View {
         .sheet(isPresented: $window.pickingTab) {
             BesidePicker(current: current.id, title: "Open in a Tab", exclude: Set(window.tabs.map(\.id) + (window.beside.map { [$0.id] } ?? [])),
                          emptyMessage: "Every other notebook is already open.") { id in
+                guard !window.goesToItsWindow(id) else { return }
                 window.show(OpenNotebook(id: id))
                 window.active = id
             }
@@ -194,7 +219,7 @@ struct EditorPanes: View {
         .onReceive(NotificationCenter.default.publisher(for: UIScene.didDisconnectNotification)) { note in
             guard (note.object as? UIScene)?.session.persistentIdentifier == sceneID else { return }
             let shown = current.id
-            putAway(window.park().filter { $0.id != shown })
+            putAway(park().filter { $0.id != shown })
         }
     }
 
@@ -222,12 +247,18 @@ struct EditorPanes: View {
 
     // MARK: Tabs
 
+    private func selectTab(_ id: UUID) {
+        if !window.goesToItsWindow(id) { window.select(id) }
+    }
+
     /// The tab on show is closed by its own editor, which can say so if saving fails; one behind the bar is saved
     /// and closed here.
     private func closeTab(_ id: UUID) {
         guard window.tabs.count > 1, !window.isLeaving else { return }
         if id == current.id {
-            window.closing = .tab
+            // With no other tab this window can show, closing the one on show is going back to the library.
+            window.letGoOfTabsOpenElsewhere()
+            window.closing = window.tabs.count > 1 ? .tab : .library
             NotificationCenter.default.post(name: .owlLunaCloseEditor, object: id)
         } else {
             window.removeTab(id)
@@ -237,6 +268,7 @@ struct EditorPanes: View {
 
     /// Every tab but one goes: those behind the bar at once, and the one on show, if it isn't the one staying, by its own editor.
     private func closeOtherTabs(_ id: UUID) {
+        guard !window.goesToItsWindow(id) else { return }
         let shown = current.id
         for tab in window.tabs where tab.id != id && tab.id != shown { closeTab(tab.id) }
         if shown != id { closeTab(shown) }
@@ -244,6 +276,8 @@ struct EditorPanes: View {
 
     /// A tab leaves the bar for the pane beside the first. Its document, if it is open, goes with it, undo history and all.
     private func openBeside(_ id: UUID) {
+        guard !window.goesToItsWindow(id) else { return }
+        window.letGoOfTabsOpenElsewhere()
         guard window.beside == nil, window.tabs.count > 1, !window.isLeaving else { return }
         window.removeTab(id)
         window.beside = OpenNotebook(id: id)
@@ -275,9 +309,18 @@ struct EditorPanes: View {
         let closing = window.closing
         window.closing = .library
         window.release(id)
+        window.letGoOfTabsOpenElsewhere()
         if closing == .tab, window.tabs.count > 1 { return window.removeTab(id) }
-        putAway(window.park())
+        // A notebook still beside was never asked to close: the editor is leaving some other way than Back to Library.
+        if let beside = window.beside, let document = DocumentRegistry.shared.document(for: beside.id) { putAway([document]) }
+        putAway(park())
         onClose()
+    }
+
+    /// Parks the tabs with the pane still on the notebook it showed; with a lone tab forgotten it would turn to the one the library first opened.
+    private func park() -> [NotebookDocument] {
+        leaving = current
+        return window.park()
     }
 
     private var divider: some View {
@@ -379,7 +422,7 @@ struct BesidePicker: View {
     }
 }
 
-/// Opens a notebook's document and hosts the editor. One per notebook across windows.
+/// Opens a notebook's document and hosts the editor. One per notebook across windows: a second gives way.
 struct EditorScreen: View {
     let notebookID: UUID
     var initialPageID: UUID?
@@ -465,6 +508,14 @@ struct EditorScreen: View {
     }
 
     private func open() async {
+        // One editor writes each notebook: a pane that would be a second gives way, and the window that has the notebook comes forward.
+        if let window, window.isOpenElsewhere(notebookID) {
+            // A pane the window has already turned from closes nothing.
+            guard (pane == .secondary ? window.beside?.id : window.selected) == notebookID else { return }
+            _ = window.goesToItsWindow(notebookID, page: initialPageID)
+            if pane != .secondary { window.closing = .tab }
+            return onClose()
+        }
         do {
             let opened = try await DocumentRegistry.shared.open(notebookID, root: store.root, scene: sceneID) { [weak store, weak activity] document in
                 let id = document.id
