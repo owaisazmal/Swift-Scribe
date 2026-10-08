@@ -129,7 +129,7 @@ final class AccessibilityAuditUITests: XCTestCase {
         app.buttons["Settings"].firstMatch.tap()
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 10))
         sleep(1)
-        try checkSheet("settings", scrolling: app.collectionViews.firstMatch,
+        try checkSheet("settings", scrolling: app.scrollViews.firstMatch,
                        formText: ["Cobalt", "Tomato", "Moss", "Oxblood", "Mustard", "Print",
                                   "Stop Using Daily Journal", "About", "Sync with iCloud", "iCloud isn't available", "Sync Now",
                                   "Back Up Library", "Restore from a Backup", "Straighten Shapes", "Print Today's Events",

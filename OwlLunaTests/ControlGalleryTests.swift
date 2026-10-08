@@ -8,6 +8,8 @@ private struct ControlGallery: View {
     @State private var typed = "Physics"
     @State private var tab = 0
     @State private var style = 1
+    @State private var switchOn = true
+    @State private var switchOff = false
     @FocusState private var goFocus: Bool
     @FocusState private var searchFocus: Bool
     @FocusState private var typedFocus: Bool
@@ -79,6 +81,13 @@ private struct ControlGallery: View {
                     Button("Disabled") { }.buttonStyle(.owlLuna(.primary)).disabled(true)
                     Button("Disabled") { }.buttonStyle(.owlLuna).disabled(true)
                 }
+                HStack(spacing: Space.x8) {
+                    Toggle("On", isOn: $switchOn)
+                    Toggle("Off", isOn: $switchOff)
+                    Toggle("Disabled", isOn: .constant(true)).disabled(true)
+                    Toggle("Disabled", isOn: .constant(false)).disabled(true)
+                }
+                .toggleStyle(.owlLuna)
             }
             .padding(Space.x4)
             .background(Color.surface)

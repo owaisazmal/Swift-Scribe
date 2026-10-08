@@ -55,7 +55,7 @@ struct TabStrip: View {
                             self.tab(tab.id, record: byID[tab.id], number: index + 1, of: tabs.count)
                         }
                     }
-                    .background { thumbView.matchedGeometryEffect(id: window.selected, in: thumb, isSource: false) }
+                    .background { if let selected = window.selected { thumbView.matchedGeometryEffect(id: selected, in: thumb, isSource: false) } }
                     .animation(slide, value: window.selected)
                 }
                 .scrollIndicators(.hidden)
@@ -126,25 +126,42 @@ struct TabStrip: View {
             .accessibilityShowsLargeContentViewer { Label("Close \(title)", systemImage: "xmark") }
             .accessibilityIdentifier("tabs.close.\(title)")
         }
-        .contentShape([.hoverEffect, .contextMenuPreview, .dragPreview], RoundedRectangle(cornerRadius: 18, style: .continuous).inset(by: 4))
+        .contentShape(.hoverEffect, RoundedRectangle(cornerRadius: 18, style: .continuous).inset(by: 4))
         .hoverEffect(.highlight)
         .overlay { if dropTarget == id, dragging != id { insertionRule(at: index, of: count) } }
-        .contextMenu { menu(for: id, at: index, of: count) }
+        .contextMenu { menu(for: id, at: index, of: count) } preview: { lifted(title, cloth: record?.cloth ?? .slate) }
         .onDrag {
             dragging = id
             let provider = NSItemProvider()
             provider.register(TabReference(id: id))
             return provider
+        } preview: {
+            lifted(title, cloth: record?.cloth ?? .slate)
         }
-        .dropDestination(for: TabReference.self) { items, _ in
-            dropTarget = nil
-            guard let item = items.first, let destination = window.tabs.firstIndex(where: { $0.id == id }) else { return false }
-            return move(item.id, to: destination)
-        } isTargeted: { targeted in
-            if targeted { dropTarget = id } else if dropTarget == id { dropTarget = nil }
-        }
+        .onDrop(of: [.tabReference], delegate: TabDrop(tab: id, target: $dropTarget) { dragged in
+            guard let destination = window.tabs.firstIndex(where: { $0.id == id }) else { return }
+            move(dragged, to: destination)
+        })
         .matchedGeometryEffect(id: id, in: thumb)
         .id(id)
+    }
+
+    /// A tab off the bar, while it is held or dragged: its label on a board of its own, as the tab on show has.
+    private func lifted(_ title: String, cloth: ClothColor) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+        return HStack(spacing: Space.x2) {
+            SpineChip(cloth: cloth)
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.ink)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, Space.x4)
+        .frame(minWidth: 72, maxWidth: 220, minHeight: 36)
+        .fixedSize()
+        .background(Color.board)
+        .contentShape([.contextMenuPreview, .dragPreview], shape)
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
     }
 
     @ViewBuilder
@@ -214,5 +231,30 @@ struct TabStrip: View {
             .hidden()
             .accessibilityHidden(true)
         }
+    }
+}
+
+/// Takes a dragged tab at the tab it is dropped on. The drop is a move, so the tab carries no badge on its way.
+private struct TabDrop: DropDelegate {
+    let tab: UUID
+    @Binding var target: UUID?
+    let move: @MainActor (UUID) -> Void
+
+    func validateDrop(info: DropInfo) -> Bool { info.hasItemsConforming(to: [.tabReference]) }
+
+    func dropEntered(info: DropInfo) { target = tab }
+
+    func dropExited(info: DropInfo) { if target == tab { target = nil } }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? { DropProposal(operation: .move) }
+
+    func performDrop(info: DropInfo) -> Bool {
+        target = nil
+        guard let provider = info.itemProviders(for: [.tabReference]).first else { return false }
+        _ = provider.loadTransferable(type: TabReference.self) { result in
+            guard let dragged = try? result.get() else { return }
+            Task { @MainActor in move(dragged.id) }
+        }
+        return true
     }
 }

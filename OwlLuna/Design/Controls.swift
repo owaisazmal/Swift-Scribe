@@ -583,6 +583,7 @@ struct OwlLunaToggleStyle: ToggleStyle {
         var body: some View {
             Color.clear
                 .frame(width: 54, height: 30)
+                .background(Color.well, in: track)
                 .well(in: track)
                 .overlay { cloth.opacity(isOn ? 1 : 0) }
                 .overlay { if differentiate || UIAccessibility.isOnOffSwitchLabelsEnabled { marks } }
