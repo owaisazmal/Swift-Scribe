@@ -576,7 +576,7 @@ fileprivate struct EditorContent: View {
     }
 
     /// A pane beside another notebook has about half a window: its bar keeps the essentials and the rest move into More.
-    private var isNarrow: Bool { paneWidth < 620 }
+    private var isNarrow: Bool { paneWidth < EditorPanes.narrowWidth }
     private var isCompact: Bool { sizeClass == .compact || isNarrow }
 
     /// An open whiteboard has its own button in the bar, where there is room for one.

@@ -275,8 +275,8 @@ struct PageNavigator: View {
     }
 }
 
-/// The dashed rule marking where a dragged page will land.
-private struct InsertionRule: Shape {
+/// The dashed rule marking where a dragged page, or a dragged tab, will land.
+struct InsertionRule: Shape {
     let vertical: Bool
 
     func path(in rect: CGRect) -> Path {

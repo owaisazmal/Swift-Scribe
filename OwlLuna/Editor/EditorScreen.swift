@@ -76,7 +76,9 @@ final class EditorWindow {
         if let index = tabs.firstIndex(where: { $0.id == selected }) { tabs[index].pageID = nil }
     }
 
+    /// Only a tab's document is kept: one that finishes opening after its tab has gone is its next editor's to hold.
     func keep(_ document: NotebookDocument) {
+        guard tabs.contains(where: { $0.id == document.id }) else { return }
         documents[document.id] = document
     }
 
@@ -91,6 +93,14 @@ final class EditorWindow {
         guard let index = tabs.firstIndex(where: { $0.id == id }) else { return }
         tabs.remove(at: index)
         if selected == id { selected = tabs.isEmpty ? nil : tabs[min(index, tabs.count - 1)].id }
+    }
+
+    /// Moves a tab to where another stands on the bar, which makes room for it. The tab on show stays on show.
+    @discardableResult
+    func moveTab(_ id: UUID, to index: Int) -> Bool {
+        guard let from = tabs.firstIndex(where: { $0.id == id }), from != index, tabs.indices.contains(index) else { return false }
+        tabs.insert(tabs.remove(at: from), at: index)
+        return true
     }
 
     /// Going back to the library: several tabs wait to be shown again, a notebook on its own doesn't.
@@ -140,10 +150,13 @@ struct EditorPanes: View {
     @Environment(EditorWindow.self) private var window
     @Environment(LibraryStore.self) private var store
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var size = CGSize.zero
     @State private var dragOrigin: CGFloat?
 
     static let dividerWidth: CGFloat = 14
+    /// Narrower than this a pane's bar keeps to the essentials, and a window has no room for a second pane.
+    static let narrowWidth: CGFloat = 620
     /// `-splitSideBySide` lets a test see the narrow panes of a landscape window while the simulator stays upright.
     private var stacked: Bool { size.height > size.width && !LaunchOptions.arguments.contains("-splitSideBySide") }
 
@@ -152,11 +165,14 @@ struct EditorPanes: View {
 
     private var showsTabs: Bool { window.tabs.count > 1 && !window.hidesChrome }
 
+    /// A tab can move beside the first pane wherever the title menu would offer to open a notebook there.
+    private var hasRoomBeside: Bool { window.beside == nil && sizeClass != .compact && size.width >= Self.narrowWidth }
+
     var body: some View {
         @Bindable var window = window
         VStack(spacing: 0) {
             if showsTabs {
-                TabStrip(select: { window.select($0) }, close: closeTab)
+                TabStrip(select: { window.select($0) }, close: closeTab, closeOthers: closeOtherTabs, openBeside: hasRoomBeside ? { openBeside($0) } : nil)
                     .disabled(window.isLeaving)
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
@@ -217,6 +233,21 @@ struct EditorPanes: View {
             window.removeTab(id)
             putAway(window.release(id).map { [$0] } ?? [])
         }
+    }
+
+    /// Every tab but one goes: those behind the bar at once, and the one on show, if it isn't the one staying, by its own editor.
+    private func closeOtherTabs(_ id: UUID) {
+        let shown = current.id
+        for tab in window.tabs where tab.id != id && tab.id != shown { closeTab(tab.id) }
+        if shown != id { closeTab(shown) }
+    }
+
+    /// A tab leaves the bar for the pane beside the first. Its document, if it is open, goes with it, undo history and all.
+    private func openBeside(_ id: UUID) {
+        guard window.beside == nil, window.tabs.count > 1, !window.isLeaving else { return }
+        window.removeTab(id)
+        window.beside = OpenNotebook(id: id)
+        window.active = id
     }
 
     private func putAway(_ documents: [NotebookDocument]) {
@@ -443,7 +474,8 @@ struct EditorScreen: View {
             }
             opened.noteOpened()
             document = opened
-            if pane != .secondary { window?.keep(opened) }
+            // A tab's document stays open behind the bar; one that came with a tab moved beside is this pane's to hold from here.
+            if pane == .secondary { window?.release(notebookID) } else { window?.keep(opened) }
         } catch {
             failure = error.localizedDescription
         }

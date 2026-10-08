@@ -5986,6 +5986,28 @@
         }
       }
     },
+    "Built by %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entwickelt von %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Creado por %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Créé par %@"
+          }
+        }
+      }
+    },
     "Calendar" : {
       "localizations" : {
         "de" : {
@@ -6825,6 +6847,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Fermer quand même"
+          }
+        }
+      }
+    },
+    "Close Other Tabs" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Andere Tabs schließen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cerrar las demás pestañas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fermer les autres onglets"
           }
         }
       }
@@ -12718,6 +12762,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Page manquante"
+          }
+        }
+      }
+    },
+    "MIT License" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MIT-Lizenz"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Licencia MIT"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Licence MIT"
           }
         }
       }

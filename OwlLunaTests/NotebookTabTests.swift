@@ -60,6 +60,38 @@ final class NotebookTabTests: XCTestCase {
         XCTAssertEqual(window.tabs.map(\.id), [ids[1]])
     }
 
+    func testATabMovesAlongTheBarAndTheOneOnShowStaysOnShow() {
+        let window = EditorWindow()
+        let ids = [UUID(), UUID(), UUID(), UUID()]
+        ids.forEach { window.show(OpenNotebook(id: $0)) }
+        window.select(ids[1])
+        XCTAssertTrue(window.moveTab(ids[0], to: 2))
+        XCTAssertEqual(window.tabs.map(\.id), [ids[1], ids[2], ids[0], ids[3]], "dropped on a later tab, it lands after it")
+        XCTAssertTrue(window.moveTab(ids[3], to: 0))
+        XCTAssertEqual(window.tabs.map(\.id), [ids[3], ids[1], ids[2], ids[0]], "and on an earlier one, before it")
+        XCTAssertEqual(window.selected, ids[1], "the tab on show stays on show")
+        XCTAssertTrue(window.moveTab(ids[1], to: 3))
+        XCTAssertEqual(window.selected, ids[1], "wherever it is moved to")
+        XCTAssertFalse(window.moveTab(ids[1], to: 3), "a tab dropped where it stands hasn't moved")
+        XCTAssertFalse(window.moveTab(ids[1], to: 4), "and there is nowhere past the end of the bar")
+        XCTAssertFalse(window.moveTab(UUID(), to: 0), "only a tab can be moved")
+        XCTAssertEqual(window.tabs.map(\.id), [ids[3], ids[2], ids[0], ids[1]])
+    }
+
+    func testOnlyATabsDocumentIsKept() {
+        let window = EditorWindow()
+        let first = makeDocument(), second = makeDocument()
+        window.show(OpenNotebook(id: first.id))
+        window.show(OpenNotebook(id: second.id))
+        window.keep(first)
+        window.keep(second)
+        window.removeTab(second.id)
+        XCTAssertEqual(window.selected, first.id)
+        XCTAssertTrue(window.release(second.id) === second, "a tab moved beside leaves its document to be handed on, undo history and all")
+        window.keep(second)
+        XCTAssertEqual(Array(window.documents.keys), [first.id], "a document that opens after its tab has gone isn't kept")
+    }
+
     func testSeveralTabsWaitInTheLibraryAndANotebookOnItsOwnDoesNot() {
         let window = EditorWindow()
         let alone = makeDocument()

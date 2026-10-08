@@ -204,6 +204,7 @@ struct NewNotebookView: View {
             Toggle(isOn: $useForQuickNote) {
                 Text("Use this paper for Quick Note").foregroundStyle(Color.ink)
             }
+            .toggleStyle(.owlLuna)
         }
     }
 
