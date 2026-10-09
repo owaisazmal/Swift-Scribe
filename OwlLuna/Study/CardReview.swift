@@ -94,10 +94,9 @@ struct CardReview: View {
         .background { shortcuts }
         .task(id: session.current?.id) { await loadImages() }
         .onChange(of: session.current?.id) { focusOnCard = true }
-        .confirmationDialog("Delete this flashcard?", isPresented: $confirmingDelete, titleVisibility: .visible) {
+        .notice("Delete this flashcard?", isPresented: $confirmingDelete, message: Text("The page it was made from stays as it is.")) {
+            Button("Cancel", role: .cancel) {}
             Button("Delete Flashcard", role: .destructive, action: deleteCurrent)
-        } message: {
-            Text("The page it was made from stays as it is.")
         }
     }
 
@@ -117,7 +116,7 @@ struct CardReview: View {
                 .accessibilityElement(children: .combine)
                 HStack {
                     Spacer()
-                    Menu {
+                    OwlLunaMenu {
                         if let page = current.card.pageID, let openPage {
                             Button {
                                 dismiss()
@@ -130,14 +129,13 @@ struct CardReview: View {
                     } label: {
                         Label("Card Options", systemImage: "ellipsis")
                     }
-                    .menuStyle(.button)
-                    .buttonStyle(.boardIcon)
+                    .buttonStyle(.plateIcon)
                     .accessibilityIdentifier("review.options")
                 }
             }
             HStack {
                 Button { dismiss() } label: { Label("Close", systemImage: "xmark") }
-                    .buttonStyle(.boardIcon)
+                    .buttonStyle(.plateIcon)
                     .keyboardShortcut(.cancelAction)
                     .accessibilityIdentifier("review.close")
                 Spacer()
@@ -345,13 +343,13 @@ private struct ReviewProgress: View {
 
     var body: some View {
         GeometryReader { proxy in
-            Capsule()
+            RoundedRectangle(cornerRadius: 2)
                 .fill(Color.primaryCloth)
                 .frame(width: max(proxy.size.width * min(max(value, 0), 1), value > 0 ? 6 : 0))
                 .animation(Motion.adaptive(Motion.standard, reduceMotion: reduceMotion), value: value)
         }
         .frame(height: 6)
-        .well(in: Capsule())
+        .well(in: RoundedRectangle(cornerRadius: 2))
         .accessibilityHidden(true)
     }
 }

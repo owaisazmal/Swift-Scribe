@@ -29,8 +29,8 @@ struct TranscriptLines: View {
                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                 .background {
                     if line.id == current {
-                        RoundedRectangle(cornerRadius: Radius.control).fill(Color.mustard.opacity(0.2))
-                        RoundedRectangle(cornerRadius: Radius.control).strokeBorder(Color.mustard, lineWidth: 1.5)
+                        RoundedRectangle.plate.fill(Color.mustard.opacity(0.2))
+                        RoundedRectangle.plate.strokeBorder(Color.mustard, lineWidth: 1.5)
                     }
                 }
                 .contentShape(Rectangle())
@@ -111,8 +111,8 @@ struct TranscriptView: View {
     }
 
     private var languagePicker: some View {
-        Menu {
-            Picker("Language", selection: Binding(get: { locale.identifier(.bcp47) }, set: { language = $0 })) {
+        OwlLunaMenu(Text("Language")) {
+            OwlLunaPicker(selection: Binding(get: { locale.identifier(.bcp47) }, set: { language = $0 })) {
                 ForEach(languages, id: \.identifier) { Text(Transcription.name(of: $0)).tag($0.identifier(.bcp47)) }
             }
         } label: {
@@ -121,7 +121,6 @@ struct TranscriptView: View {
                 Image(systemName: "chevron.up.chevron.down").imageScale(.small).foregroundStyle(Color.textSecondary)
             }
         }
-        .menuStyle(.button)
         .buttonStyle(.owlLuna(.secondary, compact: true))
         .accessibilityLabel(Text("Language"))
         .accessibilityValue(Text(Transcription.name(of: locale)))
@@ -162,14 +161,14 @@ struct TranscriptView: View {
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Menu {
+                OwlLunaMenu {
                     Button {
                         UIPasteboard.general.string = transcript.text
                         AccessibilityNotification.Announcement(String(localized: "Copied")).post()
                     } label: { Label("Copy Transcript", systemImage: "doc.on.doc") }
                     if !recorder.isReadOnly {
                         if languages.count > 1 {
-                            Menu {
+                            OwlLunaMenu {
                                 ForEach(languages, id: \.identifier) { choice in
                                     Button(Transcription.name(of: choice)) {
                                         language = choice.identifier(.bcp47)
@@ -185,8 +184,7 @@ struct TranscriptView: View {
                 } label: {
                     Label("Transcript Options", systemImage: "ellipsis")
                 }
-                .menuStyle(.button)
-                .buttonStyle(.boardIcon)
+                .buttonStyle(.plateIcon)
                 .accessibilityIdentifier("transcript.options")
             }
             .boardBackground()

@@ -23,13 +23,14 @@ enum PageMasthead {
         }
     }
 
-    static func draw(day: String, template: PaperTemplate, paper: PaperColor, in ctx: CGContext, size: CGSize) {
+    static func draw(day: String, template: PaperTemplate, paper: PaperColor, in ctx: CGContext, size: CGSize, night: Bool = false) {
         let u = size.width / 800
         guard u > 0, ctx.boundingBoxOfClipPath.minY < 110 * u, let baselines = baselines(for: template, size: size),
               let lines = lines(for: day) else { return }
         let right = 800 - rightMargin
         let weekday = bounds(of: lines.weekday), date = bounds(of: lines.date), count = bounds(of: lines.count)
-        let ink = paper.isDark ? UIColor(white: 1, alpha: 0.7) : UIColor(hex: 0x1B2230, alpha: 0.7)
+        let dark = paper.isDark || night
+        let ink = dark ? UIColor(white: 1, alpha: 0.7) : UIColor(hex: 0x1B2230, alpha: 0.7)
 
         let textMatrix = ctx.textMatrix
         ctx.saveGState()
@@ -41,13 +42,13 @@ enum PageMasthead {
         let top = baselines.weekday - weekday.ascent - 6, bottom = baselines.date + date.descent + 9
         var knockout = CGRect(x: left - 8, y: top, width: right - left + 16, height: bottom - top)
         if template == .dotted || template == .grid { knockout = snapped(knockout, step: 26) }
-        ctx.setFillColor(PageRenderer.paperColor(paper).cgColor)
+        ctx.setFillColor(PageRenderer.paperColor(paper, night: night).cgColor)
         ctx.fill(knockout)
 
         let ruleY = baselines.weekday - weekday.ascent * 0.32
         let ruleStart = left + weekday.width + 12, ruleEnd = right - count.width - 12
         if ruleEnd > ruleStart {
-            ctx.setFillColor(ink.withAlphaComponent(paper.isDark ? 0.22 : 0.18).cgColor)
+            ctx.setFillColor(ink.withAlphaComponent(dark ? 0.22 : 0.18).cgColor)
             ctx.fill(CGRect(x: ruleStart, y: ruleY - 0.5, width: ruleEnd - ruleStart, height: 1))
         }
 
@@ -57,7 +58,7 @@ enum PageMasthead {
         CTLineDraw(lines.weekday, ctx)
         ctx.textPosition = CGPoint(x: left - 1, y: baselines.date)
         CTLineDraw(lines.date, ctx)
-        ctx.setFillColor(ink.withAlphaComponent(paper.isDark ? 0.55 : 0.5).cgColor)
+        ctx.setFillColor(ink.withAlphaComponent(dark ? 0.55 : 0.5).cgColor)
         ctx.textPosition = CGPoint(x: right - count.width, y: baselines.weekday)
         CTLineDraw(lines.count, ctx)
     }

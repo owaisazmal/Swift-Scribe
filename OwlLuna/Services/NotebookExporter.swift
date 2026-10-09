@@ -241,7 +241,7 @@ struct ExportSheet: View {
                                 .buttonStyle(.owlLuna)
                         }
                     }
-                    .sheet(isPresented: $sharing) { ShareSheet(items: urls) }
+                    .sheet(isPresented: $sharing) { ShareSheet(items: urls).presentationCornerRadius(Radius.sheet) }
                 case .failed(let message):
                     Label(message, systemImage: "exclamationmark.triangle")
                 case .cancelled:

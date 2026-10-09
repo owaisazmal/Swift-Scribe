@@ -211,6 +211,7 @@ struct EditorPanes: View {
                 window.show(OpenNotebook(id: id))
                 window.active = id
             }
+            .presentationCornerRadius(Radius.sheet)
         }
         .onReceive(NotificationCenter.default.publisher(for: .owlLunaSelectTab)) { note in
             guard let id = note.object as? UUID, id != window.beside?.id, !window.isLeaving else { return }
@@ -327,7 +328,7 @@ struct EditorPanes: View {
         Color.desk
             .frame(width: stacked ? nil : Self.dividerWidth, height: stacked ? Self.dividerWidth : nil)
             .overlay { Rectangle().fill(Color.hairline).frame(width: stacked ? nil : 1, height: stacked ? 1 : nil) }
-            .overlay { Capsule().fill(Color.textSecondary).frame(width: stacked ? 40 : 5, height: stacked ? 5 : 40) }
+            .overlay { RoundedRectangle(cornerRadius: 1.5).fill(Color.textSecondary).frame(width: stacked ? 40 : 5, height: stacked ? 5 : 40) }
             .ignoresSafeArea()
             .contentShape(Rectangle())
             .gesture(DragGesture(minimumDistance: 2, coordinateSpace: .global)
@@ -493,13 +494,11 @@ struct EditorScreen: View {
             document.recorder?.shutdown()
             close()
         }
-        .alert("Your latest changes aren't saved yet", isPresented: Binding(get: { unsavedReason != nil },
-                                                                            set: { if !$0 { unsavedReason = nil } })) {
-            Button("Try Again") { close() }
-            Button("Close Anyway", role: .destructive) { closeWhileSaving() }
+        .notice("Your latest changes aren't saved yet", isPresented: Binding(get: { unsavedReason != nil }, set: { if !$0 { unsavedReason = nil } }),
+                message: Text("OwlLuna couldn't write to this device: \(unsavedReason ?? ""). If you close now, it keeps trying in the background, but changes that haven't been saved are lost if the app quits first.")) {
             Button("Keep Editing", role: .cancel) {}
-        } message: {
-            Text("OwlLuna couldn't write to this device: \(unsavedReason ?? ""). If you close now, it keeps trying in the background, but changes that haven't been saved are lost if the app quits first.")
+            Button("Close Anyway", role: .destructive) { closeWhileSaving() }
+            Button("Try Again") { close() }
         }
     }
 

@@ -35,7 +35,7 @@ struct WhiteboardTip: View {
         }
         .padding(Space.x4)
         .frame(maxWidth: 420, alignment: .leading)
-        .board(in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
+        .board(in: RoundedRectangle.bar)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("editor.board.tip")
     }
@@ -44,6 +44,7 @@ struct WhiteboardTip: View {
 /// Every button round an open whiteboard, with its name and what it does.
 struct WhiteboardGuide: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.panelClose) private var panelClose
 
     private struct Entry: Identifiable {
         let symbol: String
@@ -106,20 +107,22 @@ struct WhiteboardGuide: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: Space.x3) {
-                Text("Whiteboard Guide")
-                    .displayFont(22, relativeTo: .title3)
-                    .foregroundStyle(Color.ink)
-                    .accessibilityAddTraits(.isHeader)
-                Spacer(minLength: 0)
-                Button("Done") { dismiss() }
-                    .buttonStyle(.owlLuna(.primary, compact: true))
-                    .keyboardShortcut(.defaultAction)
-                    .accessibilityIdentifier("editor.board.guide.done")
+            if panelClose == nil {
+                HStack(spacing: Space.x3) {
+                    Text("Whiteboard Guide")
+                        .displayFont(22, relativeTo: .title3)
+                        .foregroundStyle(Color.ink)
+                        .accessibilityAddTraits(.isHeader)
+                    Spacer(minLength: 0)
+                    Button("Done") { dismiss() }
+                        .buttonStyle(.owlLuna(.primary, compact: true))
+                        .keyboardShortcut(.defaultAction)
+                        .accessibilityIdentifier("editor.board.guide.done")
+                }
+                .padding(.horizontal, Space.x5)
+                .padding(.top, Space.x4)
+                .padding(.bottom, Space.x2)
             }
-            .padding(.horizontal, Space.x5)
-            .padding(.top, Space.x4)
-            .padding(.bottom, Space.x2)
             ScrollView {
                 VStack(alignment: .leading, spacing: Space.x5) {
                     Text("A whiteboard is a page with no edges. Write in any direction and it keeps going.")
@@ -151,7 +154,7 @@ struct WhiteboardGuide: View {
                             .font(.body.weight(.medium))
                             .foregroundStyle(Color.ink)
                             .frame(width: 36, height: 36)
-                            .well(in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                            .well(in: RoundedRectangle.plate)
                             .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(entry.title).font(.subheadline.weight(.semibold)).foregroundStyle(Color.ink)
@@ -164,8 +167,8 @@ struct WhiteboardGuide: View {
                     .accessibilityElement(children: .combine)
                 }
             }
-            .background(Color.paper, in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
-            .overlay { RoundedRectangle(cornerRadius: Radius.control, style: .continuous).strokeBorder(Color.hairline) }
+            .background(Color.paper, in: RoundedRectangle.plate)
+            .overlay { RoundedRectangle.plate.strokeBorder(Color.hairline) }
         }
     }
 }

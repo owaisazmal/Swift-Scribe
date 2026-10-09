@@ -9,6 +9,7 @@ struct OwlLunaSettingsView: View {
     @AppStorage(SettingsKey.defaultTemplate) private var template: PaperTemplate = .narrowRuled
     @AppStorage(SettingsKey.defaultPaperColor) private var color: PaperColor = .white
     @AppStorage(SettingsKey.defaultPageSize) private var size: PageSize = .letter
+    @AppStorage(SettingsKey.darkPaper) private var darkPaper = true
     @AppStorage(SettingsKey.dailyJournalID) private var journalID = ""
     @AppStorage(SettingsKey.showsOnThisDay) private var showsOnThisDay = true
     @AppStorage(SettingsKey.snapsShapes) private var snapsShapes = true
@@ -44,6 +45,7 @@ struct OwlLunaSettingsView: View {
                     inputSection
                     pencilSection
                     paperSection
+                    pagesSection
                     if UIApplication.shared.supportsAlternateIcons {
                         SettingsSection("App Icon") { AppIconPicker().settingsRow() }
                     }
@@ -75,14 +77,13 @@ struct OwlLunaSettingsView: View {
         }
         .tint(Color.accentColor)
         .presentationSizing(.page)
-        .sheet(item: $sharedBackup) { file in ShareSheet(items: [file.url]) }
+        .sheet(item: $sharedBackup) { file in ShareSheet(items: [file.url]).presentationCornerRadius(Radius.sheet) }
         .fileImporter(isPresented: $choosingBackup, allowedContentTypes: [.owlLunaBackup, .legacyBackup, .appleArchive]) { result in
             if case .success(let url) = result { restore(url) }
         }
-        .alert("Backup", isPresented: Binding(get: { backupMessage != nil }, set: { if !$0 { backupMessage = nil } })) {
+        .notice("Backup", isPresented: Binding(get: { backupMessage != nil }, set: { if !$0 { backupMessage = nil } }),
+                message: Text(backupMessage ?? "")) {
             Button("OK", role: .cancel) {}
-        } message: {
-            Text(backupMessage ?? "")
         }
     }
 
@@ -136,6 +137,14 @@ struct OwlLunaSettingsView: View {
         }
     }
 
+    private var pagesSection: some View {
+        SettingsSection("Pages", note: "In Dark Mode, light paper is shown dark and its ink light. A PDF, a photo and everything you export keep their own colours.") {
+            Toggle("Dark Paper in Dark Mode", isOn: $darkPaper)
+                .accessibilityIdentifier("settings.paper.dark")
+                .settingsRow()
+        }
+    }
+
     private var journalSection: some View {
         let journal = journalID.isEmpty ? nil : store.dailyJournal
         return SettingsSection("Daily Journal", note: "Touch and hold a notebook, then choose Use as Daily Journal. Press ⌘T in the library to open today's page. With Print Today's Events on, each new day's page starts with that day's events from your calendar, as text you can move or delete. They are read on this iPad.") {
@@ -148,10 +157,9 @@ struct OwlLunaSettingsView: View {
                 SettingsActionRow(title: "Stop Using Daily Journal", systemImage: "calendar.badge.minus") { journalID = "" }
             }
         }
-        .alert("Calendar", isPresented: Binding(get: { agendaMessage != nil }, set: { if !$0 { agendaMessage = nil } })) {
+        .notice("Calendar", isPresented: Binding(get: { agendaMessage != nil }, set: { if !$0 { agendaMessage = nil } }),
+                message: Text(agendaMessage ?? "")) {
             Button("OK", role: .cancel) {}
-        } message: {
-            Text(agendaMessage ?? "")
         }
     }
 
@@ -160,10 +168,10 @@ struct OwlLunaSettingsView: View {
             Toggle("Keep Writing History", isOn: Bindable(activity).isEnabled).settingsRow()
             SettingsActionRow(title: "Clear Writing History…", systemImage: "trash", role: .destructive) { confirmingHistoryClear = true }
                 .disabled(!activity.hasHistory)
-                .confirmationDialog("Clear your writing history?", isPresented: $confirmingHistoryClear, titleVisibility: .visible) {
+                .notice("Clear your writing history?", isPresented: $confirmingHistoryClear,
+                        message: Text("The week strip and calendar start afresh. Your notebooks and pages aren't affected.")) {
+                    Button("Cancel", role: .cancel) {}
                     Button("Clear Writing History", role: .destructive) { Task { await activity.clear() } }
-                } message: {
-                    Text("The week strip and calendar start afresh. Your notebooks and pages aren't affected.")
                 }
         }
     }

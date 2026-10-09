@@ -231,7 +231,7 @@ final class BoardCardView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        chip.layer.cornerRadius = chip.bounds.height / 2
+        chip.layer.cornerRadius = Radius.plate
     }
 
     @objc private func open() { onOpen?() }
@@ -244,6 +244,8 @@ final class BoardCardView: UIView {
 
 final class PageSlotView: UIView {
     var page: NotebookPage
+    /// Whether the app is showing light paper dark. The slot is made again when that changes.
+    let night: Bool
     var paper: PagePaperView?
     var card: BoardCardView?
     weak var canvas: PageCanvasView?
@@ -261,7 +263,7 @@ final class PageSlotView: UIView {
         }
         for item in items {
             let view = itemViews[item.id] ?? PageItemView(item: item, assets: assets)
-            view.update(item, onDark: page.effectivePaperColor.isDark, links: links, lifted: lifted.contains(item.id))
+            view.update(item, onDark: page.isDark(night: night), links: links, lifted: lifted.contains(item.id))
             view.onActivate = onActivate
             view.layout(scale: scale)
             itemViews[item.id] = view
@@ -287,7 +289,7 @@ final class PageSlotView: UIView {
 
     func showLifted(_ lifted: Set<UUID>, links: LinkTitles) {
         for item in page.items where item.isOverInk {
-            itemViews[item.id]?.update(item, onDark: page.effectivePaperColor.isDark, links: links, lifted: lifted.contains(item.id))
+            itemViews[item.id]?.update(item, onDark: page.isDark(night: night), links: links, lifted: lifted.contains(item.id))
         }
     }
 
@@ -295,10 +297,11 @@ final class PageSlotView: UIView {
         for view in itemViews.values { view.layout(scale: scale) }
     }
 
-    init(page: NotebookPage) {
+    init(page: NotebookPage, night: Bool = false) {
         self.page = page
+        self.night = night
         super.init(frame: .zero)
-        backgroundColor = PageRenderer.paperColor(page.effectivePaperColor)
+        backgroundColor = PageRenderer.paperColor(page.effectivePaperColor, night: page.turnsDark(night))
         clipsToBounds = true
         isAccessibilityElement = false
     }
@@ -331,6 +334,8 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     private var canvases: [UUID: PageCanvasView] = [:]
     private var pool: [PageCanvasView] = []
     private var canvasWindow: ClosedRange<Int>?
+    /// Whether light paper is being shown dark.
+    private var night = false
     private var isApplyingDrawing = false
     private var isBaking = false
     private var paperLevel = 0
@@ -437,6 +442,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .desk
+        night = PaperNight.isOn(traitCollection)
         scrollView.frame = view.bounds
         scrollView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         scrollView.delegate = self
@@ -484,7 +490,9 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         applyDrawingPolicy(session.drawingInput.policy)
         registerForTraitChanges([UITraitUserInterfaceStyle.self, UITraitAccessibilityContrast.self]) { (self: Self, _) in
             self.updatePageEdges()
+            self.updateNight()
         }
+        NotificationCenter.default.addObserver(self, selector: #selector(settingsChanged), name: UserDefaults.didChangeNotification, object: nil)
         registerForTraitChanges([UITraitPreferredContentSizeCategory.self]) { (self: Self, _) in
             self.layoutZoomPanel()
             self.updateInsets()
@@ -864,16 +872,35 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         }
     }
 
-    /// The tray's pens show ink as the current page will: light on Chalkboard.
+    /// The tray's pens show ink as the current page will: light on Chalkboard, and on paper that is shown dark.
     private func updateInkAppearance() {
         let index = pendingPage ?? session.currentPage
         guard pages.indices.contains(index) else { return }
-        let dark = pages[index].effectivePaperColor.inkAppearance == .dark
+        let dark = pages[index].effectivePaperColor.inkAppearance == .dark, turned = pages[index].turnsDark(night)
         if session.inkIsLight != dark { session.inkIsLight = dark }
+        if session.paperIsNight != turned { session.paperIsNight = turned }
+    }
+
+    @objc private nonisolated func settingsChanged() {
+        Task { @MainActor [weak self] in self?.updateNight() }
+    }
+
+    /// Light paper goes dark with the app, and comes back with it: its pages are made again.
+    private func updateNight() {
+        let now = PaperNight.isOn(traitCollection)
+        guard now != night else { return }
+        night = now
+        guard isViewLoaded else { return }
+        if session.isEditingText { finishTyping() }
+        if inkLasso != nil { setInkSelection([:]) }
+        for (id, slot) in slots where slot.page.turnsDark(true) { removeSlot(id) }
+        updateWindow(force: true)
+        refreshZoomWindow()
+        updateInkAppearance()
     }
 
     private func makeSlot(_ page: NotebookPage, at index: Int) -> PageSlotView {
-        let slot = PageSlotView(page: page)
+        let slot = PageSlotView(page: page, night: night)
         slot.layer.borderWidth = isSolo ? 0 : 1 / max(traitCollection.displayScale, 1)
         slot.layer.borderColor = UIColor.hairline.resolvedColor(with: traitCollection).cgColor
         position(slot, at: index)
@@ -921,7 +948,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
 
     /// Paper is kept a quarter of the viewport beyond what shows, so a 5× page costs no more than a 1× one.
     private func updatePaper(in slot: PageSlotView, density: CGFloat) {
-        let paper = slot.paper ?? PagePaperView(page: slot.page, assets: document.package.assetsDirectory)
+        let paper = slot.paper ?? PagePaperView(page: slot.page, assets: document.package.assetsDirectory, night: night)
         if slot.paper == nil {
             slot.insertSubview(paper, at: 0)
             slot.paper = paper
@@ -966,7 +993,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         let canvas = pool.popLast() ?? makeCanvas()
         syncTool(canvas)
         canvas.pageID = page.id
-        canvas.overrideUserInterfaceStyle = page.effectivePaperColor.inkAppearance
+        canvas.overrideUserInterfaceStyle = page.inkAppearance(night: night)
         let number = (index(of: page.id) ?? 0) + 1
         canvas.accessibilityLabel = canvasLabel(page, number: number)
         canvas.accessibilityIdentifier = "page.canvas.\(number)"
@@ -1387,7 +1414,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
 
     private func selectedItemChanged(_ item: PageItem, final: Bool) {
         guard let selection = session.selection, let slot = slots[selection.pageID] else { return }
-        slot.itemViews[item.id]?.update(item, onDark: slot.page.effectivePaperColor.isDark, links: linkTitles, lifted: session.liftedTapes.contains(item.id))
+        slot.itemViews[item.id]?.update(item, onDark: slot.page.isDark(night: night), links: linkTitles, lifted: session.liftedTapes.contains(item.id))
         slot.itemViews[item.id]?.layout(scale: bakedScale)
         selectionView?.show(item)
         guard final else { return }
@@ -1500,7 +1527,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
 
     private func layoutTextEditor() {
         guard let textView, let (slot, item) = liveTextItem(), let box = item.text else { return }
-        let font = box.font(scale: bakedScale), color = box.tint.color(onDark: slot.page.effectivePaperColor.isDark)
+        let font = box.font(scale: bakedScale), color = box.tint.color(onDark: slot.page.isDark(night: night))
         if textView.font != font { textView.font = font }
         if textView.textColor != color { textView.textColor = color }
         if textView.textAlignment != box.alignment.textAlignment { textView.textAlignment = box.alignment.textAlignment }
@@ -1822,7 +1849,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
     private func drawCard(in slot: PageSlotView) {
         guard let card = slot.card else { return }
         let page = slot.page, id = page.id, assets = document.package.assetsDirectory, titles = linkTitles
-        let width = min(max(slot.bounds.width, 320), 1100), scale = max(traitCollection.displayScale, 1)
+        let width = min(max(slot.bounds.width, 320), 1100), scale = max(traitCollection.displayScale, 1), night = slot.night
         Task { [weak self, weak card] in
             guard let self else { return }
             let ink = await document.ink(id)
@@ -1830,7 +1857,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
             guard let card, card.shownKey != key else { return }
             card.shownKey = key
             let image = await Task.detached(priority: .userInitiated) {
-                SharedSlide(image: PageRenderer.image(of: page, ink: ink, assets: assets, width: width, scale: scale, links: titles))
+                SharedSlide(image: PageRenderer.image(of: page, ink: ink, assets: assets, width: width, scale: scale, links: titles, night: night))
             }.value.image
             if card.shownKey == key { card.image = image }
         }
@@ -2005,7 +2032,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
             let bounds = picked.bounds.insetBy(dx: -2, dy: -2)
             guard !bounds.isNull, !bounds.isEmpty else { continue }
             var image: UIImage?
-            UITraitCollection(userInterfaceStyle: page.effectivePaperColor.inkAppearance).performAsCurrent {
+            UITraitCollection(userInterfaceStyle: page.inkAppearance(night: night)).performAsCurrent {
                 image = picked.image(from: bounds, scale: min(screen * bakedScale, 6))
             }
             if let image { images.append((image, bounds.offsetBy(dx: frame.minX, dy: frame.minY))) }
@@ -2241,7 +2268,7 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         slot.bringSubviewToFront(view)
         view.frame = slot.bounds
         view.show(rects, current: findCurrent?.pageID == slot.page.id ? findCurrent?.rect : nil, scale: bakedScale,
-                  onDark: slot.page.effectivePaperColor.isDark)
+                  onDark: slot.page.isDark(night: night))
         slot.findView = view
     }
 
@@ -2394,17 +2421,17 @@ final class PageStackController: UIViewController, UIScrollViewDelegate, PKCanva
         if canvas.contentSize != size { canvas.contentSize = size }
         let offset = CGPoint(x: window.rect.minX * scale, y: window.rect.minY * scale)
         if canvas.contentOffset != offset { canvas.contentOffset = offset }
-        canvas.overrideUserInterfaceStyle = page.effectivePaperColor.inkAppearance
+        canvas.overrideUserInterfaceStyle = page.inkAppearance(night: night)
         canvas.accessibilityLabel = String(localized: "Zoom window, page \(index + 1)")
         if canvas.pageID != page.id { loadZoomInk(page.id, into: canvas) }
         panel.setTitle(String(localized: "Zoom Window · Page \(index + 1)"))
         panel.setEnabled(zoomLevel > 0, for: .closer)
         panel.setEnabled(zoomLevel < ZoomWindow.widths.count - 1, for: .further)
 
-        let assets = document.package.assetsDirectory, titles = linkTitles, rect = window.rect
+        let assets = document.package.assetsDirectory, titles = linkTitles, rect = window.rect, night = night
         panel.paper.image = UIGraphicsImageRenderer(size: area.size).image { context in
             context.cgContext.translateBy(x: -rect.minX * scale, y: -rect.minY * scale)
-            PageRenderer.drawBackground(page, assets: assets, in: context.cgContext, size: size, links: titles)
+            PageRenderer.drawBackground(page, assets: assets, in: context.cgContext, size: size, links: titles, night: night)
         }
         layoutZoomTarget()
     }

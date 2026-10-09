@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// Controls are bound like the notebooks: boards stand on the desk, wells are pressed into it, and the finishing action is cloth.
+/// Controls are bound like the notebooks: boards stand on the desk, wells are pressed into it, plates are ruled onto a bar,
+/// and the finishing action is cloth.
 enum Elevation {
     /// Shadows on the desk are a warm umber by day and plain black at night.
     static func shade(_ dark: Bool) -> Color { dark ? .black : umber }
@@ -85,7 +86,44 @@ private struct WellSurface<S: InsettableShape>: ViewModifier {
     }
 }
 
+func plateEdge(_ contrast: ColorSchemeContrast, flat: Bool = false) -> Color {
+    Color.ink.opacity(flat ? 0.18 : (contrast == .increased ? 0.7 : 0.35))
+}
+
+private struct PlateSurface<S: InsettableShape>: ViewModifier {
+    let shape: S
+    var fill: Color = .clear
+    var pressed = false
+    var focused = false
+    var flat = false
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    func body(content: Content) -> some View {
+        content
+            .background { shape.fill(fill).overlay { if pressed { shape.fill(Color.well) } } }
+            .overlay {
+                shape.strokeBorder(focused ? Color.accentColor : plateEdge(contrast, flat: flat),
+                                   lineWidth: focused ? (contrast == .increased ? 2 : 1.5) : 1)
+                    .allowsHitTesting(false)
+            }
+            .animation(Motion.quick, value: focused)
+    }
+}
+
+extension RoundedRectangle {
+    static let plate = RoundedRectangle(cornerRadius: Radius.plate, style: .continuous)
+    static let thumb = RoundedRectangle(cornerRadius: Radius.thumb, style: .continuous)
+    static let track = RoundedRectangle(cornerRadius: Radius.track, style: .continuous)
+    static let bar = RoundedRectangle(cornerRadius: Radius.bar, style: .continuous)
+}
+
 extension View {
+    /// A flat panel ruled in ink, with nothing under it unless it is given a fill: what a bar's controls are cut from.
+    func plate<S: InsettableShape>(in shape: S, fill: Color = .clear, pressed: Bool = false, focused: Bool = false,
+                                   flat: Bool = false) -> some View {
+        modifier(PlateSurface(shape: shape, fill: fill, pressed: pressed, focused: focused, flat: flat))
+    }
+
     /// A raised Board panel with a Hairline edge, a lit top edge and a soft umber shadow.
     func board<S: InsettableShape>(in shape: S, pressed: Bool = false, flat: Bool = false) -> some View {
         modifier(BoardSurface(shape: shape, pressed: pressed, flat: flat))
@@ -99,6 +137,30 @@ extension View {
 
 /// Bars stay one height: their controls stop growing at the largest standard size and show the Large Content Viewer instead.
 private let barTextLimit = DynamicTypeSize.xxxLarge
+
+/// A bar's controls are drawn 40 points tall and touched at 44.
+private enum Bar {
+    static let height: CGFloat = 40
+    static let inset: CGFloat = 2
+}
+
+/// What a control stands on: a plate in a bar, a board where it has to stand clear of what is under it.
+private struct Ground: ViewModifier {
+    enum Kind { case none, plate, board }
+
+    let kind: Kind
+    let shape: RoundedRectangle
+    let pressed: Bool
+    let flat: Bool
+
+    func body(content: Content) -> some View {
+        switch kind {
+        case .none: content
+        case .plate: content.plate(in: shape, pressed: pressed, flat: flat)
+        case .board: content.board(in: shape, pressed: pressed, flat: flat)
+        }
+    }
+}
 
 private struct TextSizeCap: ViewModifier {
     let active: Bool
@@ -144,28 +206,29 @@ struct OwlLunaButtonStyle: ButtonStyle {
         @Environment(\.accessibilityReduceMotion) private var reduceMotion
         @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
-        private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: 22, style: .continuous) }
+        private let shape = RoundedRectangle.plate
+        private var height: CGFloat { compact ? 34 : (inBar ? Bar.height : 44) }
 
         var body: some View {
             let pressed = configuration.isPressed && isEnabled
             let cloth = role != .secondary
             let wraps = !inBar && dynamicTypeSize.isAccessibilitySize
             configuration.label
-                .font(.system(compact ? .subheadline : .body, weight: cloth ? .semibold : .medium))
+                .font(.system(compact ? .subheadline : (inBar ? .callout : .body), weight: cloth ? .semibold : .medium))
                 .lineLimit(wraps ? 3 : 1)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: inBar, vertical: true)
                 .foregroundStyle(foreground)
-                .padding(.horizontal, compact ? Space.x3 : Space.x4)
+                .padding(.horizontal, compact || inBar ? Space.x3 : Space.x4)
                 .padding(.vertical, wraps ? Space.x2 : 0)
-                .frame(minWidth: 44, minHeight: compact ? 34 : 44)
+                .frame(minWidth: 44, minHeight: height)
                 .fixedSize(horizontal: inBar, vertical: false)
                 .background { if cloth { filled(pressed: pressed) } }
-                .modifier(SecondaryBoard(active: !cloth, shape: shape, pressed: pressed, flat: !isEnabled))
+                .modifier(Ground(kind: cloth ? .none : (inBar ? .plate : .board), shape: shape, pressed: pressed, flat: !isEnabled))
                 .scaleEffect(pressed && !reduceMotion ? 0.97 : 1)
                 .contentShape([.hoverEffect, .accessibility], shape)
                 .hoverEffect(.highlight)
-                .padding(.vertical, compact ? 5 : 0)
+                .padding(.vertical, (44 - height) / 2)
                 .contentShape(Rectangle())
                 .animation(Motion.quick, value: pressed)
                 .modifier(BarLimit(active: inBar))
@@ -201,21 +264,10 @@ struct OwlLunaButtonStyle: ButtonStyle {
             }
         }
     }
-
-    private struct SecondaryBoard: ViewModifier {
-        let active: Bool
-        let shape: RoundedRectangle
-        let pressed: Bool
-        let flat: Bool
-
-        func body(content: Content) -> some View {
-            if active { content.board(in: shape, pressed: pressed, flat: flat) } else { content }
-        }
-    }
 }
 
 extension ButtonStyle where Self == OwlLunaButtonStyle {
-    /// A board button: Ink on Board.
+    /// A board button: Ink on Board. In a bar it is a plate.
     static var owlLuna: OwlLunaButtonStyle { OwlLunaButtonStyle() }
 
     static func owlLuna(_ role: OwlLunaButtonStyle.Role, compact: Bool = false, inBar: Bool = false) -> OwlLunaButtonStyle {
@@ -245,10 +297,14 @@ struct BarIconButtonStyle: ButtonStyle {
                 .padding(.horizontal, 10)
                 .frame(minWidth: 44, minHeight: 44)
                 .background {
-                    if (configuration.isPressed && isEnabled) || showBorders { Capsule().fill(Color.well).padding(3) }
+                    if (configuration.isPressed && isEnabled) || showBorders {
+                        RoundedRectangle.thumb.fill(Color.well)
+                            .padding(.horizontal, 3)
+                            .padding(.vertical, Bar.inset + 3)
+                    }
                 }
                 .contentShape(Rectangle())
-                .contentShape(.hoverEffect, Capsule().inset(by: 2))
+                .contentShape(.hoverEffect, RoundedRectangle.plate.inset(by: Bar.inset))
                 .hoverEffect(.highlight)
                 .dynamicTypeSize(...barTextLimit)
                 .accessibilityShowsLargeContentViewer { configuration.label.labelStyle(.titleAndIcon) }
@@ -260,29 +316,40 @@ extension ButtonStyle where Self == BarIconButtonStyle {
     static var barIcon: BarIconButtonStyle { BarIconButtonStyle() }
 }
 
-/// A row of controls on one board, the way toolbar groups and floating bars are drawn.
+/// A run of icons on one plate with a rule between each, the way toolbar groups are drawn.
 struct BarGroup<Content: View>: View {
     @ViewBuilder var content: Content
+    @Environment(\.colorSchemeContrast) private var contrast
 
     var body: some View {
-        HStack(spacing: 0) { content }
-            .buttonStyle(.barIcon)
-            .menuStyle(.button)
-            .padding(.horizontal, Space.x1)
-            .board(in: Capsule())
-            .fixedSize()
-            .dynamicTypeSize(...barTextLimit)
+        HStack(spacing: 0) {
+            Group(subviews: content) { cells in
+                ForEach(cells) { cell in
+                    if cell.id != cells.first?.id {
+                        Rectangle().fill(plateEdge(contrast)).frame(width: 1).padding(.vertical, Bar.inset)
+                    }
+                    cell
+                }
+            }
+        }
+        .buttonStyle(.barIcon)
+        .background { Color.clear.plate(in: RoundedRectangle.plate).padding(.vertical, Bar.inset) }
+        .fixedSize()
+        .dynamicTypeSize(...barTextLimit)
     }
 }
 
-/// A single icon on its own round board: the way back, settings, the sidebar.
-struct BoardIconButtonStyle: ButtonStyle {
+/// A single icon on a plate of its own: the way back, settings, the sidebar. Lifted, it stands on a board over a page.
+struct PlateIconButtonStyle: ButtonStyle {
+    var lifted = false
+
     func makeBody(configuration: Configuration) -> some View {
-        BoardIcon(configuration: configuration)
+        PlateIcon(configuration: configuration, lifted: lifted)
     }
 
-    private struct BoardIcon: View {
+    private struct PlateIcon: View {
         let configuration: Configuration
+        let lifted: Bool
         @Environment(\.isEnabled) private var isEnabled
 
         var body: some View {
@@ -292,10 +359,11 @@ struct BoardIconButtonStyle: ButtonStyle {
                 .imageScale(.large)
                 .foregroundStyle(Color.ink)
                 .opacity(isEnabled ? 1 : 0.35)
-                .frame(width: 44, height: 44)
-                .board(in: Circle(), pressed: configuration.isPressed && isEnabled, flat: !isEnabled)
-                .contentShape([.interaction, .accessibility], Circle())
-                .contentShape(.hoverEffect, Circle())
+                .frame(width: Bar.height, height: Bar.height)
+                .modifier(Ground(kind: lifted ? .board : .plate, shape: .plate, pressed: configuration.isPressed && isEnabled, flat: !isEnabled))
+                .padding(Bar.inset)
+                .contentShape([.interaction, .accessibility], Rectangle())
+                .contentShape(.hoverEffect, RoundedRectangle.plate.inset(by: Bar.inset))
                 .hoverEffect(.highlight)
                 .dynamicTypeSize(...barTextLimit)
                 .accessibilityShowsLargeContentViewer { configuration.label.labelStyle(.titleAndIcon) }
@@ -303,12 +371,14 @@ struct BoardIconButtonStyle: ButtonStyle {
     }
 }
 
-extension ButtonStyle where Self == BoardIconButtonStyle {
-    static var boardIcon: BoardIconButtonStyle { BoardIconButtonStyle() }
+extension ButtonStyle where Self == PlateIconButtonStyle {
+    static var plateIcon: PlateIconButtonStyle { PlateIconButtonStyle() }
+
+    static func plateIcon(lifted: Bool) -> PlateIconButtonStyle { PlateIconButtonStyle(lifted: lifted) }
 }
 
 extension ToolbarContent {
-    /// Takes away the system's glass so the item can wear its own board.
+    /// Takes away the system's glass so the item can wear its own plate.
     @ToolbarContentBuilder
     func boardBackground() -> some ToolbarContent {
         if #available(iOS 26, *) { sharedBackgroundVisibility(.hidden) } else { self }
@@ -332,7 +402,7 @@ extension View {
 
 // MARK: Fields
 
-/// A field pressed into the desk: a glyph, the words, a way to clear them, and room for one more control. Escape clears it, then leaves it.
+/// A field ruled onto a bar: a glyph, the words, a way to clear them, and room for one more control. Escape clears it, then leaves it.
 struct OwlLunaSearchField<Accessory: View>: View {
     let prompt: LocalizedStringKey
     @Binding var text: String
@@ -357,6 +427,7 @@ struct OwlLunaSearchField<Accessory: View>: View {
                 .allowsHitTesting(false)
                 .accessibilityHidden(true)
             TextField(prompt, text: $text, prompt: Text(prompt).foregroundStyle(Color.textSecondary))
+                .font(.callout)
                 .foregroundStyle(Color.ink)
                 .tint(Color.accentColor)
                 .frame(maxWidth: .infinity, minHeight: 44)
@@ -383,9 +454,9 @@ struct OwlLunaSearchField<Accessory: View>: View {
             }
             accessory
         }
-        .padding(.leading, Space.x4)
-        .padding(.trailing, text.isEmpty ? Space.x4 : 0)
-        .background { Capsule().fill(.clear).contentShape(Capsule()).onTapGesture { focus.wrappedValue = true } }
+        .padding(.leading, Space.x3)
+        .padding(.trailing, text.isEmpty ? Space.x3 : 0)
+        .background { Color.clear.contentShape(Rectangle()).onTapGesture { focus.wrappedValue = true } }
         .background {
             if handlesEscape, focus.wrappedValue {
                 Button("Cancel") { if text.isEmpty { focus.wrappedValue = false } else { text = "" } }
@@ -394,7 +465,7 @@ struct OwlLunaSearchField<Accessory: View>: View {
                     .accessibilityHidden(true)
             }
         }
-        .well(in: Capsule(), focused: focus.wrappedValue)
+        .background { Color.clear.plate(in: RoundedRectangle.plate, fill: .board, focused: focus.wrappedValue).padding(.vertical, Bar.inset) }
         .textInputAutocapitalization(isSearch ? .never : nil)
         .autocorrectionDisabled(isSearch)
         .submitLabel(isSearch ? .search : .go)
@@ -435,7 +506,7 @@ extension View {
             .padding(.horizontal, Space.x3)
             .frame(minHeight: 44)
             .background { Color.clear.contentShape(Rectangle()).onTapGesture(perform: focus) }
-            .well(in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous), focused: focused)
+            .well(in: RoundedRectangle.plate, focused: focused)
     }
 }
 
@@ -479,7 +550,7 @@ struct OwlLunaSegmentedPicker<Value: Hashable, Label: View>: View {
                         .padding(.vertical, wraps ? Space.x3 : (inBar ? 0 : Space.x1))
                         .frame(maxWidth: .infinity, minHeight: 44, maxHeight: .infinity)
                         .contentShape(Rectangle())
-                        .contentShape(.hoverEffect, RoundedRectangle(cornerRadius: 18, style: .continuous).inset(by: 4))
+                        .contentShape(.hoverEffect, RoundedRectangle.thumb.inset(by: inBar ? Bar.inset + 3 : 4))
                 }
                 .buttonStyle(.plain)
                 .hoverEffect(.highlight)
@@ -490,7 +561,7 @@ struct OwlLunaSegmentedPicker<Value: Hashable, Label: View>: View {
         }
         .background { thumbView.matchedGeometryEffect(id: selection, in: thumb, isSource: false) }
         .animation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.86), value: selection)
-        .well(in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background { Color.clear.well(in: RoundedRectangle.track).padding(.vertical, inBar ? Bar.inset : 0) }
         .fixedSize(horizontal: inBar, vertical: true)
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(.isTabBar)
@@ -498,12 +569,13 @@ struct OwlLunaSegmentedPicker<Value: Hashable, Label: View>: View {
     }
 
     private var thumbView: some View {
-        let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
+        let shape = RoundedRectangle.thumb
         return Color.clear
             .board(in: shape)
             .overlay { if scheme == .dark { shape.fill(Color.ink.opacity(0.10)) } }
             .overlay { if contrast == .increased { shape.strokeBorder(Color.inkSecondary, lineWidth: 1) } }
-            .padding(4)
+            .padding(.horizontal, inBar ? 3 : 4)
+            .padding(.vertical, inBar ? Bar.inset + 3 : 4)
     }
 }
 
@@ -577,8 +649,8 @@ struct OwlLunaToggleStyle: ToggleStyle {
         @Environment(\.accessibilityReduceMotion) private var reduceMotion
         @Environment(\.accessibilityDifferentiateWithoutColor) private var differentiate
 
-        private var track: RoundedRectangle { RoundedRectangle(cornerRadius: 9, style: .continuous) }
-        private var knob: RoundedRectangle { RoundedRectangle(cornerRadius: 6, style: .continuous) }
+        private let track = RoundedRectangle.track
+        private let knob = RoundedRectangle.thumb
 
         var body: some View {
             Color.clear

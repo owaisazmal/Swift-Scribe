@@ -141,7 +141,7 @@ struct WritingCalendarView: View {
                 Button { select(dayKey) } label: {
                     label
                         .overlay {
-                            if isSelected { RoundedRectangle(cornerRadius: 10).strokeBorder(Color.accentColor, lineWidth: 2).padding(3) }
+                            if isSelected { RoundedRectangle.plate.strokeBorder(Color.accentColor, lineWidth: 2).padding(3) }
                         }
                         .contentShape(Rectangle())
                 }
@@ -190,9 +190,9 @@ struct WritingCalendarView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(Space.x4)
-                    .background(Color.paper, in: RoundedRectangle(cornerRadius: Radius.control))
+                    .background(Color.paper, in: RoundedRectangle.plate)
                     .overlay {
-                        if selected == dayKey { RoundedRectangle(cornerRadius: Radius.control).strokeBorder(Color.accentColor, lineWidth: 2) }
+                        if selected == dayKey { RoundedRectangle.plate.strokeBorder(Color.accentColor, lineWidth: 2) }
                     }
                 }
                 .buttonStyle(.plain)
@@ -382,6 +382,7 @@ private struct CalendarPageCard: View {
     let action: () -> Void
     @Environment(LibraryStore.self) private var store
     @State private var image: UIImage?
+    @PaperNight private var night
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.x2) {
@@ -390,7 +391,7 @@ private struct CalendarPageCard: View {
                     if let image {
                         Image(uiImage: image).resizable().transition(.opacity)
                     } else {
-                        Rectangle().fill(Color(uiColor: PageRenderer.paperColor(entry.page.effectivePaperColor)))
+                        Rectangle().fill(Color(uiColor: entry.page.paperShown(night: night)))
                     }
                 }
                 .aspectRatio(entry.page.shownSize.width / max(entry.page.shownSize.height, 1), contentMode: .fit)
@@ -410,9 +411,9 @@ private struct CalendarPageCard: View {
                 .accessibilityHidden(true)
                 .onTapGesture(perform: action)
         }
-        .task(id: "\(entry.page.thumbnailKey)|\(isLocked)") {
+        .task(id: "\(entry.page.thumbnailKey)|\(isLocked)|\(night)") {
             guard !isLocked else { return image = nil }
-            let loaded = await PageThumbnailer.thumbnail(package: NotebookPackage(root: store.root, id: notebookID), page: entry.page)
+            let loaded = await PageThumbnailer.thumbnail(package: NotebookPackage(root: store.root, id: notebookID), page: entry.page, night: night)
             withAnimation(Motion.quick) { image = loaded }
         }
     }

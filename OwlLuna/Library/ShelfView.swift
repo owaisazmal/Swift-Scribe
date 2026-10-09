@@ -197,21 +197,20 @@ struct ShelfView: View {
             }
             .ignoresSafeArea()
         }
-        .alert("Rename Notebook", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
+        .notice("Rename Notebook", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
             TextField("Title", text: $renameText)
+        } actions: {
             Button("Cancel", role: .cancel) {}
             Button("Save") { if let renaming { store.rename(renaming, to: renameText) } }
         }
-        .confirmationDialog("Delete all notebooks in Recently Deleted?", isPresented: $confirmingEmptyTrash, titleVisibility: .visible) {
+        .notice("Delete all notebooks in Recently Deleted?", isPresented: $confirmingEmptyTrash, message: Text("This can't be undone.")) {
+            Button("Cancel", role: .cancel) {}
             Button("Delete All", role: .destructive) { store.deletePermanently(visible) }
-        } message: {
-            Text("This can't be undone.")
         }
-        .alert("Something went wrong", isPresented: Binding(get: { errorMessage != nil || store.lastError != nil },
-                                                           set: { if !$0 { errorMessage = nil; store.clearError() } })) {
+        .notice("Something went wrong", isPresented: Binding(get: { errorMessage != nil || store.lastError != nil },
+                                                             set: { if !$0 { errorMessage = nil; store.clearError() } }),
+                message: Text(errorMessage ?? store.lastError ?? "")) {
             Button("OK", role: .cancel) {}
-        } message: {
-            Text(errorMessage ?? store.lastError ?? "")
         }
         .onChange(of: scope) { _, _ in
             endSelection()
@@ -219,19 +218,19 @@ struct ShelfView: View {
         }
         .task(id: "\(store.searchVersion)|\(records.count)|\(scope)|\(searchText)") { await runSearch() }
         .task(id: tagPagesKey) { await loadTagPages() }
-        .sheet(item: $export) { job in ExportSheet(job: job) }
-        .sheet(item: $editingCover) { record in CoverEditorView(record: record) }
+        .sheet(item: $export) { job in ExportSheet(job: job).presentationCornerRadius(Radius.sheet) }
+        .sheet(item: $editingCover) { record in CoverEditorView(record: record).presentationCornerRadius(Radius.sheet) }
         .sheet(item: $tagging) { record in
             TagSheet(subject: record.title.isEmpty ? String(localized: "Untitled") : record.title, initial: record.tags) { tags in
                 changes.setTags(tags, for: record, in: store, undoManager: undoManager)
             }
+            .presentationCornerRadius(Radius.sheet)
         }
-        .alert(permanentDeleteTitle, isPresented: Binding(get: { !changes.pendingPermanentDelete.isEmpty },
-                                                          set: { if !$0 { changes.pendingPermanentDelete = [] } })) {
+        .notice(Text(permanentDeleteTitle), isPresented: Binding(get: { !changes.pendingPermanentDelete.isEmpty },
+                                                                 set: { if !$0 { changes.pendingPermanentDelete = [] } }),
+                message: Text("This can't be undone.")) {
             Button("Cancel", role: .cancel) {}
             Button("Delete Permanently", role: .destructive) { confirmPermanentDelete() }
-        } message: {
-            Text("This can't be undone.")
         }
         .overlay(alignment: .bottom) { slip }
         .task(id: changes.current?.id) {
@@ -311,9 +310,9 @@ struct ShelfView: View {
                           zoomNamespace: zoomNamespace, showsFolder: showsFolder) {
             if isSelecting { toggle(record) } else if !record.isTrashed { onOpen(record) }
         }
-        .contextMenu { if !isSelecting { menu(for: record) } }
+        .heldMenu(Text(record.title), when: !isSelecting, draggable: true) { menu(for: record) }
         .draggable(NotebookReference(id: record.id)) {
-            Text(record.title).padding(Space.x2).background(Color.surface, in: RoundedRectangle(cornerRadius: 6))
+            Text(record.title).padding(Space.x2).background(Color.surface, in: RoundedRectangle.plate)
         }
     }
 
@@ -358,7 +357,7 @@ struct ShelfView: View {
                 .accessibilityIdentifier("notebook.\(record.title)")
                 .accessibilityAddTraits(selection.contains(record.id) ? .isSelected : [])
                 .accessibilityActions { if !isSelecting { trashActions(for: record) } }
-                .contextMenu { if !isSelecting { menu(for: record) } }
+                .heldMenu(Text(record.title), when: !isSelecting, draggable: true) { menu(for: record) }
                 .draggable(NotebookReference(id: record.id))
                 .listRowBackground(Color.surface)
             }
@@ -481,7 +480,7 @@ struct ShelfView: View {
                     Button { changes.setFavorite(true, for: selected(visible), in: store, undoManager: undoManager); endSelection() } label: {
                         Label("Favourite", systemImage: "star")
                     }
-                    Menu {
+                    OwlLunaMenu {
                         Button("Not on a shelf") { move(selected(visible), to: nil); endSelection() }
                         ForEach(folders) { folder in Button(tree.path(of: folder.id)) { move(selected(visible), to: folder); endSelection() } }
                     } label: { Label("Move", systemImage: "folder") }
@@ -527,20 +526,22 @@ struct ShelfView: View {
                     .buttonStyle(.owlLuna(.primary, inBar: true))
                     .accessibilityLabel(selection.isEmpty ? String(localized: "Done") : String(localized: "\(selection.count) selected, done"))
             } else {
-                BarGroup {
+                HStack(spacing: Space.x2) {
                     if scope == .trash {
                         Button("Empty") { confirmingEmptyTrash = true }.disabled(visible.isEmpty)
-                        Rectangle().fill(Color.hairline).frame(width: 1, height: 24)
                     } else {
-                        Menu {
-                            Picker("Sort By", selection: $sort) {
+                        OwlLunaMenu {
+                            OwlLunaPicker("Sort By", selection: $sort) {
                                 ForEach(LibrarySortOrder.allCases) { Text($0.displayName).tag($0) }
                             }
-                            Picker("Group By", selection: $grouping) {
+                            OwlLunaPicker("Group By", selection: $grouping) {
                                 ForEach(LibraryGrouping.allCases) { Text($0.displayName).tag($0) }
                             }
                         } label: { Label("Sort", systemImage: "arrow.up.arrow.down") }
-                        Menu {
+                    }
+                    Button("Select") { isSelecting = true }.disabled(visible.isEmpty)
+                    if scope != .trash {
+                        OwlLunaMenu {
                             Button { onCreate() } label: { Label("New Notebook", systemImage: "book.closed") }
                             Button { onQuickNote() } label: { Label("Quick Note", systemImage: "square.and.pencil") }
                             Button { onWhiteboard() } label: { Label("Whiteboard", systemImage: "scribble.variable") }
@@ -554,9 +555,11 @@ struct ShelfView: View {
                         } primaryAction: {
                             onCreate()
                         }
+                        .buttonStyle(.owlLuna(.primary, inBar: true))
                     }
-                    Button("Select") { isSelecting = true }.disabled(visible.isEmpty)
                 }
+                .buttonStyle(.owlLuna(.secondary, inBar: true))
+                .labelStyle(.titleAndIcon)
                 .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { actionsWidth = $0 }
             }
         }
@@ -593,13 +596,16 @@ struct ShelfView: View {
             Button { startExport(record, as: .pdf) } label: { Label("Export as PDF", systemImage: "square.and.arrow.up") }
             Button { startExport(record, as: .images) } label: { Label("Export as Images", systemImage: "photo.on.rectangle") }
             Text("Made with a newer version of OwlLuna, so it can only be read here.")
+                .font(.footnote)
+                .foregroundStyle(Color.textSecondary)
+                .padding(Space.x3)
         } else {
             Button { onOpen(record) } label: { Label("Open", systemImage: "book") }
             Button { renameText = record.title; renaming = record } label: { Label("Rename", systemImage: "pencil") }
             Button { changes.setFavorite(!record.isFavorite, for: [record], in: store, undoManager: undoManager) } label: {
                 Label(record.isFavorite ? "Unfavourite" : "Favourite", systemImage: record.isFavorite ? "star.slash" : "star")
             }
-            Menu {
+            OwlLunaMenu {
                 Button { move([record], to: nil) } label: { Label("Not on a shelf", systemImage: record.folder == nil ? "checkmark" : "tray") }
                 ForEach(folders) { folder in
                     Button { move([record], to: folder) } label: {
@@ -620,7 +626,7 @@ struct ShelfView: View {
             Button { toggleLock(record) } label: {
                 Label(record.isLocked ? "Remove Lock…" : "Lock…", systemImage: record.isLocked ? "lock.open" : "lock")
             }
-            Divider()
+            MenuBreak()
             Button(role: .destructive) { changes.moveToTrash([record], in: store, undoManager: undoManager) } label: { Label("Delete", systemImage: "trash") }
         }
     }

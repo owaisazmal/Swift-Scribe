@@ -43,7 +43,7 @@ struct StudyCard: View {
                     .font(.body.weight(.semibold))
                     .foregroundStyle(Color.accentColor)
                     .frame(width: 36, height: 36)
-                    .background(Color.accentColor.opacity(0.12), in: Circle())
+                    .background(Color.accentColor.opacity(0.12), in: RoundedRectangle.plate)
                     .contentTransition(.symbolEffect(.replace))
             }
         }

@@ -52,19 +52,22 @@ enum PageRenderer {
     static let pdfs = LRUCache<SharedPDF>(capacity: 6)
     static let images = LRUCache<SharedImage>(capacity: 12)
 
-    static func paperColor(_ color: PaperColor) -> UIColor {
-        let (r, g, b) = color.rgb
+    static func paperColor(_ color: PaperColor, night: Bool = false) -> UIColor {
+        let (r, g, b) = night ? color.nightRGB : color.rgb
         return UIColor(red: r, green: g, blue: b, alpha: 1)
     }
 
     /// Fills `rect` (whose size is the page size scaled by `rect.width / page.size.width`) with the page background.
     /// The editor passes `items: false`: there, pictures and stickers are live views that can be moved.
-    static func drawBackground(_ page: NotebookPage, assets: URL, in ctx: CGContext, size: CGSize, items: Bool = true, links: LinkTitles? = nil) {
-        ctx.setFillColor(paperColor(page.effectivePaperColor).cgColor)
+    /// At `night` light paper is drawn dark, as the screen shows it in Dark Mode. What is exported leaves it out.
+    static func drawBackground(_ page: NotebookPage, assets: URL, in ctx: CGContext, size: CGSize, items: Bool = true, links: LinkTitles? = nil,
+                               night: Bool = false) {
+        let night = page.turnsDark(night)
+        ctx.setFillColor(paperColor(page.effectivePaperColor, night: night).cgColor)
         ctx.fill(CGRect(origin: .zero, size: size))
-        drawPaper(page, assets: assets, in: ctx, size: size)
+        drawPaper(page, assets: assets, in: ctx, size: size, night: night)
         if items, page.hasItems {
-            PageItemRenderer.draw(page.items, pageSize: page.size, assets: assets, in: ctx, size: size, onDark: page.effectivePaperColor.isDark, links: links)
+            PageItemRenderer.draw(page.items, pageSize: page.size, assets: assets, in: ctx, size: size, onDark: page.isDark(night: night), links: links)
         }
     }
 
@@ -74,13 +77,16 @@ enum PageRenderer {
         PageItemRenderer.draw(page.items, pageSize: page.size, assets: assets, in: ctx, size: size, overInk: true, lifted: lifted)
     }
 
-    private static func drawPaper(_ page: NotebookPage, assets: URL, in ctx: CGContext, size: CGSize) {
+    private static func drawPaper(_ page: NotebookPage, assets: URL, in ctx: CGContext, size: CGSize, night: Bool) {
         switch page.background {
         case .template where page.isBoard:
-            drawBoardPaper(page.template ?? .blank, color: page.paperColor, origin: page.cut ?? .zero, scale: size.width / max(page.size.width, 1), in: ctx)
+            drawBoardPaper(page.template ?? .blank, color: page.paperColor, origin: page.cut ?? .zero, scale: size.width / max(page.size.width, 1), in: ctx,
+                           night: night)
         case .template:
-            drawTemplate(page.template ?? .blank, color: page.paperColor, in: ctx, size: size)
-            if let day = page.day { PageMasthead.draw(day: day, template: page.template ?? .blank, paper: page.paperColor, in: ctx, size: size) }
+            drawTemplate(page.template ?? .blank, color: page.paperColor, in: ctx, size: size, night: night)
+            if let day = page.day {
+                PageMasthead.draw(day: day, template: page.template ?? .blank, paper: page.paperColor, in: ctx, size: size, night: night)
+            }
         case .pdf(let file, let index):
             let url = assets.appending(path: file)
             guard let pdf = pdfs.value(url.path(percentEncoded: false), create: {
@@ -139,7 +145,7 @@ enum PageRenderer {
     /// Renders a page (background plus ink clipped to the page) to an image `width` points wide. Thread-safe.
     /// A whiteboard is drawn as the part of it that has something on it.
     static func image(of page: NotebookPage, ink: PKDrawing, assets: URL, width: CGFloat, scale: CGFloat = 1,
-                      includeBackground: Bool = true, links: LinkTitles? = nil, lifted: Set<UUID> = []) -> UIImage {
+                      includeBackground: Bool = true, links: LinkTitles? = nil, lifted: Set<UUID> = [], night: Bool = false) -> UIImage {
         let page = Whiteboard.whole(page, ink: ink)
         let factor = width / max(page.size.width, 1)
         let size = CGSize(width: width, height: (page.size.height * factor).rounded())
@@ -148,13 +154,13 @@ enum PageRenderer {
         format.opaque = true
         var inkImage: UIImage?
         if !ink.strokes.isEmpty {
-            UITraitCollection(userInterfaceStyle: includeBackground ? page.effectivePaperColor.inkAppearance : .light).performAsCurrent {
+            UITraitCollection(userInterfaceStyle: includeBackground ? page.inkAppearance(night: night) : .light).performAsCurrent {
                 inkImage = ink.image(from: page.inkRect, scale: factor * scale)
             }
         }
         return UIGraphicsImageRenderer(size: size, format: format).image { context in
             if includeBackground {
-                drawBackground(page, assets: assets, in: context.cgContext, size: size, links: links)
+                drawBackground(page, assets: assets, in: context.cgContext, size: size, links: links, night: night)
             } else {
                 UIColor.white.setFill()
                 context.fill(CGRect(origin: .zero, size: size))

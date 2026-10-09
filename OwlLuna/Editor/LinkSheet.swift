@@ -220,18 +220,19 @@ struct SavedPageThumbnail: View {
     let package: NotebookPackage
     let page: NotebookPage
     @State private var image: UIImage?
+    @PaperNight private var night
 
     var body: some View {
         Group {
             if let image {
                 Image(uiImage: image).resizable()
             } else {
-                Rectangle().fill(Color(uiColor: PageRenderer.paperColor(page.effectivePaperColor)))
+                Rectangle().fill(Color(uiColor: page.paperShown(night: night)))
             }
         }
         .aspectRatio(page.size.width / max(page.size.height, 1), contentMode: .fit)
         .overlay { Rectangle().strokeBorder(Color.hairline, lineWidth: 1) }
-        .task(id: "\(page.id)-\(page.thumbnailKey)") { image = await PageThumbnailer.thumbnail(package: package, page: page) }
+        .task(id: "\(page.id)-\(page.thumbnailKey)-\(night)") { image = await PageThumbnailer.thumbnail(package: package, page: page, night: night) }
     }
 }
 

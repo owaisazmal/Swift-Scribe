@@ -256,6 +256,42 @@ final class PaperParityTests: XCTestCase {
         XCTAssertLessThan(rendered.luminance(at: CGPoint(x: 250, y: 300)), 0.3)
     }
 
+    func testLightPaperIsDarkAtNightAndKeepsItsColourWhenExported() async throws {
+        let drawing = PKDrawing(strokes: [stroke(from: CGPoint(x: 100, y: 300), to: CGPoint(x: 400, y: 300), width: 10)])
+        let ink = CGPoint(x: 250, y: 300), bare = CGPoint(x: 250, y: 610)
+        for color in PaperColor.allCases where !color.isDark {
+            let page = NotebookPage.template(.blank, color: color, size: .letter)
+            let night = Bitmap(image: PageRenderer.image(of: page, ink: drawing, assets: assets, width: page.size.width, night: true))
+            XCTAssertLessThan(night.luminance(at: bare), 0.2, "\(color) is shown dark")
+            XCTAssertGreaterThan(night.luminance(at: ink), 0.7, "black ink is light on it")
+            let day = Bitmap(image: PageRenderer.image(of: page, ink: drawing, assets: assets, width: page.size.width))
+            XCTAssertGreaterThan(day.luminance(at: bare), 0.6, "\(color) keeps its colour by day")
+            XCTAssertLessThan(day.luminance(at: ink), 0.3)
+        }
+
+        let chalk = NotebookPage.template(.blank, color: .chalkboard, size: .letter)
+        XCTAssertEqual(PageRenderer.image(of: chalk, ink: drawing, assets: assets, width: chalk.size.width, night: true).pngData(),
+                       PageRenderer.image(of: chalk, ink: drawing, assets: assets, width: chalk.size.width).pngData(), "dark paper is as it was")
+        let scan = NotebookPage(background: .image(file: "missing.png"), paperColor: .white, size: PageSize.letter.points)
+        XCTAssertFalse(scan.turnsDark(true), "a photo or a PDF keeps its own colours")
+        XCTAssertEqual(scan.inkAppearance(night: true), .light)
+
+        let root = temporaryRoot(self), id = UUID()
+        let package = NotebookPackage(root: root, id: id)
+        let page = NotebookPage.template(.blank, color: .white, size: .letter)
+        try await package.create(NotebookManifest(id: id, title: "Night", defaults: PageDefaults(template: .blank, paperColor: .white, pageSize: .letter),
+                                                  pages: [page]))
+        let input = NotebookExporter.Input(title: "Night", pages: [page], inMemoryInk: [page.id: drawing], package: package)
+        let urls = try await NotebookExporter.exportImages(input) { _ in }
+        let image = try XCTUnwrap(UIImage(contentsOfFile: try XCTUnwrap(urls.first).path(percentEncoded: false)))
+        let bitmap = Bitmap(image: image), k = image.size.width / page.size.width
+        XCTAssertGreaterThan(bitmap.luminance(at: CGPoint(x: bare.x * k, y: bare.y * k)), 0.9, "white paper is exported white")
+        XCTAssertLessThan(bitmap.luminance(at: CGPoint(x: ink.x * k, y: ink.y * k)), 0.3, "and its ink dark")
+
+        XCTAssertNotEqual(PageThumbnailer.key(for: page, night: true), PageThumbnailer.key(for: page, night: false))
+        XCTAssertEqual(PageThumbnailer.key(for: chalk, night: true), chalk.thumbnailKey)
+    }
+
     func testTileTimeAtFiveX() throws {
         try XCTSkipUnless(ProcessInfo.processInfo.environment["OWLLUNA_PERF"] == "1", "Set OWLLUNA_PERF=1 to run")
         let scale: CGFloat = 10, tile: CGFloat = 512 / 10

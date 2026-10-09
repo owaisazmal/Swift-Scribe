@@ -26,6 +26,7 @@ enum SettingsKey {
     static let defaultTemplate = "defaultTemplate"
     static let defaultPaperColor = "defaultPaperColor"
     static let defaultPageSize = "defaultPageSize"
+    static let darkPaper = "darkPaper"
     static let librarySort = "librarySort"
     static let dailyJournalID = "dailyJournalID"
     static let whiteboardTipSeen = "whiteboardTipSeen"

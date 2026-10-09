@@ -169,7 +169,7 @@ struct PresenterNotesSheet: View {
                             .accessibilityHidden(true)
                     }
                 }
-                .well(in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous), focused: focused)
+                .well(in: RoundedRectangle.plate, focused: focused)
                 .padding(Space.x4)
                 .background(Color.surface)
                 .accessibilityLabel(Text("Notes for page \(number)"))

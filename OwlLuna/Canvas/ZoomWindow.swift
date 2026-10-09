@@ -129,7 +129,7 @@ final class ZoomTargetView: UIView {
         outline.lineWidth = 2
         layer.addSublayer(outline)
 
-        tab.layer.cornerRadius = 8
+        tab.layer.cornerRadius = Radius.plate
         tab.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
         let icon = UIImageView(image: UIImage(systemName: "arrow.up.and.down.and.arrow.left.and.right",
                                               withConfiguration: UIImage.SymbolConfiguration(pointSize: 13, weight: .bold)))
@@ -269,7 +269,8 @@ final class ZoomWindowPanel: UIView {
         for action in Action.allCases {
             var configuration = UIButton.Configuration.plain()
             configuration.image = UIImage(systemName: action.symbol, withConfiguration: UIImage.SymbolConfiguration(pointSize: 17, weight: .medium, scale: .large))
-            configuration.cornerStyle = .capsule
+            configuration.cornerStyle = .fixed
+            configuration.background.cornerRadius = Radius.thumb
             configuration.background.backgroundInsets = NSDirectionalEdgeInsets(top: 3, leading: 3, bottom: 3, trailing: 3)
             let button = UIButton(configuration: configuration, primaryAction: UIAction { [weak self] _ in self?.onAction?(action) })
             button.configurationUpdateHandler = { button in

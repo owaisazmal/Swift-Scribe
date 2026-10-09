@@ -6,7 +6,7 @@ struct SettingsSection<Content: View>: View {
     var note: LocalizedStringKey?
     @ViewBuilder var content: Content
 
-    private let shape = RoundedRectangle(cornerRadius: Radius.control, style: .continuous)
+    private let shape = RoundedRectangle.plate
 
     init(_ title: LocalizedStringKey, note: LocalizedStringKey? = nil, @ViewBuilder content: () -> Content) {
         self.init(title: Text(title), note: note, content: content)
@@ -78,15 +78,15 @@ struct SettingsChoiceRow<Value: Hashable, Options: View>: View {
     @ViewBuilder var options: Options
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
-    private let chip = RoundedRectangle(cornerRadius: 8, style: .continuous)
+    private let chip = RoundedRectangle.plate
 
     var body: some View {
         let layout = dynamicTypeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
                                                          : AnyLayout(HStackLayout(spacing: Space.x3))
         layout {
             Text(title).fixedSize(horizontal: false, vertical: true).frame(maxWidth: .infinity, alignment: .leading)
-            Menu {
-                Picker(title, selection: $selection) { options }
+            OwlLunaMenu(Text(title)) {
+                OwlLunaPicker(selection: $selection) { options }
             } label: {
                 HStack(spacing: Space.x2) {
                     Text(value).multilineTextAlignment(.leading)
@@ -103,7 +103,6 @@ struct SettingsChoiceRow<Value: Hashable, Options: View>: View {
                 .contentShape(Rectangle())
                 .contentShape(.hoverEffect, chip)
             }
-            .menuStyle(.button)
             .buttonStyle(.plain)
             .hoverEffect(.highlight)
             .accessibilityLabel(Text(title))
@@ -187,7 +186,7 @@ struct SettingsRowButtonStyle: ButtonStyle {
         let tint: Color
         let isEnabled: Bool
 
-        private var tile: RoundedRectangle { RoundedRectangle(cornerRadius: 8, style: .continuous) }
+        private let tile = RoundedRectangle.plate
 
         func makeBody(configuration: Configuration) -> some View {
             HStack(spacing: Space.x3) {

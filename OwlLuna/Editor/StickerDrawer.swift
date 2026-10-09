@@ -65,16 +65,14 @@ struct StickerDrawer: View {
             Task { await cutOut(item) }
         }
         .task { await reload() }
-        .alert("No Subject Found", isPresented: Binding(get: { uncut != nil }, set: { if !$0 { uncut = nil } })) {
-            Button("Use Whole Photo") { if let uncut { keepWhole(uncut) } }
+        .notice("No Subject Found", isPresented: Binding(get: { uncut != nil }, set: { if !$0 { uncut = nil } }),
+                message: Text("OwlLuna couldn't find a clear subject to lift out of this photo. You can use the whole photo as a sticker instead.")) {
             Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("OwlLuna couldn't find a clear subject to lift out of this photo. You can use the whole photo as a sticker instead.")
+            Button("Use Whole Photo") { if let uncut { keepWhole(uncut) } }
         }
-        .alert("Something went wrong", isPresented: Binding(get: { failure != nil }, set: { if !$0 { failure = nil } })) {
+        .notice("Something went wrong", isPresented: Binding(get: { failure != nil }, set: { if !$0 { failure = nil } }),
+                message: Text(failure ?? "")) {
             Button("OK", role: .cancel) {}
-        } message: {
-            Text(failure ?? "")
         }
     }
 
@@ -129,8 +127,8 @@ struct StickerDrawer: View {
             }
             .foregroundStyle(Color.ink)
             .frame(maxWidth: .infinity, minHeight: 80)
-            .background(Color.paper, in: RoundedRectangle(cornerRadius: Radius.control))
-            .overlay { RoundedRectangle(cornerRadius: Radius.control).strokeBorder(Color.ink.opacity(0.35), style: StrokeStyle(lineWidth: 1, dash: [5, 4])) }
+            .background(Color.paper, in: RoundedRectangle.plate)
+            .overlay { RoundedRectangle.plate.strokeBorder(Color.ink.opacity(0.35), style: StrokeStyle(lineWidth: 1, dash: [5, 4])) }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -149,13 +147,13 @@ struct StickerDrawer: View {
             OwnStickerImage(sticker: sticker)
                 .frame(maxWidth: 64, maxHeight: 56)
                 .frame(maxWidth: .infinity, minHeight: 80)
-                .background(Color.paper, in: RoundedRectangle(cornerRadius: Radius.control))
-                .overlay { RoundedRectangle(cornerRadius: Radius.control).strokeBorder(Color.hairline) }
+                .background(Color.paper, in: RoundedRectangle.plate)
+                .overlay { RoundedRectangle.plate.strokeBorder(Color.hairline) }
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .hoverEffect(.lift)
-        .contextMenu {
+        .heldMenu(Text("Sticker")) {
             Button(role: .destructive) { remove(sticker) } label: { Label("Delete Sticker", systemImage: "trash") }
         }
         .accessibilityLabel(Text("My sticker \(number)"))
@@ -179,8 +177,8 @@ struct StickerDrawer: View {
                 .aspectRatio(sticker.aspect, contentMode: .fit)
                 .frame(maxWidth: sticker.aspect > 1.2 ? 84 : 56, maxHeight: 56)
                 .frame(maxWidth: .infinity, minHeight: 80)
-                .background(Color.paper, in: RoundedRectangle(cornerRadius: Radius.control))
-                .overlay { RoundedRectangle(cornerRadius: Radius.control).strokeBorder(Color.hairline) }
+                .background(Color.paper, in: RoundedRectangle.plate)
+                .overlay { RoundedRectangle.plate.strokeBorder(Color.hairline) }
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

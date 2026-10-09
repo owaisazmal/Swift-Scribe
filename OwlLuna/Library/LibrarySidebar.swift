@@ -100,21 +100,21 @@ struct LibrarySidebar: View {
         let rows = tree.rows(collapsed: collapsed).compactMap { row in byID[row.id].map { (row: row, folder: $0) } }
         List(selection: $scope) {
             Section {
-                row(String(localized: "All notebooks"), icon: "books.vertical", count: notebooks.count).tag(LibraryScope.all)
-                row(String(localized: "Favourites"), icon: "star", count: counts.favorites).tag(LibraryScope.favorites)
-                row(String(localized: "Recently deleted"), icon: "trash", count: nil, bounces: changes.trashBumps).tag(LibraryScope.trash)
+                row(String(localized: "All notebooks"), icon: "books.vertical", count: notebooks.count).scoped(.all, chosen: scope)
+                row(String(localized: "Favourites"), icon: "star", count: counts.favorites).scoped(.favorites, chosen: scope)
+                row(String(localized: "Recently deleted"), icon: "trash", count: nil, bounces: changes.trashBumps).scoped(.trash, chosen: scope)
             }
             Section {
                 ForEach(rows, id: \.row.id) { row, folder in
                     folderRow(folder, row: row, tree: tree, count: tree.subtree(folder.id).reduce(0) { $0 + (counts.byFolder[$1] ?? 0) })
-                        .tag(LibraryScope.folder(folder.id))
+                        .scoped(.folder(folder.id), chosen: scope)
                         .dropDestination(for: NotebookReference.self) { items, _ in
                             let ids = Set(items.map(\.id))
                             let moved = notebooks.filter { ids.contains($0.id) }
                             changes.move(moved, to: folder, in: store, undoManager: undoManager)
                             return !moved.isEmpty
                         }
-                        .contextMenu { folderMenu(folder, tree: tree) }
+                        .heldMenu(Text(folder.name)) { folderMenu(folder, tree: tree) }
                 }
                 .onMove { store.moveFolders(rows.map(\.folder), from: $0, to: $1) }
                 Button { folderName = ""; creatingInside = nil; creatingFolder = true } label: {
@@ -132,8 +132,8 @@ struct LibrarySidebar: View {
                 Section {
                     ForEach(store.smartShelves) { shelf in
                         smartRow(shelf)
-                            .tag(LibraryScope.smart(shelf.id))
-                            .contextMenu { smartMenu(shelf, tags: tags) }
+                            .scoped(.smart(shelf.id), chosen: scope)
+                            .heldMenu(Text(shelf.name)) { smartMenu(shelf, tags: tags) }
                     }
                     if !tags.isEmpty {
                         Button { shelfDraft = SmartShelfDraft(tags: tags.map(\.name)) } label: {
@@ -153,8 +153,8 @@ struct LibrarySidebar: View {
                 Section {
                     ForEach(tags) { tag in
                         tagRow(tag)
-                            .tag(LibraryScope.tag(tag.name))
-                            .contextMenu { tagMenu(tag) }
+                            .scoped(.tag(tag.name), chosen: scope)
+                            .heldMenu(Text(tag.name)) { tagMenu(tag) }
                     }
                 } header: {
                     Text("Tags").metaStyle(.footnote)
@@ -175,8 +175,9 @@ struct LibrarySidebar: View {
             Button { showingSettings = true } label: { Label("Settings", systemImage: "gearshape") }
                 .keyboardShortcut(",", modifiers: .command)
         })
-        .alert("New Folder", isPresented: $creatingFolder) {
+        .notice("New Folder", isPresented: $creatingFolder, message: creatingInside.map { Text("Inside \($0.name)") }) {
             TextField("Name", text: $folderName)
+        } actions: {
             Button("Cancel", role: .cancel) {}
             Button("Create") {
                 let cloth = creatingInside?.cloth ?? ClothColor.allCases[folders.count % ClothColor.allCases.count]
@@ -185,33 +186,30 @@ struct LibrarySidebar: View {
                     scope = .folder(folder.id)
                 }
             }
-        } message: {
-            if let creatingInside { Text("Inside \(creatingInside.name)") }
         }
-        .alert("Rename Folder", isPresented: Binding(get: { editingFolder != nil }, set: { if !$0 { editingFolder = nil } })) {
+        .notice("Rename Folder", isPresented: Binding(get: { editingFolder != nil }, set: { if !$0 { editingFolder = nil } })) {
             TextField("Name", text: $folderName)
+        } actions: {
             Button("Cancel", role: .cancel) {}
             Button("Save") { if let editingFolder { store.renameFolder(editingFolder, to: folderName) } }
         }
-        .alert("Rename Tag", isPresented: Binding(get: { renamingTag != nil }, set: { if !$0 { renamingTag = nil } })) {
+        .notice("Rename Tag", isPresented: Binding(get: { renamingTag != nil }, set: { if !$0 { renamingTag = nil } }),
+                message: Text("Every notebook and page carrying it takes the new name.")) {
             TextField("Name", text: $tagName)
+        } actions: {
             Button("Cancel", role: .cancel) {}
             Button("Save") {
                 if let old = renamingTag, let name = store.renameTag(old, to: tagName), scope == .tag(old) { scope = .tag(name) }
             }
-        } message: {
-            Text("Every notebook and page carrying it takes the new name.")
         }
-        .alert(removingTag.map { String(localized: "Remove “\($0)” from every notebook and page?") } ?? "",
-               isPresented: Binding(get: { removingTag != nil }, set: { if !$0 { removingTag = nil } })) {
+        .notice(Text(removingTag.map { String(localized: "Remove “\($0)” from every notebook and page?") } ?? ""),
+                isPresented: Binding(get: { removingTag != nil }, set: { if !$0 { removingTag = nil } }), message: Text("This can't be undone.")) {
             Button("Cancel", role: .cancel) {}
             Button("Remove Tag", role: .destructive) {
                 guard let tag = removingTag else { return }
                 if scope == .tag(tag) { scope = .all }
                 store.renameTag(tag, to: nil)
             }
-        } message: {
-            Text("This can't be undone.")
         }
         .sheet(item: $shelfDraft) { draft in
             SmartShelfEditor(draft: draft) { name, tags, match in
@@ -221,6 +219,7 @@ struct LibrarySidebar: View {
                     scope = .smart(made.id)
                 }
             }
+            .presentationCornerRadius(Radius.sheet)
         }
     }
 
@@ -317,7 +316,7 @@ struct LibrarySidebar: View {
         }
         let places = folders.filter { $0.id != folder.parentID && tree.canMove(folder.id, into: $0.id) }
         if folder.parentID != nil || !places.isEmpty {
-            Menu {
+            OwlLunaMenu {
                 if folder.parentID != nil {
                     Button { store.moveFolder(folder, into: nil) } label: { Label("Top Level", systemImage: "arrow.up.to.line") }
                 }
@@ -327,7 +326,7 @@ struct LibrarySidebar: View {
             } label: { Label("Move Into", systemImage: "arrow.turn.down.right") }
         }
         Button { store.sortFoldersByName(folders) } label: { Label("Sort Shelves A to Z", systemImage: "textformat") }
-        Menu {
+        OwlLunaMenu {
             ForEach(ClothColor.allCases) { cloth in
                 Button { store.setCloth(cloth, for: folder) } label: {
                     Label(cloth.displayName, systemImage: folder.cloth == cloth ? "checkmark" : "circle.fill")
@@ -338,6 +337,13 @@ struct LibrarySidebar: View {
             if scope == .folder(folder.id) { scope = .all }
             store.deleteFolder(folder)
         } label: { Label("Delete Folder", systemImage: "trash") }
+    }
+}
+
+private extension View {
+    /// Tags a row with its scope, and cuts the highlight of the one on show as square as the controls.
+    func scoped(_ value: LibraryScope, chosen: LibraryScope?) -> some View {
+        tag(value).listRowBackground(RoundedRectangle.plate.fill(value == chosen ? Color.well : .clear).padding(.horizontal, Space.x2))
     }
 }
 
@@ -357,7 +363,7 @@ private struct SidebarHeader<Buttons: View>: ViewModifier {
                             .lineLimit(1)
                             .accessibilityAddTraits(.isHeader)
                         Spacer(minLength: Space.x2)
-                        buttons.buttonStyle(.boardIcon)
+                        buttons.buttonStyle(.plateIcon)
                     }
                     .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                     .padding(.leading, Space.x5)
@@ -369,7 +375,7 @@ private struct SidebarHeader<Buttons: View>: ViewModifier {
             content
                 .barGround(.surface)
                 .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) { buttons.buttonStyle(.boardIcon) }
+                    ToolbarItem(placement: .topBarTrailing) { buttons.buttonStyle(.plateIcon) }
                 }
         }
     }

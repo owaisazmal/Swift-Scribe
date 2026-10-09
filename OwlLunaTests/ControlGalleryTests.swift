@@ -22,7 +22,7 @@ private struct ControlGallery: View {
                 Spacer()
                 OwlLunaSegmentedPicker("Show", selection: $tab, options: [0, 1], inBar: true) { Text($0 == 0 ? "Pages" : "Outline") }.fixedSize()
                 Spacer()
-                Button { } label: { Label("Add Page", systemImage: "plus") }.buttonStyle(.boardIcon)
+                Button { } label: { Label("Add Page", systemImage: "plus") }.buttonStyle(.plateIcon)
                 Button("Done") { }.buttonStyle(.owlLuna(.primary, inBar: true))
             }
             .padding(Space.x4)
@@ -31,11 +31,13 @@ private struct ControlGallery: View {
             caption("Library toolbar, on Paper")
             HStack(spacing: Space.x3) {
                 Spacer()
-                BarGroup {
+                HStack(spacing: Space.x2) {
                     Button { } label: { Label("Sort", systemImage: "arrow.up.arrow.down") }
-                    Button { } label: { Label("New", systemImage: "plus") }
-                    Button("Select") { }.buttonStyle(.plain).font(.body.weight(.semibold)).foregroundStyle(Color.ink).padding(.horizontal, Space.x3).frame(minHeight: 44)
+                    Button("Select") { }
+                    Button { } label: { Label("New", systemImage: "plus") }.buttonStyle(.owlLuna(.primary, inBar: true))
                 }
+                .buttonStyle(.owlLuna(.secondary, inBar: true))
+                .labelStyle(.titleAndIcon)
                 OwlLunaSearchField("Search", text: $search, focus: $searchFocus).frame(width: 260)
             }
             .padding(Space.x4)
@@ -43,7 +45,7 @@ private struct ControlGallery: View {
 
             caption("Editor bar, on Desk")
             HStack(spacing: Space.x3) {
-                Button { } label: { Label("Library", systemImage: "chevron.backward") }.buttonStyle(.boardIcon)
+                Button { } label: { Label("Library", systemImage: "chevron.backward") }.buttonStyle(.plateIcon)
                 Spacer()
                 Text("Physics II 3").font(.headline).foregroundStyle(Color.ink)
                 Spacer()
@@ -65,11 +67,11 @@ private struct ControlGallery: View {
             caption("Sheet, on Surface")
             VStack(alignment: .leading, spacing: Space.x4) {
                 HStack {
-                    Button("Cancel") { }.buttonStyle(.owlLuna)
+                    Button("Cancel") { }.buttonStyle(.owlLuna(.secondary, inBar: true))
                     Spacer()
                     Text("New Notebook").font(.headline).foregroundStyle(Color.ink)
                     Spacer()
-                    Button("Create") { }.buttonStyle(.owlLuna(.primary))
+                    Button("Create") { }.buttonStyle(.owlLuna(.primary, inBar: true))
                 }
                 TextField("Title", text: $typed).owlLunaField(focused: true)
                 TextField("Name", text: .constant(""), prompt: Text("Optional").foregroundStyle(Color.textSecondary)).owlLunaField()
@@ -98,12 +100,12 @@ private struct ControlGallery: View {
                 Text("3 of 12").font(.subheadline.weight(.semibold).monospacedDigit()).foregroundStyle(Color.ink).padding(.horizontal, Space.x3)
                 Button { } label: { Label("Previous", systemImage: "chevron.up") }
                 Button { } label: { Label("Next", systemImage: "chevron.down") }
-                Button("Done") { }.buttonStyle(.owlLuna(.primary, compact: true)).padding(.leading, Space.x2)
+                Button("Done") { }.buttonStyle(.owlLuna(.primary, compact: true, inBar: true)).padding(.leading, Space.x2)
             }
             .buttonStyle(.barIcon)
             .padding(.horizontal, Space.x2)
             .padding(.vertical, Space.x1)
-            .board(in: Capsule())
+            .board(in: RoundedRectangle.bar)
             .frame(maxWidth: .infinity)
             .padding(Space.x6)
             .background(Color.white)

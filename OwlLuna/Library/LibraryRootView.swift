@@ -90,14 +90,15 @@ struct LibraryRootView: View {
             NewNotebookView(folder: folder) { id in
                 openNotebook(id)
             }
+            .presentationCornerRadius(Radius.sheet)
         }
         .sheet(isPresented: $showingSettings) {
             OwlLunaSettingsView()
+                .presentationCornerRadius(Radius.sheet)
         }
-        .alert("The note couldn't be created", isPresented: Binding(get: { quickNoteError != nil }, set: { if !$0 { quickNoteError = nil } })) {
+        .notice("The note couldn't be created", isPresented: Binding(get: { quickNoteError != nil }, set: { if !$0 { quickNoteError = nil } }),
+                message: Text(quickNoteError ?? "")) {
             Button("OK", role: .cancel) {}
-        } message: {
-            Text(quickNoteError ?? "")
         }
         .background(SceneReader {
             sceneID = $0
@@ -428,7 +429,7 @@ private struct SidebarAnchor: UIViewRepresentable {
     func updateUIView(_ view: UIView, context: Context) { control.anchor = view }
 }
 
-/// On iPadOS 26 and later the system's sidebar button is a glass bubble; this puts a board one in its place.
+/// On iPadOS 26 and later the system's sidebar button is a glass bubble; this puts a plate in its place.
 private struct BoardSidebarToggle: ViewModifier {
     let shows: Bool
     let title: LocalizedStringKey
@@ -443,7 +444,7 @@ private struct BoardSidebarToggle: ViewModifier {
                     if shows {
                         ToolbarItem(placement: placement) {
                             Button(action: action) { Label(title, systemImage: "sidebar.leading") }
-                                .buttonStyle(.boardIcon)
+                                .buttonStyle(.plateIcon)
                                 .accessibilityIdentifier("ToggleSidebar")
                         }
                         .boardBackground()

@@ -207,7 +207,7 @@ struct LibrarySlipView: View {
         .padding(.trailing, Space.x1)
         .padding(.vertical, stacked ? Space.x3 : Space.x1)
         .frame(maxWidth: 520)
-        .board(in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
+        .board(in: RoundedRectangle.bar)
         .padding(.horizontal, Space.x4)
         .accessibilityElement(children: .contain)
     }

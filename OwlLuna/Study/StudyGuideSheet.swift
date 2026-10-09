@@ -91,8 +91,8 @@ struct StudyGuideSheet: View {
     // MARK: What to read
 
     private var scopeMenu: some View {
-        Menu {
-            Picker("Write From", selection: $scope) {
+        OwlLunaMenu(Text("Write From")) {
+            OwlLunaPicker(selection: $scope) {
                 Text("Whole Notebook").tag(StudyScope.notebook)
                 if let page = currentPage { Text("Page \(session.currentPage + 1)").tag(StudyScope.page(page.id)) }
                 ForEach(Array(session.recorder.recordings.enumerated()), id: \.element.id) { index, recording in
@@ -105,7 +105,6 @@ struct StudyGuideSheet: View {
                 Image(systemName: "chevron.down").font(.caption.weight(.semibold)).accessibilityHidden(true)
             }
         }
-        .menuStyle(.button)
         .buttonStyle(.owlLuna(.secondary, inBar: true))
         .accessibilityLabel(Text("Write from: \(scopeName)"))
         .accessibilityIdentifier("guide.scope")
@@ -439,7 +438,7 @@ private struct QuestionCard: View {
 private extension View {
     /// A sheet of paper lying on the surface: the summary is written on one.
     func leaf() -> some View {
-        let shape = RoundedRectangle(cornerRadius: Radius.control, style: .continuous)
+        let shape = RoundedRectangle.plate
         return background { shape.fill(Color.paper).overlay { shape.strokeBorder(Color.hairline, lineWidth: 1) } }
     }
 }

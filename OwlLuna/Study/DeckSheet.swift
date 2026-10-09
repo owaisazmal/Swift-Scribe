@@ -43,7 +43,7 @@ struct DeckSheet: View {
                 if canChange {
                     ToolbarItem(placement: .primaryAction) {
                         Button { draft = CardDraft(pageID: currentPageID) } label: { Label("New Flashcard", systemImage: "plus") }
-                            .buttonStyle(.boardIcon)
+                            .buttonStyle(.plateIcon)
                             .accessibilityIdentifier("deck.new")
                     }
                     .boardBackground()
@@ -51,17 +51,16 @@ struct DeckSheet: View {
             }
         }
         .presentationBackground(Color.surface)
-        .sheet(item: $draft) { draft in CardComposer(notebook: notebook, draft: draft) }
+        .sheet(item: $draft) { draft in CardComposer(notebook: notebook, draft: draft).presentationCornerRadius(Radius.sheet) }
         .fullScreenCover(item: $reviewing) { deck in
             CardReview(due: deck.due, all: deck.all) { _, page in
                 dismiss()
                 if let index = session.document.index(of: page) { session.go(to: index) }
             }
         }
-        .alert("Something went wrong", isPresented: Binding(get: { failure != nil }, set: { if !$0 { failure = nil } })) {
+        .notice("Something went wrong", isPresented: Binding(get: { failure != nil }, set: { if !$0 { failure = nil } }),
+                message: Text(failure ?? "")) {
             Button("OK", role: .cancel) {}
-        } message: {
-            Text(failure ?? "")
         }
     }
 
@@ -98,7 +97,7 @@ struct DeckSheet: View {
                             Button(role: .destructive) { library.remove([card.id], from: notebook) } label: { Label("Delete", systemImage: "trash") }
                         }
                     }
-                    .contextMenu {
+                    .heldMenu(Text("Flashcard")) {
                         if let page = card.pageID, let index = session.document.index(of: page) {
                             Button {
                                 dismiss()
@@ -289,7 +288,7 @@ struct CardComposer: View {
                     HStack {
                         Rectangle().fill(Color.hairline).frame(height: 1)
                         Button { draft.swapSides() } label: { Label("Swap Question and Answer", systemImage: "arrow.up.arrow.down") }
-                            .buttonStyle(.boardIcon)
+                            .buttonStyle(.plateIcon)
                             .accessibilityIdentifier("composer.swap")
                         Rectangle().fill(Color.hairline).frame(height: 1)
                     }
@@ -321,10 +320,9 @@ struct CardComposer: View {
         .task(id: draft.front.imageName) { frontImage = await library.image(draft.front.imageName, in: notebook) }
         .task(id: draft.back.imageName) { backImage = await library.image(draft.back.imageName, in: notebook) }
         .onAppear { if draft.card == nil { focus = draft.front.isEmpty ? .front : .back } }
-        .alert("The card couldn't be saved", isPresented: Binding(get: { failure != nil }, set: { if !$0 { failure = nil } })) {
+        .notice("The card couldn't be saved", isPresented: Binding(get: { failure != nil }, set: { if !$0 { failure = nil } }),
+                message: Text(failure ?? "")) {
             Button("OK", role: .cancel) {}
-        } message: {
-            Text(failure ?? "")
         }
     }
 

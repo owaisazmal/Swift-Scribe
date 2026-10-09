@@ -126,6 +126,7 @@ private struct PageHitCard: View {
     let action: () -> Void
     @Environment(LibraryStore.self) private var store
     @State private var image: UIImage?
+    @PaperNight private var night
 
     var body: some View {
         Button(action: action) {
@@ -134,7 +135,7 @@ private struct PageHitCard: View {
                     if let image {
                         Image(uiImage: image).resizable()
                     } else {
-                        Rectangle().fill(Color(uiColor: PageRenderer.paperColor(hit.page.effectivePaperColor)))
+                        Rectangle().fill(Color(uiColor: hit.page.paperShown(night: night)))
                     }
                 }
                 .aspectRatio(hit.page.shownSize.width / max(hit.page.shownSize.height, 1), contentMode: .fit)
@@ -151,16 +152,16 @@ private struct PageHitCard: View {
                 .frame(width: 200, alignment: .leading)
             }
             .padding(Space.x3)
-            .background(Color.surface, in: RoundedRectangle(cornerRadius: Radius.control))
-            .overlay { RoundedRectangle(cornerRadius: Radius.control).strokeBorder(Color.hairline) }
+            .background(Color.surface, in: RoundedRectangle.plate)
+            .overlay { RoundedRectangle.plate.strokeBorder(Color.hairline) }
             .zoomSource(id: "hit-\(hit.id)", in: zoomNamespace)
         }
         .buttonStyle(.plain)
         .hoverEffect(.lift)
         .accessibilityElement(children: .ignore)
         .accessibilityAddTraits(.isButton)
-        .task(id: hit.page.thumbnailKey) {
-            image = await PageThumbnailer.thumbnail(package: NotebookPackage(root: store.root, id: hit.notebookID), page: hit.page)
+        .task(id: "\(hit.page.thumbnailKey)-\(night)") {
+            image = await PageThumbnailer.thumbnail(package: NotebookPackage(root: store.root, id: hit.notebookID), page: hit.page, night: night)
         }
     }
 }

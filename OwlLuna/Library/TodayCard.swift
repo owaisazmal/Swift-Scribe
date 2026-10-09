@@ -88,10 +88,9 @@ struct DeskCards: View {
             StartJournalCard(today: today, zoomID: "today-\(newJournalID.uuidString)", zoomNamespace: zoomNamespace, asRow: asRows,
                              action: startJournal) { promptHidden = true }
                 .keepsDayCurrent($today, scenePhase: scenePhase)
-                .alert("The journal couldn't be created", isPresented: Binding(get: { failure != nil }, set: { if !$0 { failure = nil } })) {
+                .notice("The journal couldn't be created", isPresented: Binding(get: { failure != nil }, set: { if !$0 { failure = nil } }),
+                        message: Text(failure ?? "")) {
                     Button("OK", role: .cancel) {}
-                } message: {
-                    Text(failure ?? "")
                 }
         }
     }
@@ -173,6 +172,7 @@ struct TodayCard: View {
     @Environment(LibraryStore.self) private var store
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var image: UIImage?
+    @PaperNight private var night
 
     private var title: String { record.title.isEmpty ? String(localized: "Untitled") : record.title }
     private var todayIndex: Int? { manifest?.pages.lastIndex { $0.day == today } }
@@ -214,7 +214,7 @@ struct TodayCard: View {
                     .font(.body.weight(.semibold))
                     .foregroundStyle(Color.accentColor)
                     .frame(width: 36, height: 36)
-                    .background(Color.accentColor.opacity(0.12), in: Circle())
+                    .background(Color.accentColor.opacity(0.12), in: RoundedRectangle.plate)
                     .contentTransition(.symbolEffect(.replace))
             }
         }
@@ -226,14 +226,14 @@ struct TodayCard: View {
         .accessibilityHint(Text("Opens the notebook at today's page"))
         .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier("desk.today")
-        .task(id: "\(preview?.id.uuidString ?? "")|\(preview?.thumbnailKey ?? "")|\(record.isLocked)") { await loadImage(preview) }
+        .task(id: "\(preview?.id.uuidString ?? "")|\(preview?.thumbnailKey ?? "")|\(record.isLocked)|\(night)") { await loadImage(preview) }
     }
 
     private func loadImage(_ page: NotebookPage?) async {
         guard let page else { return }
         let loaded = todayIndex == nil || record.isLocked
-            ? await BlankPages.image(page)
-            : await PageThumbnailer.thumbnail(package: NotebookPackage(root: store.root, id: record.id), page: page)
+            ? await BlankPages.image(page, night: night)
+            : await PageThumbnailer.thumbnail(package: NotebookPackage(root: store.root, id: record.id), page: page, night: night)
         guard !Task.isCancelled, let loaded else { return }
         withAnimation(Motion.adaptive(Motion.quick, reduceMotion: reduceMotion)) { image = loaded }
     }
@@ -248,6 +248,7 @@ struct StartJournalCard: View {
     let onDismiss: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var image: UIImage?
+    @PaperNight private var night
 
     private var preview: NotebookPage {
         var page = NotebookPage.template(NotebookStarter.journal.template, color: NotebookStarter.journal.paperColor, size: .letter)
@@ -272,7 +273,7 @@ struct StartJournalCard: View {
                     .font(.body.weight(.semibold))
                     .foregroundStyle(Color.accentColor)
                     .frame(width: 36, height: 36)
-                    .overlay { Circle().strokeBorder(Color.accentColor.opacity(0.35), lineWidth: 1) }
+                    .overlay { RoundedRectangle.plate.strokeBorder(Color.accentColor.opacity(0.35), lineWidth: 1) }
             }
         }
         .buttonStyle(DeskCardButtonStyle())
@@ -282,11 +283,11 @@ struct StartJournalCard: View {
         .accessibilityHint(Text("Creates a journal and opens today's page"))
         .accessibilityAddTraits(.isButton)
         .accessibilityAction(named: Text("Don't Show Again"), onDismiss)
-        .contextMenu {
+        .heldMenu(Text("Daily Journal")) {
             Button(action: onDismiss) { Label("Don't Show Again", systemImage: "eye.slash") }
         }
-        .task(id: preview.thumbnailKey) {
-            let loaded = await BlankPages.image(preview)
+        .task(id: "\(preview.thumbnailKey)|\(night)") {
+            let loaded = await BlankPages.image(preview, night: night)
             withAnimation(Motion.adaptive(Motion.quick, reduceMotion: reduceMotion)) { image = loaded }
         }
     }
@@ -316,7 +317,7 @@ struct DeskCardLayout<Thumbnail: View, Content: View, Accessory: View>: View {
         .frame(maxWidth: asRow ? nil : .infinity, maxHeight: asRow ? nil : .infinity, alignment: .leading)
         .background {
             if !asRow {
-                let shape = RoundedRectangle(cornerRadius: Radius.control)
+                let shape = RoundedRectangle.plate
                 if quiet {
                     shape.strokeBorder(Color.hairline, style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
                 } else {
@@ -324,7 +325,7 @@ struct DeskCardLayout<Thumbnail: View, Content: View, Accessory: View>: View {
                 }
             }
         }
-        .contentShape(RoundedRectangle(cornerRadius: Radius.control))
+        .contentShape(RoundedRectangle.plate)
     }
 }
 
@@ -349,6 +350,7 @@ struct DeskPage: View {
     let page: NotebookPage?
     var ribbon: ClothColor?
     var width: CGFloat = 56
+    @PaperNight private var night
 
     var body: some View {
         let aspect = page.map { $0.shownSize.width / max($0.shownSize.height, 1) } ?? PageSize.letter.points.width / PageSize.letter.points.height
@@ -358,7 +360,7 @@ struct DeskPage: View {
             if let image {
                 Image(uiImage: image).resizable().aspectRatio(contentMode: .fill).transition(.opacity)
             } else {
-                Color(uiColor: PageRenderer.paperColor(page?.effectivePaperColor ?? .ivory))
+                Color(uiColor: page?.paperShown(night: night) ?? PageRenderer.paperColor(.ivory, night: night))
             }
         }
         .frame(width: pageWidth, height: height)
@@ -405,11 +407,11 @@ struct DeskCardButtonStyle: ButtonStyle {
 enum BlankPages {
     private static let images = LRUCache<PageThumbnailer.SharedUIImage>(capacity: 8)
 
-    static func image(_ page: NotebookPage) async -> UIImage? {
-        let key = page.appearanceKey
+    static func image(_ page: NotebookPage, night: Bool = false) async -> UIImage? {
+        let key = PageThumbnailer.key(for: page, night: night) + page.appearanceKey
         if let hit = images.value(key, create: { nil }) { return hit.image }
         let image = await Task.detached(priority: .utility) {
-            PageThumbnailer.render(page: page, ink: PKDrawing(), assets: FileManager.default.temporaryDirectory)
+            PageThumbnailer.render(page: page, ink: PKDrawing(), assets: FileManager.default.temporaryDirectory, night: night)
         }.value
         return images.value(key) { PageThumbnailer.SharedUIImage(image: image) }?.image
     }

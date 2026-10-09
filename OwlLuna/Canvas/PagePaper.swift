@@ -68,13 +68,15 @@ final class PagePaperView: UIView {
 
     private let page: NotebookPage
     private let assets: URL
+    private let night: Bool
     private var unit: CGFloat = 0
     private var tiles: [Key: Tile] = [:]
     private var shown: PaperTiles?
 
-    init(page: NotebookPage, assets: URL) {
+    init(page: NotebookPage, assets: URL, night: Bool = false) {
         self.page = page
         self.assets = assets
+        self.night = night
         super.init(frame: .zero)
         isUserInteractionEnabled = false
         isAccessibilityElement = false
@@ -132,9 +134,9 @@ final class PagePaperView: UIView {
         layer.addSublayer(tile.layer)
         tiles[key] = tile
         let work = BlockOperation()
-        work.addExecutionBlock { [weak self, weak work, page, assets, unit] in
+        work.addExecutionBlock { [weak self, weak work, page, assets, unit, night] in
             guard let work, !work.isCancelled else { return }
-            let image = PagePaperView.image(of: page, assets: assets, unit: unit, density: key.density, pixels: pixels).map(SharedImage.init)
+            let image = PagePaperView.image(of: page, assets: assets, unit: unit, density: key.density, pixels: pixels, night: night).map(SharedImage.init)
             DispatchQueue.main.async { self?.show(image, at: key, from: work) }
         }
         tile.work = work
@@ -159,17 +161,18 @@ final class PagePaperView: UIView {
     }
 
     /// One piece as an opaque image. Core Graphics only, so it is safe on any thread and touches no layer.
-    nonisolated static func image(of page: NotebookPage, assets: URL, unit: CGFloat, density: CGFloat, pixels: CGRect) -> CGImage? {
+    nonisolated static func image(of page: NotebookPage, assets: URL, unit: CGFloat, density: CGFloat, pixels: CGRect, night: Bool = false) -> CGImage? {
         let width = Int(pixels.width), height = Int(pixels.height)
         let format = CGImageAlphaInfo.noneSkipFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
         guard width > 0, height > 0, let space = CGColorSpace(name: CGColorSpace.sRGB),
               let ctx = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0, space: space, bitmapInfo: format)
         else { return nil }
-        ctx.setFillColor(PageRenderer.paperColor(page.effectivePaperColor).cgColor)
+        ctx.setFillColor(PageRenderer.paperColor(page.effectivePaperColor, night: page.turnsDark(night)).cgColor)
         ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
         ctx.translateBy(x: -pixels.minX, y: pixels.maxY)
         ctx.scaleBy(x: density, y: -density)
-        PageRenderer.drawBackground(page, assets: assets, in: ctx, size: CGSize(width: page.size.width * unit, height: page.size.height * unit), items: false)
+        PageRenderer.drawBackground(page, assets: assets, in: ctx, size: CGSize(width: page.size.width * unit, height: page.size.height * unit), items: false,
+                                    night: night)
         return ctx.makeImage()
     }
 }

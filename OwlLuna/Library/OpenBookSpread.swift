@@ -12,6 +12,7 @@ struct OpenBookSpread: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @PaperNight private var night
     @State private var pages: Pages?
     @State private var currentImage: UIImage?
     @State private var previousImage: UIImage?
@@ -51,7 +52,7 @@ struct OpenBookSpread: View {
         .accessibilityLabel(Text("Continue writing \(title), page \(pageNumber) of \(record.pageCount)"))
         .accessibilityHint(Text("Opens at this page"))
         .accessibilityAddTraits(.isButton)
-        .task(id: "\(record.id)-\(record.currentPage)-\(record.modifiedAt.timeIntervalSince1970)") { await load() }
+        .task(id: "\(record.id)-\(record.currentPage)-\(record.modifiedAt.timeIntervalSince1970)-\(night)") { await load() }
     }
 
     // MARK: The book
@@ -112,7 +113,7 @@ struct OpenBookSpread: View {
 
     /// The page's own paper until its thumbnail arrives; paper never inverts, so nothing flashes in dark mode.
     private func placeholder(_ page: NotebookPage?) -> Color {
-        page.map { Color(uiColor: PageRenderer.paperColor($0.effectivePaperColor)) } ?? Color.surface
+        page.map { Color(uiColor: $0.paperShown(night: night)) } ?? Color.surface
     }
 
     /// The seam, shaded where the pages curve into it; a plain rule with Increase Contrast.
@@ -186,8 +187,8 @@ struct OpenBookSpread: View {
         let index = min(record.currentPage, manifest.pages.count - 1)
         let loaded = Pages(current: manifest.pages[index], previous: index > 0 ? manifest.pages[index - 1] : nil)
         if loaded != pages { pages = loaded }
-        async let current = PageThumbnailer.thumbnail(package: package, page: loaded.current)
-        async let previous = Self.thumbnail(package: package, page: loaded.previous)
+        async let current = PageThumbnailer.thumbnail(package: package, page: loaded.current, night: night)
+        async let previous = Self.thumbnail(package: package, page: loaded.previous, night: night)
         let images = await (current, previous)
         guard !Task.isCancelled else { return }
         withAnimation(Motion.adaptive(Motion.quick, reduceMotion: reduceMotion)) {
@@ -196,9 +197,9 @@ struct OpenBookSpread: View {
         }
     }
 
-    private static func thumbnail(package: NotebookPackage, page: NotebookPage?) async -> UIImage? {
+    private static func thumbnail(package: NotebookPackage, page: NotebookPage?, night: Bool) async -> UIImage? {
         guard let page else { return nil }
-        return await PageThumbnailer.thumbnail(package: package, page: page)
+        return await PageThumbnailer.thumbnail(package: package, page: page, night: night)
     }
 }
 

@@ -180,7 +180,7 @@ final class InkLassoOverlay: UIView {
         if let selectionBounds {
             let rect = CGRect(x: selectionBounds.minX * scale, y: selectionBounds.minY * scale, width: selectionBounds.width * scale, height: selectionBounds.height * scale)
                 .insetBy(dx: -8, dy: -8).offsetBy(dx: drag.width * scale, dy: drag.height * scale)
-            box.path = UIBezierPath(roundedRect: rect, cornerRadius: 6).cgPath
+            box.path = UIBezierPath(roundedRect: rect, cornerRadius: Radius.plate).cgPath
         } else {
             box.path = nil
         }

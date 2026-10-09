@@ -120,7 +120,7 @@ struct PenRoll: View {
 
     static let height: CGFloat = 88
     private static let pocket: CGFloat = 30
-    private static let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+    private static let shape = RoundedRectangle.plate
 
     var body: some View {
         let kinds = ToolPreset.kinds

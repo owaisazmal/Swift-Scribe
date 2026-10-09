@@ -202,6 +202,7 @@ private struct WritingCalendarPresenter: ViewModifier {
                 chosen = choice
                 isPresented = false
             }
+            .presentationCornerRadius(Radius.sheet)
         }
     }
 

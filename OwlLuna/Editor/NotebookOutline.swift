@@ -141,8 +141,9 @@ struct NotebookOutline: View {
             guard !pdfFiles.isEmpty else { contents = []; return }
             contents = await Task.detached(priority: .userInitiated) { PDFOutlineReader.entries(pages: pages, assets: assets) }.value
         }
-        .alert("Name Bookmark", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
+        .notice("Name Bookmark", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
             TextField("Name", text: $name)
+        } actions: {
             Button("Cancel", role: .cancel) {}
             Button("Save") { if let renaming { document.setBookmark(name, forPage: renaming) } }
         }
@@ -169,7 +170,7 @@ struct NotebookOutline: View {
                 Button { name = page.bookmark ?? ""; renaming = page.id } label: { Label("Rename", systemImage: "pencil") }
             }
         }
-        .contextMenu {
+        .heldMenu(Text("Bookmark"), when: !document.isReadOnly) {
             if !document.isReadOnly {
                 Button { name = page.bookmark ?? ""; renaming = page.id } label: { Label("Rename…", systemImage: "pencil") }
                 Button(role: .destructive) { document.setBookmark(nil, forPage: page.id) } label: { Label("Remove Bookmark", systemImage: "bookmark.slash") }

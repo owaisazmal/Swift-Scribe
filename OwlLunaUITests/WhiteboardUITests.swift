@@ -44,11 +44,11 @@ final class WhiteboardUITests: XCTestCase {
         XCTAssertTrue(app.buttons["editor.board.tip.guide"].waitForExistence(timeout: 5), "the first whiteboard comes with a tip")
         attach(app, "board-tip")
         app.buttons["editor.board.tip.guide"].tap()
-        XCTAssertTrue(app.buttons["editor.board.guide.done"].waitForExistence(timeout: 5), "the guide")
+        XCTAssertTrue(app.buttons["panel.done"].waitForExistence(timeout: 5), "the guide")
         XCTAssertTrue(app.staticTexts["Whiteboard Guide"].exists)
         attach(app, "board-guide")
         try audit(app, [.contrast, .elementDetection, .hitRegion, .sufficientElementDescription], screen: "whiteboard guide", modal: true, popover: true)
-        app.buttons["editor.board.guide.done"].tap()
+        app.buttons["panel.done"].tap()
         app.buttons["editor.board.tip.done"].tap()
         XCTAssertTrue(app.buttons["editor.board.tip.done"].waitForNonExistence(timeout: 5), "the tip is put away for good")
         // The board's own controls are behind one button in the bar, and nothing stands over the board.

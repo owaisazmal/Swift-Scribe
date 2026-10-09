@@ -10,13 +10,21 @@ enum PageThumbnailer {
 
     struct SharedUIImage: @unchecked Sendable { let image: UIImage }
 
-    static func cached(package: NotebookPackage, page: NotebookPage) -> UIImage? {
-        memory.value(package.thumbURL(page.id, key: page.thumbnailKey).path(percentEncoded: false)) { nil }?.image
+    /// Light paper shown dark has a thumbnail of its own, beside the one in the paper's colour.
+    static func key(for page: NotebookPage, night: Bool) -> String {
+        page.turnsDark(night) ? page.thumbnailKey + nightSuffix : page.thumbnailKey
+    }
+
+    static let nightSuffix = "-night"
+
+    static func cached(package: NotebookPackage, page: NotebookPage, night: Bool = false) -> UIImage? {
+        memory.value(package.thumbURL(page.id, key: key(for: page, night: night)).path(percentEncoded: false)) { nil }?.image
     }
 
     /// Thumbnail of the saved page (its manifest ink hash). For unsaved ink, use `render(page:ink:assets:)`.
-    static func thumbnail(package: NotebookPackage, page: NotebookPage) async -> UIImage? {
-        let file = package.thumbURL(page.id, key: page.thumbnailKey)
+    static func thumbnail(package: NotebookPackage, page: NotebookPage, night: Bool = false) async -> UIImage? {
+        let name = key(for: page, night: night)
+        let file = package.thumbURL(page.id, key: name)
         let key = file.path(percentEncoded: false)
         if let hit = memory.value(key, create: { nil }) { return hit.image }
         let assets = package.assetsDirectory
@@ -27,18 +35,18 @@ enum PageThumbnailer {
             case .ink(let drawing, _): ink = drawing
             case .empty, .quarantined, .cancelled: ink = PKDrawing()
             }
-            let image = render(page: page, ink: ink, assets: assets)
-            if let png = image.pngData() { try? await package.writeThumbnail(png, pageID: page.id, key: page.thumbnailKey) }
+            let image = render(page: page, ink: ink, assets: assets, night: night)
+            if let png = image.pngData() { try? await package.writeThumbnail(png, pageID: page.id, key: name) }
             return image
         }.value
         if let image { _ = memory.value(key) { SharedUIImage(image: image) } }
         return image
     }
 
-    static func render(page: NotebookPage, ink: PKDrawing, assets: URL) -> UIImage {
+    static func render(page: NotebookPage, ink: PKDrawing, assets: URL, night: Bool = false) -> UIImage {
         let interval = signposter.beginInterval("Thumbnail")
         defer { signposter.endInterval("Thumbnail", interval) }
-        return PageRenderer.image(of: page, ink: ink, assets: assets, width: pixelWidth, scale: 1)
+        return PageRenderer.image(of: page, ink: ink, assets: assets, width: pixelWidth, scale: 1, night: night)
     }
 
     /// Makes sure the first page's thumbnail exists on disk, for first-page covers.

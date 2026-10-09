@@ -21,8 +21,10 @@ struct PaperDrawer: View {
     let session: EditorSession
     let mode: Mode
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.panelClose) private var panelClose
     @State private var template: PaperTemplate
     @State private var color: PaperColor
+    @PaperNight private var night
     @State private var pageSize: PageSize?
     private let newPageSize: CGSize
 
@@ -76,7 +78,7 @@ struct PaperDrawer: View {
             .background(Color.surface)
             .navigationTitle("Paper")
             .toolbar(.hidden, for: .navigationBar)
-            .safeAreaInset(edge: .top, spacing: 0) { header }
+            .safeAreaInset(edge: .top, spacing: 0) { if panelClose == nil { header } }
             .onChange(of: changing == nil) { _, gone in if gone, !mode.isAdding { dismiss() } }
         }
         .frame(minWidth: 340, idealWidth: 560, minHeight: 440, idealHeight: 720)
@@ -101,10 +103,16 @@ struct PaperDrawer: View {
     private var controls: some View {
         VStack(alignment: .leading, spacing: Space.x4) {
             PaperColorChips(selection: Binding(get: { selectedColor }, set: pickColor))
+            if night, !selectedColor.isDark {
+                Text("In Dark Mode this paper is shown dark. It keeps its colour when exported.")
+                    .font(.footnote)
+                    .foregroundStyle(Color.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if mode.isAdding {
                 LabeledContent {
-                    Menu {
-                        Picker("Page Size", selection: $pageSize) {
+                    OwlLunaMenu(Text("Page Size")) {
+                        OwlLunaPicker(selection: $pageSize) {
                             if PageSize.allCases.allSatisfy({ $0.points != newPageSize }) {
                                 Text("Current Size").tag(PageSize?.none)
                             }
@@ -116,7 +124,6 @@ struct PaperDrawer: View {
                             Image(systemName: "chevron.up.chevron.down").imageScale(.small).foregroundStyle(Color.textSecondary)
                         }
                     }
-                    .menuStyle(.button)
                     .buttonStyle(.owlLuna(.secondary, compact: true))
                     .accessibilityLabel(Text("Page Size"))
                     .accessibilityValue(Text(sizeName))
@@ -315,11 +322,11 @@ struct PaperColorChips: View {
                     .foregroundStyle(option.isDark ? Color.white : Color.labelInk)
                     .padding(.horizontal, Space.x3)
                     .frame(minHeight: 34)
-                    .background(Color(uiColor: PageRenderer.paperColor(option)), in: Capsule())
-                    .overlay { Capsule().strokeBorder(Color.hairline) }
+                    .background(Color(uiColor: PageRenderer.paperColor(option)), in: RoundedRectangle.plate)
+                    .overlay { RoundedRectangle.plate.strokeBorder(Color.hairline) }
                     .padding(3)
-                    .overlay { if isSelected { Capsule().strokeBorder(Color.accentColor, lineWidth: 2.5) } }
-                    .contentShape(Capsule())
+                    .overlay { if isSelected { RoundedRectangle.plate.strokeBorder(Color.accentColor, lineWidth: 2.5) } }
+                    .contentShape(RoundedRectangle.plate)
                 }
                 .buttonStyle(.plain)
                 .accessibilityElement(children: .ignore)

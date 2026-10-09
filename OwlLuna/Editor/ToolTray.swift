@@ -70,7 +70,7 @@ struct ToolTray: View {
         }
         .padding(.horizontal, Self.inset)
         .frame(height: Self.height)
-        .board(in: Capsule())
+        .board(in: RoundedRectangle.bar)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(Text("Tools"))
         .accessibilityIdentifier("editor.tools.tray")
@@ -118,14 +118,12 @@ struct ToolTray: View {
         let inHand = toolbox.choice == .pen(pen.id)
         // The pen in hand opens; any other is taken up.
         return Button { if inHand { editing = pen.id } else { take(.pen(pen.id), named: pen.name) } } label: {
-            ToolSwatch(preset: pen, inUse: inHand, onDark: session.inkIsLight)
+            ToolSwatch(preset: pen, inUse: inHand, onDark: session.inkIsLight, turned: session.paperIsNight)
         }
         .buttonStyle(ToolSwatchButtonStyle())
-        .popover(isPresented: Binding(get: { editing == pen.id }, set: { if !$0, editing == pen.id { editing = nil } })) {
-            ScrollView { PenOptions(id: pen.id, toolbox: toolbox, onDark: session.inkIsLight) { remove(pen) } }
+        .panel("Pen Options", isPresented: Binding(get: { editing == pen.id }, set: { if !$0, editing == pen.id { editing = nil } })) {
+            ScrollView { PenOptions(id: pen.id, toolbox: toolbox, onDark: session.inkIsLight, turned: session.paperIsNight) { remove(pen) } }
                 .scrollBounceBehavior(.basedOnSize)
-                .presentationCompactAdaptation(.popover)
-                .presentationBackground(Color.surface)
         }
         .simultaneousGesture(LongPressGesture(minimumDuration: 0.4).onEnded { _ in change(pen) })
         .accessibilityLabel(Text(pen.name))
@@ -180,11 +178,9 @@ struct ToolTray: View {
             Label("Eraser", systemImage: "eraser")
         }
         .buttonStyle(TrayIconStyle(isOn: inHand))
-        .popover(isPresented: $editingEraser) {
+        .panel("Eraser", isPresented: $editingEraser) {
             ScrollView { EraserOptions(toolbox: toolbox) }
                 .scrollBounceBehavior(.basedOnSize)
-                .presentationCompactAdaptation(.popover)
-                .presentationBackground(Color.surface)
         }
         .accessibilityValue(Text(toolbox.eraser.kind.displayName))
         .accessibilityAddTraits(inHand ? .isSelected : [])
@@ -215,11 +211,9 @@ struct ToolTray: View {
     private var customiseButton: some View {
         Button { customising = true } label: { Label("Customise Tools", systemImage: "slider.horizontal.3") }
             .buttonStyle(TrayIconStyle(isOn: customising))
-            .popover(isPresented: $customising) {
+            .panel("Customise Tools", isPresented: $customising) {
                 ScrollView { ShortcutOptions(toolbox: toolbox) }
                     .scrollBounceBehavior(.basedOnSize)
-                    .presentationCompactAdaptation(.popover)
-                    .presentationBackground(Color.surface)
             }
             .accessibilityIdentifier("editor.tools.customise")
     }
@@ -268,7 +262,7 @@ private struct ShortcutTag: View {
 
     var body: some View {
         let night = scheme == .dark
-        let shape = RoundedRectangle(cornerRadius: fills ? 16 : 100, style: .continuous)
+        let shape = RoundedRectangle.plate
         Button(action: action) {
             HStack(spacing: Space.x2) {
                 Image(systemName: extra.symbol).font(.footnote.weight(.semibold))
@@ -301,6 +295,7 @@ private struct PenOptions: View {
     let id: UUID
     let toolbox: Toolbox
     let onDark: Bool
+    let turned: Bool
     let remove: () -> Void
     @Environment(\.dynamicTypeSize) private var textSize
     @Environment(\.colorScheme) private var scheme
@@ -319,7 +314,8 @@ private struct PenOptions: View {
         let width = pen.width.formatted(.number.precision(.fractionLength(0...1)))
         let night = scheme == .dark && !onDark
         // The label shows the ink as faint as it is set; the tools of the roll and the bars are drawn at full strength.
-        let colour = ToolSwatch.ink(pen, onDark: onDark, night: night), solid = ToolSwatch.ink(pen, onDark: onDark, solid: true)
+        let colour = ToolSwatch.ink(pen, onDark: onDark, night: night, turned: turned)
+        let solid = ToolSwatch.ink(pen, onDark: onDark, solid: true, turned: turned)
         let paper = ToolSwatch.paper(onDark: onDark, night: night), faintest = ToolPreset.leastOpacity
         // At the largest text sizes the name goes under the label, where it has the whole width.
         let stacked = textSize.isAccessibilitySize
@@ -357,7 +353,7 @@ private struct PenOptions: View {
             // Opacity moves in steps of a twentieth, so the figure beside it is a round one.
             WidthBar(measure: .opacity, travel: Binding(get: { (pen.opacity - faintest) / (1 - faintest) }, set: { travel in
                 toolbox.changePen(id) { $0.opacity = ((faintest + (1 - faintest) * travel) * 20).rounded() / 20 }
-            }), ink: solid, paper: paper, night: night, value: pen.opacityName, identifier: "editor.tools.pen.opacity")
+            }), ink: solid, paper: paper, night: night, turned: turned, value: pen.opacityName, identifier: "editor.tools.pen.opacity")
             place(pen)
         }
         .padding(Space.x4)
@@ -442,6 +438,8 @@ private struct WidthBar: View {
     let paper: Color
     /// At night the strip is a well, and the stroke and the blot wear a light rim.
     var night = false
+    /// The page is dark as well, so a faint ink is faint over the dark.
+    var turned = false
     let value: String
     let identifier: String
     @State private var isDragging = false
@@ -449,7 +447,7 @@ private struct WidthBar: View {
 
     private static let height: CGFloat = 44
     private static let knob: CGFloat = 32
-    private static let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+    private static let shape = RoundedRectangle.track
 
     var body: some View {
         let name = title.font(.subheadline.weight(.semibold)).foregroundStyle(Color.ink)
@@ -514,13 +512,13 @@ private struct WidthBar: View {
 
     /// The ink at `strength`. At night it isn't paper it lies on, so it is as pale as it would be on a page.
     private func faint(_ strength: Double) -> Color {
-        night ? ToolSwatch.onPaper(UIColor(ink), at: strength) : ink.opacity(strength)
+        night && !turned ? ToolSwatch.onPaper(UIColor(ink), at: strength) : ink.opacity(strength)
     }
 
     /// The lines of a page with the ink washed over them, from as faint as a pen can be to full strength: the
     /// stronger the ink, the less of the lines shows through.
     private var wash: some View {
-        let band = Capsule()
+        let band = RoundedRectangle.thumb
         let lines = VStack(spacing: 5) {
             ForEach(0..<3, id: \.self) { _ in Rectangle().fill(night ? Color.black.opacity(0.4) : Color.ink.opacity(0.35)).frame(height: 1) }
         }
@@ -577,11 +575,13 @@ struct ToolSwatch: View {
     var inUse = false
     /// On Chalkboard the label is the board's green, and the ink as light as it is written there.
     var onDark = false
+    /// On paper that Dark Mode shows dark the ink is as light as it is there, on the well.
+    var turned = false
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.colorScheme) private var scheme
 
     static let side: CGFloat = 32
-    static let shape = RoundedRectangle(cornerRadius: 9, style: .continuous)
+    static let shape = RoundedRectangle.plate
     private static let chalkboard = Color(red: PaperColor.chalkboard.rgb.0, green: PaperColor.chalkboard.rgb.1, blue: PaperColor.chalkboard.rgb.2)
 
     /// What a pen's ink is shown on: paper by day, a well as dark as the tray at night, Chalkboard's green on a Chalkboard page.
@@ -591,11 +591,12 @@ struct ToolSwatch: View {
     static func rim(_ contrast: ColorSchemeContrast) -> Color { Color.ink.opacity(contrast == .increased ? 0.9 : 0.55) }
 
     /// The ink as it is on the page, as faint as the pen is set unless `solid` asks for it at full strength. At
-    /// `night` a faint ink lies on a dark well, not on paper, so it is shown as pale as a page would make it.
-    static func ink(_ preset: ToolPreset, onDark: Bool, solid: Bool = false, night: Bool = false) -> Color {
-        if night, !onDark, !solid, preset.opacity < 1 { return onPaper(ToolPreset.uiColor(preset.tint), at: preset.opacity) }
+    /// `night` a faint ink lies on a dark well, not on paper, so it is shown as pale as a page would make it. Where
+    /// the page has `turned` dark, the well is what it is written on.
+    static func ink(_ preset: ToolPreset, onDark: Bool, solid: Bool = false, night: Bool = false, turned: Bool = false) -> Color {
+        if night, !onDark, !turned, !solid, preset.opacity < 1 { return onPaper(ToolPreset.uiColor(preset.tint), at: preset.opacity) }
         let color = solid ? ToolPreset.uiColor(preset.tint) : preset.uiColor
-        return Color(uiColor: onDark ? PKInkingTool.convertColor(color, from: .light, to: .dark) : color)
+        return Color(uiColor: onDark || turned ? PKInkingTool.convertColor(color, from: .light, to: .dark) : color)
     }
 
     /// A colour as it shows on white paper at `opacity`, with nothing left to show through it.
@@ -615,7 +616,7 @@ struct ToolSwatch: View {
         ZStack {
             shape.fill(Self.paper(onDark: onDark, night: night))
             Circle()
-                .fill(Self.ink(preset, onDark: onDark, night: night))
+                .fill(Self.ink(preset, onDark: onDark, night: night, turned: turned))
                 .overlay { Circle().strokeBorder(rim, lineWidth: 1) }
                 .frame(width: blot, height: blot)
                 .offset(x: 3, y: 3)
@@ -647,7 +648,7 @@ private struct ToolSwatchButtonStyle: ButtonStyle {
             .scaleEffect(configuration.isPressed ? 0.92 : 1)
             .frame(width: ToolTray.slot, height: ToolTray.button)
             .contentShape(Rectangle())
-            .contentShape(.hoverEffect, RoundedRectangle(cornerRadius: 11, style: .continuous).inset(by: 1))
+            .contentShape(.hoverEffect, RoundedRectangle.plate.inset(by: 1))
             .hoverEffect(.highlight)
     }
 }
@@ -678,7 +679,7 @@ struct TrayIconStyle: ButtonStyle {
                 .overlay { if isOn { ToolSwatch.shape.strokeBorder(Color.accentColor, lineWidth: 2) } }
                 .frame(width: ToolTray.button, height: ToolTray.button)
                 .contentShape(Rectangle())
-                .contentShape(.hoverEffect, RoundedRectangle(cornerRadius: 11, style: .continuous).inset(by: 1))
+                .contentShape(.hoverEffect, RoundedRectangle.plate.inset(by: 1))
                 .hoverEffect(.highlight)
                 // The tray stays one height; its options, opened from here, grow with the text size.
                 .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
@@ -709,7 +710,7 @@ private struct NewPenButtonStyle: ButtonStyle {
                 }
                 .frame(width: ToolTray.slot, height: ToolTray.button)
                 .contentShape(Rectangle())
-                .contentShape(.hoverEffect, RoundedRectangle(cornerRadius: 11, style: .continuous).inset(by: 1))
+                .contentShape(.hoverEffect, RoundedRectangle.plate.inset(by: 1))
                 .hoverEffect(.highlight)
                 .accessibilityShowsLargeContentViewer { configuration.label.labelStyle(.titleAndIcon) }
         }

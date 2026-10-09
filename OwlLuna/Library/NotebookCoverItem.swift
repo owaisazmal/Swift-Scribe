@@ -96,7 +96,7 @@ struct NotebookCoverItem: View {
 /// Selection is a mustard stitched outline plus a check mark, never colour alone.
 struct StitchedSelection: View {
     var body: some View {
-        RoundedRectangle(cornerRadius: 8)
+        RoundedRectangle.track
             .strokeBorder(Color.mustard, style: StrokeStyle(lineWidth: 2, dash: [6, 4]))
             .padding(-6)
             .overlay(alignment: .bottomTrailing) {

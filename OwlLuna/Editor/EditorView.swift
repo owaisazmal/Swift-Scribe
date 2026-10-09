@@ -67,6 +67,8 @@ final class EditorSession {
     var openBoard: UUID?
     /// The page being written on is Chalkboard, where ink is light: the tray's pens show it so.
     var inkIsLight = false
+    /// The page being written on is light paper shown dark, where ink is light too.
+    var paperIsNight = false
     /// How far the zoom window stands above the foot of the editor's safe area, for the tray to stand on it.
     var zoomPanelLift: CGFloat = 0
     /// Where the ink dish is out, in the page view's points: at the Pencil's tip when it was squeezed. Nil while it is put away.
@@ -725,7 +727,7 @@ fileprivate struct EditorContent: View {
     /// The editor's sheets, alerts and observers, kept apart from the layout so each stays quick to type-check.
     private func sheets<Content: View>(_ content: Content) -> some View {
         content
-        .sheet(item: $editingNotes) { target in PresenterNotesSheet(document: document, pageID: target.id) }
+        .sheet(item: $editingNotes) { target in PresenterNotesSheet(document: document, pageID: target.id).presentationCornerRadius(Radius.sheet) }
         .sheet(item: $readingInk) { target in
             InkTextSheet(ink: target.ink) { text in
                 guard let placed = session.canvas?.replaceInkSelection(with: text) else { return }
@@ -733,6 +735,7 @@ fileprivate struct EditorContent: View {
                 session.canvas?.select(placed)
                 announce(String(localized: "Handwriting replaced with text"))
             }
+            .presentationCornerRadius(Radius.sheet)
         }
         .sheet(isPresented: $pickingBeside) {
             BesidePicker(current: document.id, exclude: Set(window?.tabs.map(\.id) ?? [])) { id in
@@ -740,20 +743,24 @@ fileprivate struct EditorContent: View {
                 window?.beside = OpenNotebook(id: id)
                 window?.active = id
             }
+            .presentationCornerRadius(Radius.sheet)
         }
         .sheet(isPresented: $showingRecordingsSheet) {
             recordingList { showingRecordingsSheet = false }
                 .presentationDetents([.medium, .large])
                 .presentationBackground(Color.surface)
+                .presentationCornerRadius(Radius.sheet)
         }
         .sheet(isPresented: $showingPages) {
             PageNavigator(session: session)
+                .presentationCornerRadius(Radius.sheet)
         }
         .sheet(isPresented: Binding(get: { showingBoardGuide && !showsBoardMenu }, set: { showingBoardGuide = $0 })) {
             WhiteboardGuide().presentationBackground(Color.surface)
+                .presentationCornerRadius(Radius.sheet)
         }
-        .sheet(item: $export) { job in ExportSheet(job: job) }
-        .sheet(item: $editingCover) { record in CoverEditorView(record: record) }
+        .sheet(item: $export) { job in ExportSheet(job: job).presentationCornerRadius(Radius.sheet) }
+        .sheet(item: $editingCover) { record in CoverEditorView(record: record).presentationCornerRadius(Radius.sheet) }
         .fileImporter(isPresented: $importingPDF, allowedContentTypes: [.pdf]) { result in
             let position = session.currentPage + 1
             document.perform { await insertPDF(result, at: position) }
@@ -779,6 +786,7 @@ fileprivate struct EditorContent: View {
             } onPickOwn: { sticker in
                 document.perform { await addSticker(sticker) }
             }
+            .presentationCornerRadius(Radius.sheet)
         }
         .sheet(isPresented: $pickingLink) {
             LinkSheet(session: session) { link in
@@ -786,43 +794,42 @@ fileprivate struct EditorContent: View {
                 refreshNotebookTitles()
                 announce(String(localized: "Link added to the page"))
             }
+            .presentationCornerRadius(Radius.sheet)
         }
-        .alert("Rename Link", isPresented: $renamingLink) {
+        .notice("Rename Link", isPresented: $renamingLink, message: Text("Leave it empty to name the link after what it opens.")) {
             TextField("Name", text: $linkLabel)
+        } actions: {
             Button("Cancel", role: .cancel) {}
             Button("Save") { session.setLinkLabel(linkLabel) }
-        } message: {
-            Text("Leave it empty to name the link after what it opens.")
         }
-        .confirmationDialog("Delete page \(session.currentPage + 1)?", isPresented: $confirmingDelete, titleVisibility: .visible) {
+        .notice("Delete page \(session.currentPage + 1)?", isPresented: $confirmingDelete, message: Text("You can undo this.")) {
+            Button("Cancel", role: .cancel) {}
             Button("Delete Page", role: .destructive) {
                 if document.pages.indices.contains(session.currentPage) { document.removePages([document.pages[session.currentPage].id]) }
             }
-        } message: {
-            Text("You can undo this.")
         }
-        .alert("Go to Page", isPresented: $goToPage) {
+        .notice("Go to Page", isPresented: $goToPage, message: Text("1 to \(document.pages.count)")) {
             TextField("Page", text: $goToText).keyboardType(.numberPad)
+        } actions: {
             Button("Cancel", role: .cancel) {}
             Button("Go") { if let number = Int(goToText) { session.go(to: number - 1) } }
-        } message: {
-            Text("1 to \(document.pages.count)")
         }
-        .alert("Name Bookmark", isPresented: Binding(get: { namingBookmark != nil }, set: { if !$0 { namingBookmark = nil } })) {
+        .notice("Name Bookmark", isPresented: Binding(get: { namingBookmark != nil }, set: { if !$0 { namingBookmark = nil } })) {
             TextField("Name", text: $bookmarkName)
+        } actions: {
             Button("Cancel", role: .cancel) {}
             Button("Save") { if let namingBookmark { document.setBookmark(bookmarkName, forPage: namingBookmark) } }
         }
-        .alert("Rename Notebook", isPresented: $renaming) {
+        .notice("Rename Notebook", isPresented: $renaming) {
             TextField("Title", text: $titleText)
+        } actions: {
             Button("Cancel", role: .cancel) {}
             Button("Save") { document.rename(titleText) }
         }
-        .alert("Something went wrong", isPresented: Binding(get: { errorMessage != nil || session.recorder.errorMessage != nil },
-                                                           set: { if !$0 { errorMessage = nil; session.recorder.errorMessage = nil } })) {
+        .notice("Something went wrong", isPresented: Binding(get: { errorMessage != nil || session.recorder.errorMessage != nil },
+                                                             set: { if !$0 { errorMessage = nil; session.recorder.errorMessage = nil } }),
+                message: Text(errorMessage ?? session.recorder.errorMessage ?? "")) {
             Button("OK", role: .cancel) {}
-        } message: {
-            Text(errorMessage ?? session.recorder.errorMessage ?? "")
         }
         .onChange(of: isPresentingModal) { _, presenting in session.canvas?.setModalShowing(presenting) }
         .onChange(of: session.recorder.isRecording) { _, recording in
@@ -856,14 +863,16 @@ fileprivate struct EditorContent: View {
     /// Flashcards and the study guide.
     private func studySheets<Content: View>(_ content: Content) -> some View {
         content
-        .sheet(isPresented: $showingDeck) { DeckSheet(session: session) }
+        .sheet(isPresented: $showingDeck) { DeckSheet(session: session).presentationCornerRadius(Radius.sheet) }
         .sheet(item: $cardDraft) { draft in
             CardComposer(notebook: document.id, draft: draft) { _ in announce(String(localized: "Flashcard saved")) }
+                .presentationCornerRadius(Radius.sheet)
         }
         .sheet(item: $studyGuide) { request in
             StudyGuideSheet(session: session, request: request)
+                .presentationCornerRadius(Radius.sheet)
         }
-        .sheet(item: $tagging) { target in EditorTagSheet(document: document, target: target) }
+        .sheet(item: $tagging) { target in EditorTagSheet(document: document, target: target).presentationCornerRadius(Radius.sheet) }
     }
 
     private func makeCardFromInk() {
@@ -944,13 +953,13 @@ fileprivate struct EditorContent: View {
             } label: {
                 if pane == .secondary { Label("Close", systemImage: "xmark") } else { Label("Library", systemImage: "chevron.backward") }
             }
-            .buttonStyle(.boardIcon)
+            .buttonStyle(.plateIcon)
             // With tabs open, ⌘W closes the tab on show; the tab bar has it.
             .keyboardShortcut(pane != .secondary && (window?.tabs.count ?? 0) > 1 ? nil : shortcut("w", always: true))
             .accessibilityIdentifier(pane == .secondary ? "editor.close.pane" : "editor.back")
         }
         .boardBackground()
-        ToolbarItem(placement: .principal) { titleMenu }
+        ToolbarItem(placement: .principal) { titleMenu.environment(\.panelAnchorHeight, 44) }
         if isNarrow {
             ToolbarItem(placement: .topBarTrailing) {
                 BarGroup {
@@ -1015,7 +1024,7 @@ fileprivate struct EditorContent: View {
     }
 
     private var titleMenu: some View {
-        Menu {
+        OwlLunaMenu(Text(document.title)) {
             Button { titleText = document.title; renaming = true } label: { Label("Rename…", systemImage: "pencil") }
                 .disabled(document.isReadOnly)
             if !document.isReadOnly {
@@ -1024,7 +1033,7 @@ fileprivate struct EditorContent: View {
                 Button { toggleLock() } label: { Label(locked ? "Remove Lock…" : "Lock…", systemImage: locked ? "lock.open" : "lock") }
                 Button { tagging = .notebook } label: { Label("Tags…", systemImage: "tag") }
             }
-            Menu {
+            OwlLunaMenu {
                 Button { export = ExportJob(document: document) } label: { Label("Notebook as a PDF…", systemImage: "doc.richtext") }
                 Button { export = ExportJob(document: document, format: .images) } label: { Label("Every Page as an Image…", systemImage: "photo.on.rectangle") }
                 if let page = currentPage {
@@ -1036,7 +1045,7 @@ fileprivate struct EditorContent: View {
                 }
             } label: { Label("Export", systemImage: "square.and.arrow.up") }
             if let window, pane != .secondary {
-                Divider()
+                MenuBreak()
                 Button { window.pickingTab = true } label: { Label("Open Another Notebook in a Tab…", systemImage: "plus.rectangle.on.rectangle") }
                     .disabled(window.tabs.count >= EditorWindow.tabLimit)
                 if pane == .single, !isNarrow, sizeClass != .compact {
@@ -1063,11 +1072,9 @@ fileprivate struct EditorContent: View {
 
     private var recordingsButton: some View {
         Button { showingRecordings = true } label: { Label("Recordings", systemImage: "waveform") }
-            .popover(isPresented: $showingRecordings) {
+            .panel("Recordings", isPresented: $showingRecordings, adapts: true) {
                 recordingList { showingRecordings = false }
-                    .frame(minWidth: 460, minHeight: 440)
-                    .presentationBackground(Color.surface)
-                    .presentationCompactAdaptation(.sheet)
+                    .frame(minWidth: 460, idealWidth: 460, minHeight: 440, idealHeight: 520)
             }
     }
 
@@ -1121,7 +1128,7 @@ fileprivate struct EditorContent: View {
         .buttonStyle(.plain)
         .disabled(document.isReadOnly)
         .keyboardShortcut(shortcut("d"))
-        .contextMenu {
+        .heldMenu(Text("Bookmark"), when: page != nil && marked && !document.isReadOnly) {
             if let page, marked, !document.isReadOnly {
                 Button { bookmarkName = page.bookmark ?? ""; namingBookmark = page.id } label: { Label("Name Bookmark…", systemImage: "pencil") }
                 Button(role: .destructive) { document.setBookmark(nil, forPage: page.id) } label: { Label("Remove Bookmark", systemImage: "bookmark.slash") }
@@ -1167,7 +1174,7 @@ fileprivate struct EditorContent: View {
 
     private var focusExit: some View {
         Button { enter(.writing) } label: { Label("Exit Focus Mode", systemImage: "arrow.down.right.and.arrow.up.left") }
-            .buttonStyle(.boardIcon)
+            .buttonStyle(.plateIcon(lifted: true))
             .padding(.trailing, Space.x8)
             .padding(.top, Space.x2)
             .accessibilityIdentifier("editor.focus.exit")
@@ -1205,7 +1212,7 @@ fileprivate struct EditorContent: View {
                 }
                 arrangeButton("Duplicate", "plus.square.on.square") { session.duplicateSelection() }
             } else if isCompact, item?.text != nil || item?.link != nil {
-                Menu {
+                OwlLunaMenu {
                     Button { session.duplicateSelection() } label: { Label("Duplicate", systemImage: "plus.square.on.square") }
                     Button { session.moveSelection(forward: true) } label: { Label("Bring Forward", systemImage: "square.2.layers.3d.top.filled") }
                     Button { session.moveSelection(forward: false) } label: { Label("Send Backward", systemImage: "square.2.layers.3d.bottom.filled") }
@@ -1231,21 +1238,23 @@ fileprivate struct EditorContent: View {
     }
 
     private func textStyleMenu(_ box: TextBox) -> some View {
-        Menu {
-            Picker("Size", selection: Binding(get: { box.fontSize }, set: { size in session.updateText { $0.fontSize = size } })) {
+        OwlLunaMenu {
+            OwlLunaPicker("Size", selection: Binding(get: { box.fontSize }, set: { size in session.updateText { $0.fontSize = size } })) {
                 ForEach(TextBox.sizes, id: \.points) { Text($0.name).tag($0.points) }
             }
             Toggle(isOn: Binding(get: { box.isBold }, set: { bold in session.updateText { $0.isBold = bold } })) {
                 Label("Bold", systemImage: "bold")
             }
-            Picker("Colour", selection: Binding(get: { box.tint }, set: { tint in session.updateText { $0.tint = tint } })) {
-                ForEach(TextBox.Tint.allCases) { Text($0.displayName).tag($0) }
-            }
-            .pickerStyle(.menu)
-            Picker("Alignment", selection: Binding(get: { box.alignment }, set: { alignment in session.updateText { $0.alignment = alignment } })) {
-                ForEach(TextBox.Alignment.allCases) { Label($0.displayName, systemImage: $0.symbol).tag($0) }
-            }
-            .pickerStyle(.menu)
+            OwlLunaMenu {
+                OwlLunaPicker(selection: Binding(get: { box.tint }, set: { tint in session.updateText { $0.tint = tint } })) {
+                    ForEach(TextBox.Tint.allCases) { Text($0.displayName).tag($0) }
+                }
+            } label: { Label("Colour", systemImage: "paintpalette") }
+            OwlLunaMenu {
+                OwlLunaPicker(selection: Binding(get: { box.alignment }, set: { alignment in session.updateText { $0.alignment = alignment } })) {
+                    ForEach(TextBox.Alignment.allCases) { Label($0.displayName, systemImage: $0.symbol).tag($0) }
+                }
+            } label: { Label("Alignment", systemImage: box.alignment.symbol) }
         } label: {
             Label("Text Style", systemImage: "textformat.size")
         }
@@ -1253,8 +1262,8 @@ fileprivate struct EditorContent: View {
     }
 
     private func tapeColorMenu(_ current: TapeColor) -> some View {
-        Menu {
-            Picker("Tape Colour", selection: Binding(get: { current }, set: { session.setTapeColor($0) })) {
+        OwlLunaMenu {
+            OwlLunaPicker(selection: Binding(get: { current }, set: { session.setTapeColor($0) })) {
                 ForEach(TapeColor.allCases) { Text($0.displayName).tag($0) }
             }
         } label: {
@@ -1382,8 +1391,8 @@ fileprivate struct EditorContent: View {
                     arrangeButton("Highlight", "highlighter") { session.canvas?.highlightSelectedText(highlightColor) }
                         .accessibilityValue(Text(highlightColor.displayName))
                         .accessibilityIdentifier("editor.text.highlight")
-                    Menu {
-                        Picker("Highlight Colour", selection: Binding(get: { highlightColor }, set: { highlightColor = $0; HighlightColor.last = $0 })) {
+                    OwlLunaMenu {
+                        OwlLunaPicker(selection: Binding(get: { highlightColor }, set: { highlightColor = $0; HighlightColor.last = $0 })) {
                             ForEach(HighlightColor.allCases) { Text($0.displayName).tag($0) }
                         }
                     } label: {
@@ -1450,15 +1459,13 @@ fileprivate struct EditorContent: View {
 
     /// An open whiteboard's own controls, behind one button in the bar: they take nothing from the board.
     private var boardMenu: some View {
-        Menu {
+        OwlLunaMenu {
             boardActions
         } label: {
             Label("Whiteboard", systemImage: "scribble.variable")
         }
-        .popover(isPresented: Binding(get: { showingBoardGuide && showsBoardMenu }, set: { showingBoardGuide = $0 })) {
+        .panel("Whiteboard Guide", isPresented: Binding(get: { showingBoardGuide && showsBoardMenu }, set: { showingBoardGuide = $0 }), adapts: true) {
             WhiteboardGuide()
-                .presentationCompactAdaptation(.sheet)
-                .presentationBackground(Color.surface)
         }
         .accessibilityHint(Text("Fits the whiteboard, shows the pages and opens the guide"))
         .accessibilityIdentifier("editor.board.menu")
@@ -1599,19 +1606,19 @@ fileprivate struct EditorContent: View {
     }
 
     private var addMenu: some View {
-        Menu {
+        OwlLunaMenu {
             Button { session.addPage(after: session.currentPage) } label: { Label("Page After Current", systemImage: "doc.badge.plus") }
             Button { session.addPage() } label: { Label("Page at End", systemImage: "arrow.down.doc") }
             Button { paperMode = .add(after: session.currentPage) } label: { Label("Choose Paper…", systemImage: "square.grid.3x3") }
             Button { session.addBoard(after: session.currentPage) } label: { Label("Whiteboard", systemImage: "scribble.variable") }
                 .accessibilityIdentifier("editor.add.board")
-            Divider()
+            MenuBreak()
             Button { importingPDF = true } label: { Label("Insert PDF…", systemImage: "doc.richtext") }
             Button { photoBecomesPage = true; showingPhotoPicker = true } label: { Label("Insert Photo…", systemImage: "photo") }
             if DocumentScan.isAvailable {
                 Button(action: startScan) { Label("Scan Documents…", systemImage: "doc.viewfinder") }
             }
-            Divider()
+            MenuBreak()
             Button { photoBecomesPage = false; showingPhotoPicker = true } label: { Label("Picture on This Page…", systemImage: "photo.on.rectangle.angled") }
             Button { showingStickers = true } label: { Label("Sticker…", systemImage: "seal") }
             Button { session.addText() } label: { Label("Text Box", systemImage: "character.textbox") }
@@ -1622,15 +1629,13 @@ fileprivate struct EditorContent: View {
             Label("Add", systemImage: "plus")
         }
         .disabled(document.isReadOnly)
-        .popover(item: Binding(get: { paperMode?.isAdding == true ? paperMode : nil }, set: { paperMode = $0 })) { mode in
+        .panel("Paper", item: Binding(get: { paperMode?.isAdding == true ? paperMode : nil }, set: { paperMode = $0 }), adapts: true) { mode in
             PaperDrawer(session: session, mode: mode)
-                .presentationCompactAdaptation(.sheet)
-                .presentationBackground(Color.surface)
         }
     }
 
     private var moreMenu: some View {
-        Menu {
+        OwlLunaMenu {
             let current = document.pages.indices.contains(session.currentPage) ? document.pages[session.currentPage] : nil
             if isNarrow {
                 if !session.recorder.isRecording {
@@ -1642,7 +1647,7 @@ fileprivate struct EditorContent: View {
                     Label(session.showsTools ? "Hide Tools" : "Show Tools", systemImage: "pencil.tip.crop.circle")
                 }
                 .disabled(document.isReadOnly)
-                Divider()
+                MenuBreak()
             }
             if let current, current.template != nil, !document.isReadOnly {
                 Button { paperMode = .change(pageID: current.id) } label: { Label("Change Paper…", systemImage: "paintpalette") }
@@ -1660,7 +1665,7 @@ fileprivate struct EditorContent: View {
                 Button(role: .destructive) { confirmingDelete = true } label: { Label("Delete Page", systemImage: "trash") }
             }
             .disabled(document.isReadOnly)
-            Divider()
+            MenuBreak()
             if session.openBoard != nil {
                 // In a narrow pane the whiteboard has no button of its own in the bar.
                 if !showsBoardMenu { boardActions }
@@ -1668,7 +1673,7 @@ fileprivate struct EditorContent: View {
                 Button { session.canvas?.fit(.width) } label: { Label("Fit Width", systemImage: "arrow.left.and.right") }
                 Button { session.canvas?.fit(.page) } label: { Label("Fit Page", systemImage: "arrow.up.and.down") }
             }
-            Divider()
+            MenuBreak()
             if !document.isReadOnly {
                 Button { enter(.selecting) } label: { Label("Select Ink Across Pages", systemImage: "lasso") }
             }
@@ -1684,27 +1689,26 @@ fileprivate struct EditorContent: View {
                     Label(session.isZoomWindowOpen ? "Close Zoom Window" : "Zoom Window", systemImage: "plus.magnifyingglass")
                 }
             }
-            Divider()
+            MenuBreak()
             Button { showingDeck = true } label: { Label("Flashcards…", systemImage: "rectangle.on.rectangle.angled") }
             Button { studyGuide = StudyGuideRequest(scope: .notebook) } label: { Label("Study Guide…", systemImage: "text.badge.star") }
-            Divider()
+            MenuBreak()
             Button { enter(.focus) } label: { Label("Focus Mode", systemImage: "arrow.up.left.and.arrow.down.right") }
             Button { enter(.presenting) } label: { Label("Present", systemImage: "play.rectangle") }
             if let current, !document.isReadOnly {
                 Button { editingNotes = NotesTarget(id: current.id) } label: { Label("Presenter Notes…", systemImage: "note.text") }
             }
-            Divider()
-            Picker(selection: $session.drawingInput) {
-                ForEach(DrawingInput.allCases) { Text($0.displayName).tag($0) }
+            MenuBreak()
+            OwlLunaMenu {
+                OwlLunaPicker(selection: $session.drawingInput) {
+                    ForEach(DrawingInput.allCases) { Text($0.displayName).tag($0) }
+                }
             } label: { Label("Draw With", systemImage: "hand.draw") }
-            .pickerStyle(.menu)
         } label: {
             Label("More", systemImage: "ellipsis.circle")
         }
-        .popover(item: Binding(get: { paperMode?.isAdding == false ? paperMode : nil }, set: { paperMode = $0 })) { mode in
+        .panel("Paper", item: Binding(get: { paperMode?.isAdding == false ? paperMode : nil }, set: { paperMode = $0 }), adapts: true) { mode in
             PaperDrawer(session: session, mode: mode)
-                .presentationCompactAdaptation(.sheet)
-                .presentationBackground(Color.surface)
         }
     }
 
@@ -1843,16 +1847,15 @@ extension EditorContent {
 }
 
 private extension View {
-    /// The board capsule that floats over the page: the presenter's controls and the arrange bar.
+    /// The board that floats over the page: the presenter's controls and the arrange bar.
     func floatingBar(leading: CGFloat = Space.x1, trailing: CGFloat = Space.x2) -> some View {
         fontWeight(.semibold)
             .buttonStyle(.barIcon)
-            .menuStyle(.button)
             .padding(.leading, leading)
             .padding(.trailing, trailing)
             .padding(.vertical, 2)
             .fixedSize()
-            .board(in: Capsule())
+            .board(in: RoundedRectangle.bar)
     }
 }
 
@@ -1918,7 +1921,7 @@ struct NoticeBanner: View {
         .padding(.trailing, dismissable ? Space.x1 : Space.x4)
         .padding(.vertical, dismissable ? Space.x1 : Space.x3)
         .frame(maxWidth: 520, alignment: .leading)
-        .board(in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
+        .board(in: RoundedRectangle.bar)
         .padding(.horizontal, Space.x4)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isStaticText)
@@ -1930,6 +1933,7 @@ struct RecordingList: View {
     /// Replays a recording with its ink, from a moment in it.
     var replay: ((RecordingEntry, TimeInterval) -> Void)?
     @State private var path: [UUID] = []
+    @Environment(\.panelClose) private var panelClose
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -2003,6 +2007,7 @@ struct RecordingList: View {
             .navigationTitle("Recordings")
             .barGround(.surface)
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar(panelClose == nil ? .automatic : .hidden, for: .navigationBar)
             .navigationDestination(for: UUID.self) { id in
                 TranscriptView(recorder: recorder, recordingID: id, replay: replay)
             }

@@ -7699,6 +7699,28 @@
         }
       }
     },
+    "Dark Paper in Dark Mode" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dunkles Papier im Dunkelmodus"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Papel oscuro en modo oscuro"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Papier sombre en mode sombre"
+          }
+        }
+      }
+    },
     "Date Created" : {
       "localizations" : {
         "de" : {
@@ -9740,6 +9762,28 @@
         }
       }
     },
+    "Flashcard" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Karteikarte"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tarjeta de estudio"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carte mémoire"
+          }
+        }
+      }
+    },
     "Flashcard Made" : {
       "localizations" : {
         "de" : {
@@ -11206,6 +11250,50 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "In Dark Mode this paper is shown dark. It keeps its colour when exported." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Im Dunkelmodus wird dieses Papier dunkel angezeigt. Beim Exportieren behält es seine Farbe."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En modo oscuro, este papel se muestra oscuro. Conserva su color al exportarlo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En mode sombre, ce papier s’affiche en sombre. Il conserve sa couleur à l’exportation."
+          }
+        }
+      }
+    },
+    "In Dark Mode, light paper is shown dark and its ink light. A PDF, a photo and everything you export keep their own colours." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Im Dunkelmodus wird helles Papier dunkel und seine Tinte hell angezeigt. PDFs, Fotos und alles, was du exportierst, behalten ihre eigenen Farben."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En modo oscuro, el papel claro se muestra oscuro y su tinta, clara. Los PDF, las fotos y todo lo que exportes conservan sus propios colores."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En mode sombre, le papier clair s’affiche en sombre et son encre en clair. Les PDF, les photos et tout ce que vous exportez conservent leurs propres couleurs."
           }
         }
       }
@@ -15064,6 +15152,28 @@
         }
       }
     },
+    "On This Day" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An diesem Tag"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tal día como hoy"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce jour-là"
+          }
+        }
+      }
+    },
     "Once you have another notebook, you can link to it from here." : {
       "localizations" : {
         "de" : {
@@ -16482,6 +16592,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Stylo"
+          }
+        }
+      }
+    },
+    "Pen Options" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stiftoptionen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opciones del bolígrafo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Options du stylo"
           }
         }
       }
@@ -19850,6 +19982,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Afficher les sous-dossiers"
+          }
+        }
+      }
+    },
+    "Show Menu" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Menü anzeigen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar menú"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher le menu"
           }
         }
       }

@@ -17,7 +17,13 @@ enum Radius {
     /// Covers: nearly square, a touch rounder on the fore-edge.
     static let coverSpine: CGFloat = 2
     static let coverEdge: CGFloat = 5
-    static let control: CGFloat = 12
+    /// Controls and cards are cut nearly square, and what slides inside one squarer still.
+    static let plate: CGFloat = 4
+    static let thumb: CGFloat = 3
+    /// The well a thumb slides in, the boards that float over a page, and sheets: each a touch rounder than the last.
+    static let track: CGFloat = 6
+    static let bar: CGFloat = 8
+    static let sheet: CGFloat = 12
 }
 
 enum Motion {

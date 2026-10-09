@@ -207,7 +207,7 @@ final class ItemSelectionView: UIView, UIGestureRecognizerDelegate {
         side.frame = CGRect(x: 0, y: 0, width: Self.handleSize, height: Self.handleSize)
         grip.frame = CGRect(x: (Self.handleSize - 10) / 2, y: (Self.handleSize - 28) / 2, width: 10, height: 28)
         grip.backgroundColor = .surface
-        grip.layer.cornerRadius = 5
+        grip.layer.cornerRadius = 2
         grip.layer.borderWidth = 1
         grip.layer.borderColor = UIColor.ink.withAlphaComponent(0.35).cgColor
         side.addSubview(grip)

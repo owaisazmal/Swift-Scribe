@@ -62,7 +62,7 @@ struct PageNavigator: View {
                             Button { session.addPage(after: document.pages.count - 1) } label: {
                                 Label("Add Page", systemImage: "plus")
                             }
-                            .buttonStyle(.boardIcon)
+                            .buttonStyle(.plateIcon)
                             .disabled(document.isReadOnly)
                         }
                         Button("Done") { dismiss() }
@@ -93,7 +93,7 @@ struct PageNavigator: View {
                                         .font(.footnote.weight(.bold))
                                         .foregroundStyle(Color.onPrimaryCloth)
                                         .frame(width: 28, height: 28)
-                                        .background(Color.primaryCloth, in: Circle())
+                                        .background(Color.primaryCloth, in: RoundedRectangle.thumb)
                                         .frame(width: 44, height: 44)
                                         .contentShape(Rectangle())
                                 }
@@ -109,13 +109,12 @@ struct PageNavigator: View {
                     .boardBackground()
                 }
             }
-            .confirmationDialog("Delete this page?", isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
-                                titleVisibility: .visible) {
+            .notice("Delete this page?", isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
+                    message: Text("You can undo this.")) {
+                Button("Cancel", role: .cancel) {}
                 Button("Delete Page", role: .destructive) { if let pendingDelete { document.removePages([pendingDelete]) } }
-            } message: {
-                Text("You can undo this.")
             }
-            .sheet(item: $tagging) { target in EditorTagSheet(document: document, target: target) }
+            .sheet(item: $tagging) { target in EditorTagSheet(document: document, target: target).presentationCornerRadius(Radius.sheet) }
         }
     }
 
@@ -177,7 +176,7 @@ struct PageNavigator: View {
         .buttonStyle(.plain)
         .hoverEffect(.lift)
         .overlay { if dropTarget == page.id { insertionBar(after: dropsAfter(index)) } }
-        .contextMenu { menu(for: page, at: index) }
+        .heldMenu(Text("Page \(index + 1)"), when: !document.isReadOnly, draggable: true) { menu(for: page, at: index) }
         .onDrag {
             dragging = page.id
             let provider = NSItemProvider()
@@ -270,7 +269,7 @@ struct PageNavigator: View {
         if index < document.pages.count - 1 {
             Button { move(page.id, to: index + 1) } label: { Label("Move Later", systemImage: "arrow.forward") }
         }
-        Divider()
+        MenuBreak()
         Button(role: .destructive) { pendingDelete = page.id } label: { Label("Delete", systemImage: "trash") }
     }
 }
@@ -296,6 +295,7 @@ struct PageThumbnailCell: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @PaperNight private var night
     @State private var image: UIImage?
     @State private var ribbonDropped = false
 
@@ -304,8 +304,8 @@ struct PageThumbnailCell: View {
             if dynamicTypeSize.isAccessibilitySize { row } else { tile }
         }
         .contentShape(Rectangle())
-        .task(id: "\(page.id)-\(page.inkHash ?? "")-\(page.appearanceKey)") {
-            image = await document.thumbnail(for: page)
+        .task(id: "\(page.id)-\(page.inkHash ?? "")-\(page.appearanceKey)-\(night)") {
+            image = await document.thumbnail(for: page, night: night)
         }
     }
 
@@ -336,7 +336,7 @@ struct PageThumbnailCell: View {
             Spacer(minLength: 0)
         }
         .padding(Space.x3)
-        .background(Color.surface, in: RoundedRectangle(cornerRadius: Radius.control))
+        .background(Color.surface, in: RoundedRectangle.plate)
     }
 
     private var thumbnail: some View {
@@ -344,7 +344,7 @@ struct PageThumbnailCell: View {
             if let image {
                 Image(uiImage: image).resizable()
             } else {
-                Rectangle().fill(Color(uiColor: PageRenderer.paperColor(page.effectivePaperColor)))
+                Rectangle().fill(Color(uiColor: page.paperShown(night: night)))
             }
         }
         .aspectRatio(page.shownSize.width / max(page.shownSize.height, 1), contentMode: .fit)
@@ -397,11 +397,11 @@ extension NotebookDocument {
     }
 
     /// Thumbnail reflecting unsaved ink when the page is in memory, otherwise the cached saved one.
-    func thumbnail(for page: NotebookPage) async -> UIImage? {
+    func thumbnail(for page: NotebookPage, night: Bool = false) async -> UIImage? {
         if hasUnsavedInk(page.id), let ink = loadedInk(page.id) {
             let assets = package.assetsDirectory
-            return await Task.detached(priority: .utility) { PageThumbnailer.render(page: page, ink: ink, assets: assets) }.value
+            return await Task.detached(priority: .utility) { PageThumbnailer.render(page: page, ink: ink, assets: assets, night: night) }.value
         }
-        return await PageThumbnailer.thumbnail(package: package, page: page)
+        return await PageThumbnailer.thumbnail(package: package, page: page, night: night)
     }
 }

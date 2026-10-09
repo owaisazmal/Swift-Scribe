@@ -98,9 +98,10 @@ struct NewNotebookView: View {
                 }
                 .boardBackground()
             }
-            .alert("Something went wrong", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
+            .notice("Something went wrong", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } }),
+                    message: Text(errorMessage ?? "")) {
                 Button("OK", role: .cancel) {}
-            } message: { Text(errorMessage ?? "") }
+            }
             .task {
                 try? await Task.sleep(for: .milliseconds(350))
                 titleFocused = true
@@ -183,8 +184,8 @@ struct NewNotebookView: View {
         VStack(alignment: .leading, spacing: Space.x4) {
             Divider().overlay(Color.hairline)
             LabeledContent {
-                Menu {
-                    Picker("Size", selection: $pageSize) {
+                OwlLunaMenu(Text("Page Size")) {
+                    OwlLunaPicker(selection: $pageSize) {
                         ForEach(PageSize.allCases) { Text($0.displayName).tag($0) }
                     }
                 } label: {
@@ -193,7 +194,6 @@ struct NewNotebookView: View {
                         Image(systemName: "chevron.up.chevron.down").imageScale(.small).foregroundStyle(Color.textSecondary)
                     }
                 }
-                .menuStyle(.button)
                 .buttonStyle(.owlLuna(.secondary, compact: true))
                 .accessibilityLabel(Text("Page Size"))
                 .accessibilityValue(Text(pageSize.displayName))
@@ -342,9 +342,9 @@ private struct StarterCard: View {
             }
         }
         .padding(Space.x3)
-        .background(Color.paper, in: RoundedRectangle(cornerRadius: Radius.control))
+        .background(Color.paper, in: RoundedRectangle.plate)
         .overlay {
-            RoundedRectangle(cornerRadius: Radius.control)
+            RoundedRectangle.plate
                 .strokeBorder(isSelected ? Color.accentColor : Color.hairline, lineWidth: isSelected ? 2 : 1)
         }
         .overlay(alignment: .topTrailing) {
@@ -357,7 +357,7 @@ private struct StarterCard: View {
                     .offset(x: 6, y: -6)
             }
         }
-        .contentShape(RoundedRectangle(cornerRadius: Radius.control))
+        .contentShape(RoundedRectangle.plate)
     }
 
     @ViewBuilder private var cover: some View {

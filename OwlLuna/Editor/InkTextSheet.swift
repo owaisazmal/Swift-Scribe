@@ -42,7 +42,7 @@ struct InkTextSheet: View {
                             .disabled(isTranslating)
                             .accessibilityLabel(Text("Handwriting as text"))
                             .accessibilityIdentifier("inktext.editor")
-                            .well(in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous), focused: editing)
+                            .well(in: RoundedRectangle.plate, focused: editing)
                             .padding([.horizontal, .top], Space.x4)
                         if isTranslating || target != nil { translationNote }
                         (dynamicTypeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: Space.x3)) : AnyLayout(HStackLayout(spacing: Space.x3))) {
@@ -115,33 +115,26 @@ struct InkTextSheet: View {
                 await finishTranslation(.failure(error))
             }
         }
-        .alert("Couldn't Translate", isPresented: Binding(get: { failure != nil }, set: { if !$0 { failure = nil } })) {
+        .notice("Couldn't Translate", isPresented: Binding(get: { failure != nil }, set: { if !$0 { failure = nil } }),
+                message: Text(failure ?? "")) {
             Button("OK", role: .cancel) {}
-        } message: {
-            Text(failure ?? "")
         }
     }
 
     private var translateMenu: some View {
-        Menu {
+        OwlLunaMenu {
             if original != nil {
                 Button(action: showOriginal) { Label("Show Original", systemImage: "arrow.uturn.backward") }
-                Divider()
+                MenuBreak()
             }
             ForEach(languages, id: \.minimalIdentifier) { language in
-                Button { translate(into: language) } label: {
-                    if language.minimalIdentifier == target?.minimalIdentifier {
-                        Label(InkTranslation.name(of: language), systemImage: "checkmark")
-                    } else {
-                        Text(InkTranslation.name(of: language))
-                    }
-                }
+                Button(InkTranslation.name(of: language)) { translate(into: language) }
+                    .menuChosen(language.minimalIdentifier == target?.minimalIdentifier)
             }
         } label: {
             Label("Translate", systemImage: "translate")
         }
-        .menuStyle(.button)
-        .buttonStyle(.boardIcon)
+        .buttonStyle(.plateIcon)
         .disabled(isTranslating || (original ?? text).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         .accessibilityIdentifier("inktext.translate")
     }

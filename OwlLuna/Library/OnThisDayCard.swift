@@ -10,6 +10,7 @@ struct OnThisDayCard: View {
     @Environment(LibraryStore.self) private var store
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var image: UIImage?
+    @PaperNight private var night
 
     private var record: NotebookRecord { memory.record }
     private var notebookTitle: String { record.title.isEmpty ? String(localized: "Untitled") : record.title }
@@ -62,11 +63,11 @@ struct OnThisDayCard: View {
         .accessibilityIdentifier("desk.onThisDay")
         .accessibilityAction(named: Text("Hide for Today"), onHide)
         .accessibilityAction(named: Text("Turn Off On This Day"), onTurnOff)
-        .contextMenu {
+        .heldMenu(Text("On This Day")) {
             Button(action: onHide) { Label("Hide for Today", systemImage: "eye.slash") }
             Button(action: onTurnOff) { Label("Turn Off On This Day", systemImage: "clock.badge.xmark") }
         }
-        .task(id: memory.page?.thumbnailKey) { await loadImage() }
+        .task(id: "\(memory.page?.thumbnailKey ?? "")|\(night)") { await loadImage() }
     }
 
     @ViewBuilder
@@ -85,7 +86,7 @@ struct OnThisDayCard: View {
 
     private func loadImage() async {
         guard let page = memory.page else { return }
-        let loaded = await PageThumbnailer.thumbnail(package: NotebookPackage(root: store.root, id: record.id), page: page)
+        let loaded = await PageThumbnailer.thumbnail(package: NotebookPackage(root: store.root, id: record.id), page: page, night: night)
         guard !Task.isCancelled, let loaded else { return }
         withAnimation(Motion.adaptive(Motion.quick, reduceMotion: reduceMotion)) { image = loaded }
     }

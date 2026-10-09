@@ -26,8 +26,8 @@ struct TagChip: View {
         .padding(.trailing, Space.x3)
         .padding(.vertical, Space.x1)
         .frame(minHeight: 32)
-        .background(isChosen ? Color.mustard : Color.labelCream, in: Capsule())
-        .overlay { Capsule().strokeBorder(Color.hairline, lineWidth: 1) }
+        .background(isChosen ? Color.mustard : Color.labelCream, in: RoundedRectangle.plate)
+        .overlay { RoundedRectangle.plate.strokeBorder(Color.hairline, lineWidth: 1) }
     }
 }
 
@@ -47,9 +47,9 @@ struct TagHole: View {
 /// The small blank label on the thumbnail of a page that carries tags.
 struct TagMark: View {
     var body: some View {
-        Capsule()
+        RoundedRectangle.thumb
             .fill(Color.labelCream)
-            .overlay { Capsule().strokeBorder(Color.labelInk.opacity(0.3), lineWidth: 1) }
+            .overlay { RoundedRectangle.thumb.strokeBorder(Color.labelInk.opacity(0.3), lineWidth: 1) }
             .overlay(alignment: .leading) { TagHole(diameter: 6).padding(.leading, 4) }
             .frame(width: 26, height: 14)
             .accessibilityHidden(true)

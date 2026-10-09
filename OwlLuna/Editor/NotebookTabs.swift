@@ -65,13 +65,13 @@ struct TabStrip: View {
                     withAnimation(reduceMotion ? nil : Motion.standard) { proxy.scrollTo(selected) }
                 }
             }
-            .well(in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .well(in: RoundedRectangle.track)
+            .clipShape(RoundedRectangle.track)
             .accessibilityElement(children: .contain)
             .accessibilityAddTraits(.isTabBar)
             .accessibilityLabel(Text("Open Notebooks"))
             Button { window.pickingTab = true } label: { Label("Open Another Notebook in a Tab", systemImage: "plus") }
-                .buttonStyle(.boardIcon)
+                .buttonStyle(.plateIcon)
                 .disabled(tabs.count >= EditorWindow.tabLimit)
                 .accessibilityIdentifier("tabs.add")
         }
@@ -126,10 +126,10 @@ struct TabStrip: View {
             .accessibilityShowsLargeContentViewer { Label("Close \(title)", systemImage: "xmark") }
             .accessibilityIdentifier("tabs.close.\(title)")
         }
-        .contentShape(.hoverEffect, RoundedRectangle(cornerRadius: 18, style: .continuous).inset(by: 4))
+        .contentShape(.hoverEffect, RoundedRectangle.thumb.inset(by: 4))
         .hoverEffect(.highlight)
         .overlay { if dropTarget == id, dragging != id { insertionRule(at: index, of: count) } }
-        .contextMenu { menu(for: id, at: index, of: count) } preview: { lifted(title, cloth: record?.cloth ?? .slate) }
+        .heldMenu(Text(title), draggable: true) { menu(for: id, at: index, of: count) }
         .onDrag {
             dragging = id
             let provider = NSItemProvider()
@@ -148,7 +148,7 @@ struct TabStrip: View {
 
     /// A tab off the bar, while it is held or dragged: its label on a board of its own, as the tab on show has.
     private func lifted(_ title: String, cloth: ClothColor) -> some View {
-        let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+        let shape = RoundedRectangle.plate
         return HStack(spacing: Space.x2) {
             SpineChip(cloth: cloth)
             Text(title)
@@ -160,7 +160,7 @@ struct TabStrip: View {
         .frame(minWidth: 72, maxWidth: 220, minHeight: 36)
         .fixedSize()
         .background(Color.board)
-        .contentShape([.contextMenuPreview, .dragPreview], shape)
+        .contentShape(.dragPreview, shape)
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
     }
 
@@ -175,7 +175,7 @@ struct TabStrip: View {
         if index < count - 1 {
             Button { move(id, to: index + 1) } label: { Label("Move Right", systemImage: "arrow.right") }
         }
-        Divider()
+        MenuBreak()
         Button { closeOthers(id) } label: { Label("Close Other Tabs", systemImage: "xmark.rectangle") }
         Button { close(id) } label: { Label("Close Tab", systemImage: "xmark") }
     }
@@ -210,7 +210,7 @@ struct TabStrip: View {
 
     /// The board under the tab on show, as `OwlLunaSegmentedPicker` draws its own.
     private var thumbView: some View {
-        let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
+        let shape = RoundedRectangle.thumb
         return Color.clear
             .board(in: shape)
             .overlay { if scheme == .dark { shape.fill(Color.ink.opacity(0.10)) } }

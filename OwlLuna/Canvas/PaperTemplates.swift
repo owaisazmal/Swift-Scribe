@@ -1,4 +1,4 @@
-import UIKit
+import SwiftUI
 import CoreText
 
 /// The colours a template draws with on a given paper; grids and dots use the line colour at their own alpha.
@@ -9,8 +9,9 @@ struct TemplateInk {
     var grid: CGFloat = 0.35
     var dots: CGFloat = 0.9
 
-    static func `for`(_ color: PaperColor) -> TemplateInk {
-        switch color {
+    /// At `night` light paper is shown dark, and is ruled as Charcoal is.
+    static func `for`(_ color: PaperColor, night: Bool = false) -> TemplateInk {
+        switch night && !color.isDark ? .charcoal : color {
         case .white, .ivory, .yellow, .gray:
             TemplateInk(line: UIColor(red: 0.55, green: 0.68, blue: 0.84, alpha: 0.55),
                         accent: UIColor(red: 0.9, green: 0.35, blue: 0.35, alpha: 0.45), strong: UIColor(white: 0.35, alpha: 0.7))
@@ -36,6 +37,46 @@ struct TemplateInk {
 extension PaperColor {
     /// How PencilKit shows ink on this paper. Only Chalkboard writes light; Charcoal keeps the ink its pages already have.
     var inkAppearance: UIUserInterfaceStyle { self == .chalkboard ? .dark : .light }
+
+    /// Light paper as it is shown in Dark Mode: a dark sheet with a little of its own colour left in it.
+    var nightRGB: (CGFloat, CGFloat, CGFloat) {
+        switch self {
+        case .white: (0.133, 0.129, 0.125)
+        case .ivory: (0.141, 0.129, 0.106)
+        case .yellow: (0.145, 0.133, 0.086)
+        case .gray: (0.137, 0.145, 0.157)
+        case .kraft: (0.165, 0.129, 0.094)
+        case .sage: (0.11, 0.141, 0.118)
+        case .blush: (0.161, 0.118, 0.114)
+        case .charcoal, .chalkboard: rgb
+        }
+    }
+}
+
+extension NotebookPage {
+    /// Whether the page is shown dark at `night`: light paper is. A PDF or a photo keeps its own colours.
+    func turnsDark(_ night: Bool) -> Bool { night && template != nil && !paperColor.isDark }
+
+    /// Whether what lies on the page is drawn for dark paper.
+    func isDark(night: Bool) -> Bool { effectivePaperColor.isDark || turnsDark(night) }
+
+    func inkAppearance(night: Bool) -> UIUserInterfaceStyle { turnsDark(night) ? .dark : effectivePaperColor.inkAppearance }
+
+    /// The colour of the page's paper as it is shown.
+    func paperShown(night: Bool) -> UIColor { PageRenderer.paperColor(effectivePaperColor, night: turnsDark(night)) }
+}
+
+/// Whether light paper is shown dark: in Dark Mode, unless that is turned off in Settings. What is exported never is.
+@propertyWrapper
+struct PaperNight: DynamicProperty {
+    @Environment(\.colorScheme) private var scheme
+    @AppStorage(SettingsKey.darkPaper) private var isAllowed = true
+
+    var wrappedValue: Bool { isAllowed && scheme == .dark }
+
+    static func isOn(_ traits: UITraitCollection) -> Bool {
+        traits.userInterfaceStyle == .dark && UserDefaults.standard.object(forKey: SettingsKey.darkPaper) as? Bool ?? true
+    }
 }
 
 private extension UIColor {
@@ -46,7 +87,7 @@ extension PageRenderer {
     /// A whiteboard's rules have no margins and never end: the same gaps as a Letter page, drawn only inside the clip.
     /// `origin` is where the piece being drawn sits on its board, so the rules stay under the ink they were under.
     /// Zoomed far out, every second or fourth rule is left out rather than run together.
-    static func drawBoardPaper(_ template: PaperTemplate, color: PaperColor, origin: CGPoint, scale: CGFloat, in ctx: CGContext) {
+    static func drawBoardPaper(_ template: PaperTemplate, color: PaperColor, origin: CGPoint, scale: CGFloat, in ctx: CGContext, night: Bool = false) {
         let gap: CGFloat = switch template {
         case .grid, .dotted: 26
         case .narrowRuled: 28
@@ -65,7 +106,7 @@ extension PageRenderer {
         }
         let xs = marks(from: visible.minX, to: visible.maxX, offset: origin.x * scale)
         let ys = marks(from: visible.minY, to: visible.maxY, offset: origin.y * scale)
-        let ink = TemplateInk.for(color)
+        let ink = TemplateInk.for(color, night: night)
         ctx.saveGState()
         ctx.setLineWidth(max(0.5, unit))
         switch template {
@@ -91,9 +132,9 @@ extension PageRenderer {
     }
 
     /// Rules scale with the page width (v1's 800-unit grid); only rules inside the clip are drawn.
-    static func drawTemplate(_ template: PaperTemplate, color: PaperColor, in ctx: CGContext, size: CGSize) {
+    static func drawTemplate(_ template: PaperTemplate, color: PaperColor, in ctx: CGContext, size: CGSize, night: Bool = false) {
         let unit = size.width / 800
-        let ink = TemplateInk.for(color)
+        let ink = TemplateInk.for(color, night: night)
         let rules = TemplateRules(ctx: ctx, size: size)
         let width = size.width, height = size.height
         ctx.saveGState()

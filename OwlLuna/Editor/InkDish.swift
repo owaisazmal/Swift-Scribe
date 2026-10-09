@@ -102,7 +102,7 @@ struct InkDish: View {
     private func wellButton(_ pen: ToolPreset, at index: Int) -> some View {
         let inHand = toolbox.choice == .pen(pen.id)
         return Button { take(.pen(pen.id), named: pen.name) } label: {
-            InkWell(preset: pen, inUse: inHand, onDark: session.inkIsLight)
+            InkWell(preset: pen, inUse: inHand, onDark: session.inkIsLight, turned: session.paperIsNight)
         }
         .buttonStyle(WellButtonStyle())
         .accessibilityLabel(Text(pen.name))
@@ -136,6 +136,7 @@ private struct InkWell: View {
     let preset: ToolPreset
     let inUse: Bool
     let onDark: Bool
+    let turned: Bool
     @Environment(\.colorScheme) private var scheme
     @Environment(\.colorSchemeContrast) private var contrast
 
@@ -144,7 +145,7 @@ private struct InkWell: View {
         let rim = night ? ToolSwatch.rim(contrast) : (onDark ? Color.white : Color.labelInk).opacity(contrast == .increased ? 0.6 : 0.22)
         ZStack {
             Circle().fill(ToolSwatch.paper(onDark: onDark, night: night))
-            Circle().fill(ToolSwatch.ink(preset, onDark: onDark, night: night))
+            Circle().fill(ToolSwatch.ink(preset, onDark: onDark, night: night, turned: turned))
             // The ink lies in a hollow: its upper edge is in shadow.
             Circle().stroke(Color.black.opacity(0.22), lineWidth: 3).blur(radius: 1.5).offset(y: 1.5).clipShape(Circle())
             Image(systemName: preset.symbol)
@@ -169,8 +170,8 @@ private struct InkWell: View {
     /// Whether the kind's mark is dark: the ink, as faint as it is over what it lies on, is light enough to need it.
     private func marksDark(night: Bool) -> Bool {
         let style = UITraitCollection(userInterfaceStyle: scheme == .dark ? .dark : .light)
-        let under = night ? UIColor.white : UIColor(ToolSwatch.paper(onDark: onDark, night: night)).resolvedColor(with: style)
-        let over = UIColor(ToolSwatch.ink(preset, onDark: onDark, solid: true)).resolvedColor(with: style)
+        let under = night && !turned ? UIColor.white : UIColor(ToolSwatch.paper(onDark: onDark, night: night)).resolvedColor(with: style)
+        let over = UIColor(ToolSwatch.ink(preset, onDark: onDark, solid: true, turned: turned)).resolvedColor(with: style)
         return InkDish.luminance(of: over, at: preset.opacity, over: under) > 0.36
     }
 }
