@@ -67,10 +67,10 @@ struct OwlLunaPalette: Sendable {
         }
     }
 
-    /// The in-app launch mark on light paper: the primary icon's violet sky.
+    /// The in-app mark on light paper: the primary icon's violet sky.
     static var launchLight: OwlLunaPalette { icon(.cobalt, .light) }
 
-    /// The launch mark at night: a midnight navy-violet sky.
+    /// The in-app mark at night: a midnight navy-violet sky.
     static var launchDark: OwlLunaPalette {
         var palette = icon(.cobalt, .light)
         palette.skyTop = OwlLunaRGBA(hex: 0x1E1449)

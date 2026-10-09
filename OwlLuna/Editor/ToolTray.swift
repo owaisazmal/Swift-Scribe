@@ -297,6 +297,7 @@ private struct PenOptions: View {
     let onDark: Bool
     let turned: Bool
     let remove: () -> Void
+    @State private var mixing = false
     @Environment(\.dynamicTypeSize) private var textSize
     @Environment(\.colorScheme) private var scheme
 
@@ -338,12 +339,7 @@ private struct PenOptions: View {
                 .accessibilityIdentifier("editor.tools.pen.kind")
             LazyVGrid(columns: Self.columns, spacing: 0) {
                 ForEach(ToolPreset.palette(for: ink), id: \.self) { color in colourButton(color, chosen: pen.tint == color) }
-                ColorPicker("Custom Colour", selection: Binding(get: { Color(uiColor: ToolPreset.uiColor(pen.tint)) }, set: { color in
-                    toolbox.changePen(id) { $0.setTint(ToolPreset.bytes(of: UIColor(color))) }
-                }), supportsOpacity: false)
-                    .labelsHidden()
-                    .frame(maxWidth: .infinity, minHeight: Self.cell)
-                    .accessibilityIdentifier("editor.tools.pen.custom")
+                mixButton(pen)
             }
             .accessibilityElement(children: .contain)
             .accessibilityLabel(Text("Colour"))
@@ -379,6 +375,28 @@ private struct PenOptions: View {
         .overlay(alignment: .top) { Rectangle().fill(Color.hairline).frame(height: 1) }
     }
 
+    /// The last blot of the palette is a colour of your own: it opens the strips it is mixed on.
+    private func mixButton(_ pen: ToolPreset) -> some View {
+        let own = !ToolPreset.palette(for: pen.inkType ?? .pen).contains(pen.tint)
+        return Button { mixing = true } label: {
+            Circle()
+                .fill(own ? Color(uiColor: ToolPreset.uiColor(pen.tint)) : Color.board)
+                .overlay { Circle().strokeBorder(AngularGradient(colors: InkMixer.hues, center: .center), lineWidth: 4) }
+                .frame(width: 28, height: 28)
+                .padding(4)
+                .overlay { if own { Circle().strokeBorder(Color.accentColor, lineWidth: 2) } }
+                .frame(maxWidth: .infinity, minHeight: Self.cell)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .panel("Custom Colour", isPresented: $mixing) {
+            InkMixer(color: ToolPreset.uiColor(pen.tint)) { color in toolbox.changePen(id) { $0.setTint(ToolPreset.bytes(of: color)) } }
+        }
+        .accessibilityLabel(Text("Custom Colour"))
+        .accessibilityAddTraits(own ? .isSelected : [])
+        .accessibilityIdentifier("editor.tools.pen.custom")
+    }
+
     private func colourButton(_ color: UInt32, chosen: Bool) -> some View {
         Button { toolbox.changePen(id) { $0.setTint(color) } } label: {
             Circle()
@@ -393,6 +411,81 @@ private struct PenOptions: View {
         .buttonStyle(.plain)
         .accessibilityLabel(Text(ToolPreset.colorName(color)))
         .accessibilityAddTraits(chosen ? .isSelected : [])
+    }
+}
+
+/// A colour mixed on two strips: its hue on one, and on the other how far it is let down to white or deepened to black.
+private struct InkMixer: View {
+    let mix: (UIColor) -> Void
+    @State private var hue: Double
+    @State private var shade: Double
+
+    static let hues: [Color] = stride(from: 0.0, through: 1.0, by: 1.0 / 12).map { Color(hue: $0, saturation: 0.85, brightness: 0.95) }
+
+    init(color: UIColor, mix: @escaping (UIColor) -> Void) {
+        self.mix = mix
+        var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        color.getHue(&h, saturation: &s, brightness: &b, alpha: &a)
+        _hue = State(initialValue: h)
+        _shade = State(initialValue: b < 0.99 ? 0.5 + (1 - b) / 2 : s / 2)
+    }
+
+    /// Half way along the shade strip the hue is at its fullest; before it there is white in it, after it black.
+    private static func color(hue: Double, shade: Double) -> UIColor {
+        UIColor(hue: hue, saturation: min(1, shade * 2), brightness: min(1, (1 - shade) * 2), alpha: 1)
+    }
+
+    var body: some View {
+        let color = Self.color(hue: hue, shade: shade)
+        HStack(spacing: Space.x4) {
+            RoundedRectangle.plate
+                .fill(Color(uiColor: color))
+                .frame(width: 44, height: 44)
+                .plate(in: RoundedRectangle.plate)
+                .accessibilityHidden(true)
+            VStack(spacing: 0) {
+                MixStrip(title: "Hue", value: $hue, colors: Self.hues)
+                MixStrip(title: "Shade", value: $shade, colors: [.white, Color(uiColor: Self.color(hue: hue, shade: 0.5)), .black])
+            }
+        }
+        .padding(Space.x4)
+        .frame(width: 304 + Space.x4 * 2)
+        .onChange(of: hue) { _, _ in mix(Self.color(hue: hue, shade: shade)) }
+        .onChange(of: shade) { _, _ in mix(Self.color(hue: hue, shade: shade)) }
+    }
+}
+
+/// A strip of colour with a square knob on it. It is read the same way in every language, so it never turns round.
+private struct MixStrip: View {
+    let title: LocalizedStringKey
+    @Binding var value: Double
+    let colors: [Color]
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    private static let knob = CGSize(width: 14, height: 28)
+
+    var body: some View {
+        GeometryReader { proxy in
+            let travel = max(proxy.size.width - Self.knob.width, 1)
+            ZStack(alignment: .leading) {
+                RoundedRectangle.thumb
+                    .fill(LinearGradient(colors: colors, startPoint: .leading, endPoint: .trailing))
+                    .overlay { RoundedRectangle.thumb.strokeBorder(plateEdge(contrast), lineWidth: 1) }
+                    .frame(height: 16)
+                RoundedRectangle.thumb
+                    .fill(Color.board)
+                    .overlay { RoundedRectangle.thumb.strokeBorder(Color.ink, lineWidth: 1.5) }
+                    .frame(width: Self.knob.width, height: Self.knob.height)
+                    .shadow(color: .black.opacity(0.22), radius: 1.5, y: 1)
+                    .offset(x: travel * value)
+            }
+            .frame(maxHeight: .infinity)
+            .contentShape(Rectangle())
+            .gesture(DragGesture(minimumDistance: 0).onChanged { value = min(max(($0.location.x - Self.knob.width / 2) / travel, 0), 1) })
+        }
+        .frame(height: 44)
+        .environment(\.layoutDirection, .leftToRight)
+        .accessibilityRepresentation { Slider(value: $value) { Text(title) } }
     }
 }
 

@@ -70,13 +70,9 @@ struct InkTextSheet: View {
                     }
                 case .nothing, .failed:
                     ScrollView {
-                        ContentUnavailableView {
-                            Label(phase == .nothing ? "No Words Found" : "Couldn't Read the Ink", systemImage: "text.viewfinder").foregroundStyle(Color.ink)
-                        } description: {
-                            Text(phase == .nothing ? "Nothing in the selected ink could be read as writing. Try selecting whole words or lines."
-                                                   : "The handwriting recogniser didn't answer. Try again in a moment.")
-                                .foregroundStyle(Color.textSecondary)
-                        }
+                        EmptyPlate(phase == .nothing ? "No Words Found" : "Couldn't Read the Ink", systemImage: "text.viewfinder",
+                                   message: Text(phase == .nothing ? "Nothing in the selected ink could be read as writing. Try selecting whole words or lines."
+                                                                   : "The handwriting recogniser didn't answer. Try again in a moment."))
                     }
                     .scrollBounceBehavior(.basedOnSize)
                     .accessibilityIdentifier("inktext.empty")

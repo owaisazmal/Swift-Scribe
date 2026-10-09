@@ -26,8 +26,9 @@ struct OwlLunaApp: App {
 struct OwlLunaRoot: View {
     @State private var app = AppModel.shared
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showsLaunch = false
-    /// The launch overlay has begun handing over, so the library is on its way in.
+    /// The launch overlay has begun handing over, so the library is there under it.
     @State private var libraryShown = false
 
     private var libraryOpacity: Double {
@@ -35,19 +36,26 @@ struct OwlLunaRoot: View {
         return app.phase == .ready ? 1 : 0
     }
 
+    /// Under the splash the library waits a little large, and settles as the tiles leave it.
+    private var libraryScale: CGFloat {
+        showsLaunch && !libraryShown && !reduceMotion ? LaunchOverlay.libraryStart : 1
+    }
+
     var body: some View {
         ZStack {
             LibraryRootView()
                 .opacity(libraryOpacity)
+                .animation(LaunchOverlay.settle) { $0.scaleEffect(libraryScale) }
                 .accessibilityHidden(showsLaunch && !libraryShown)
                 .allowsHitTesting(!showsLaunch || libraryShown)
             if showsLaunch {
                 LaunchOverlay(isReady: app.phase == .ready,
-                              onHandOver: { withAnimation(.easeOut(duration: LaunchOverlay.handOverDuration)) { libraryShown = true } },
+                              onHandOver: { withAnimation(reduceMotion ? .easeOut(duration: LaunchOverlay.stillFade) : nil) { libraryShown = true } },
                               onFinished: { showsLaunch = false })
             }
         }
         .background(Color.paper.ignoresSafeArea())
+        .progressViewStyle(.thread)
         .environment(app)
         .environment(app.library)
         .environment(app.activity)

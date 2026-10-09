@@ -1937,7 +1937,7 @@ struct RecordingList: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            List {
+            Ledger {
               Section {
                 ForEach(Array(recorder.recordings.enumerated()), id: \.element.id) { index, recording in
                     HStack(spacing: Space.x3) {
@@ -1974,13 +1974,11 @@ struct RecordingList: View {
                         }
                         .buttonStyle(.barIcon)
                     }
-                    .swipeActions {
+                    .ledgerSwipe {
                         if !recorder.isReadOnly {
                             Button(role: .destructive) { recorder.delete(recording) } label: { Label("Delete", systemImage: "trash") }
                         }
                     }
-                    .listRowBackground(Color.surface)
-                    .listRowSeparatorTint(Color.hairline)
                 }
               } footer: {
                 if replay != nil, !recorder.recordings.isEmpty {
@@ -1989,16 +1987,12 @@ struct RecordingList: View {
                 }
               }
             }
-            .scrollContentBackground(.hidden)
             .background(Color.surface)
             .overlay {
                 if recorder.recordings.isEmpty {
                     ScrollView {
-                        ContentUnavailableView {
-                            Label("No Recordings", systemImage: "waveform").foregroundStyle(Color.ink)
-                        } description: {
-                            Text("Tap the microphone to record a lecture or meeting alongside your notes.").foregroundStyle(Color.textSecondary)
-                        }
+                        EmptyPlate("No Recordings", systemImage: "waveform",
+                                   message: Text("Tap the microphone to record a lecture or meeting alongside your notes."))
                     }
                     .scrollBounceBehavior(.basedOnSize)
                     .background(Color.surface)

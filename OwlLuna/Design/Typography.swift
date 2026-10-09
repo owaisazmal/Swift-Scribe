@@ -7,6 +7,7 @@ enum OwlLunaFonts {
     static let frauncesSemiBold = "Fraunces-SemiBold"
     static let frauncesRegular = "Fraunces-Regular"
     static let bricolage = "BricolageGrotesque-96ptExtraBold"
+    static let archivo = "ArchivoRoman-Black"
 
     private static let registered = OSAllocatedUnfairLock(initialState: false)
 
@@ -40,6 +41,11 @@ enum OwlLunaFonts {
     /// Bricolage Grotesque condensed ExtraBold, for Print titles only.
     static func printTitle(size: CGFloat) -> CTFont {
         variable(bricolage, size: size, axes: [weight: 800, width: 75, opticalSize: min(max(size, 12), 96)])
+    }
+
+    /// Archivo Black for the launch splash, as wide as asked: 62 is its narrowest cut, 100 its usual one, 125 its widest.
+    static func splashTitle(size: CGFloat, width: CGFloat) -> CTFont {
+        variable(archivo, size: size, axes: [weight: 900, self.width: width])
     }
 
     private static func variable(_ name: String, size: CGFloat, axes: [UInt32: CGFloat]) -> CTFont {

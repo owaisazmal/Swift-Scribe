@@ -289,11 +289,7 @@ struct StudyGuideSheet: View {
 
     private func failed(_ message: String) -> some View {
         ScrollView {
-            ContentUnavailableView {
-                Label("Couldn't Write This", systemImage: "text.badge.xmark").foregroundStyle(Color.ink)
-            } description: {
-                Text(message).foregroundStyle(Color.textSecondary)
-            } actions: {
+            EmptyPlate("Couldn't Write This", systemImage: "text.badge.xmark", message: Text(message)) {
                 Button("Try Again", action: retry)
                     .buttonStyle(.owlLuna)
             }
@@ -304,11 +300,7 @@ struct StudyGuideSheet: View {
 
     private var unavailable: some View {
         ScrollView {
-            ContentUnavailableView {
-                Label("Not on This iPad Yet", systemImage: "lock.ipad").foregroundStyle(Color.ink)
-            } description: {
-                Text(unavailableReason).foregroundStyle(Color.textSecondary)
-            }
+            EmptyPlate("Not on This iPad Yet", systemImage: "lock.ipad", message: Text(unavailableReason))
         }
         .scrollBounceBehavior(.basedOnSize)
         .accessibilityIdentifier("guide.unavailable")

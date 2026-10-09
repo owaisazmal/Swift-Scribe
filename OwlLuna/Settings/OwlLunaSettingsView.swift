@@ -355,7 +355,8 @@ struct AcknowledgementsView: View {
 
     private var entries: [Entry] {
         [("Fraunces", String(localized: "Library headings, cloth labels and empty states"), "OFL-Fraunces"),
-         ("Bricolage Grotesque", String(localized: "Print cover titles"), "OFL-BricolageGrotesque")].map { name, use, file in
+         ("Bricolage Grotesque", String(localized: "Print cover titles"), "OFL-BricolageGrotesque"),
+         ("Archivo", String(localized: "The opening screen"), "OFL-Archivo")].map { name, use, file in
             let url = Bundle.main.url(forResource: file, withExtension: "txt")
             return Entry(id: file, name: name, use: use, license: url.flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? "")
         }

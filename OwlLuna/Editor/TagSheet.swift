@@ -204,13 +204,11 @@ struct TaggedPagesSection: View {
                     }
                     .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
-                .listRowBackground(Color.surface)
                 .accessibilityLabel(Text("\(tags.formatted(.list(type: .and))), page \(item.index + 1)"))
                 .accessibilityHint(Text("Opens this page"))
             }
         } header: {
-            Text("Tagged Pages").foregroundStyle(Color.textSecondary)
+            Text("Tagged Pages")
         }
     }
 }

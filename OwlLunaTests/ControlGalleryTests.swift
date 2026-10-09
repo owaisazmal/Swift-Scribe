@@ -94,6 +94,30 @@ private struct ControlGallery: View {
             .padding(Space.x4)
             .background(Color.surface)
 
+            caption("Ledger, progress and nothing here, on Surface")
+            HStack(alignment: .top, spacing: Space.x4) {
+                Ledger {
+                    Section("Recordings") {
+                        Text("Recording 1").foregroundStyle(Color.ink)
+                        Button { } label: { Text("Recording 2").foregroundStyle(Color.ink) }
+                            .ledgerSwipe { Button(role: .destructive) { } label: { Label("Delete", systemImage: "trash") } }
+                    }
+                }
+                .frame(width: 260, height: 150)
+                VStack(alignment: .leading, spacing: Space.x5) {
+                    ProgressView(value: 0.62) { Text("Exporting…").foregroundStyle(Color.ink) } currentValueLabel: {
+                        Text("62%").foregroundStyle(Color.textSecondary)
+                    }
+                    ProgressView { Text("Reading your handwriting…").foregroundStyle(Color.ink) }
+                    ProgressView()
+                }
+                .progressViewStyle(.thread)
+                .frame(width: 220)
+                .padding(.top, Space.x4)
+                EmptyPlate("No Recordings", systemImage: "waveform", message: Text("Tap the microphone to record alongside your notes."))
+            }
+            .background(Color.surface)
+
             caption("Floating find bar, over paper")
             HStack(spacing: 0) {
                 OwlLunaSearchField("Find in Notebook", text: .constant("mitosis"), focus: $typedFocus).frame(width: 240)

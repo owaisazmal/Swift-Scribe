@@ -106,22 +106,17 @@ struct NotebookOutline: View {
         Group {
             if bookmarks.isEmpty, tagged.isEmpty, contents.isEmpty {
                 ScrollView {
-                    ContentUnavailableView {
-                        Label { Text("No Bookmarks Yet") } icon: { Image(systemName: "bookmark").foregroundStyle(Color.textSecondary) }
-                            .foregroundStyle(Color.ink)
-                    } description: {
-                        Text("Tap the small ribbon beside the page number to bookmark a page. Bookmarks, tagged pages and a PDF's table of contents are listed here.")
-                            .foregroundStyle(Color.textSecondary)
-                    }
+                    EmptyPlate("No Bookmarks Yet", systemImage: "bookmark",
+                               message: Text("Tap the small ribbon beside the page number to bookmark a page. Bookmarks, tagged pages and a PDF's table of contents are listed here."))
                 }
                 .scrollBounceBehavior(.basedOnSize)
             } else {
-                List {
+                Ledger {
                     if !bookmarks.isEmpty {
                         Section {
                             ForEach(bookmarks, id: \.page.id) { item in bookmarkRow(item.page, at: item.index) }
                         } header: {
-                            Text("Bookmarks").foregroundStyle(Color.textSecondary)
+                            Text("Bookmarks")
                         }
                     }
                     if !tagged.isEmpty { TaggedPagesSection(pages: tagged, open: open) }
@@ -129,11 +124,10 @@ struct NotebookOutline: View {
                         Section {
                             ForEach(contents) { entry in contentsRow(entry) }
                         } header: {
-                            Text("Contents").foregroundStyle(Color.textSecondary)
+                            Text("Contents")
                         }
                     }
                 }
-                .scrollContentBackground(.hidden)
             }
         }
         .task(id: pdfFiles) {
@@ -160,11 +154,9 @@ struct NotebookOutline: View {
             }
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        .listRowBackground(Color.surface)
         .accessibilityLabel(Text("\(page.bookmarkTitle(number: index + 1)), page \(index + 1)"))
         .accessibilityHint(Text("Opens this page"))
-        .swipeActions {
+        .ledgerSwipe {
             if !document.isReadOnly {
                 Button(role: .destructive) { document.setBookmark(nil, forPage: page.id) } label: { Label("Remove", systemImage: "bookmark.slash") }
                 Button { name = page.bookmark ?? ""; renaming = page.id } label: { Label("Rename", systemImage: "pencil") }
@@ -192,8 +184,6 @@ struct NotebookOutline: View {
                 }
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
-            .listRowBackground(Color.surface)
             .accessibilityLabel(Text("\(entry.title), page \(index + 1)"))
             .accessibilityHint(Text("Opens this page"))
         }

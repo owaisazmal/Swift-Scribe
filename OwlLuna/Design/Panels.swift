@@ -69,7 +69,7 @@ private struct PanelPresenter<Panel: View>: ViewModifier {
     func body(content: Content) -> some View {
         content.background {
             PanelProbe(spot: spot)
-                .fullScreenCover(isPresented: Binding(get: { covering }, set: { if !$0 { covering = false; isPresented = false } }),
+                .fullScreenCover(isPresented: Binding(get: { covering }, set: { if !$0 { covering = false; if !notice { isPresented = false } } }),
                                  onDismiss: finish) {
                     stage
                         .environment(\.panelClose, PanelClose(close: close))

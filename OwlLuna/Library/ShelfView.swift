@@ -685,7 +685,7 @@ struct ShelfView: View {
     @ViewBuilder
     private var emptyState: some View {
         if !searchText.isEmpty {
-            ContentUnavailableView.search(text: searchText)
+            EmptyShelf(title: String(localized: "Nothing found for “\(searchText)”"), message: String(localized: "Check the spelling, or try other words."))
         } else if scope == .trash {
             EmptyShelf(title: String(localized: "Nothing in the bin"), message: String(localized: "Deleted notebooks stay here for 30 days."))
         } else if scope == .favorites {

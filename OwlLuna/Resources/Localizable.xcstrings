@@ -6499,6 +6499,28 @@
         }
       }
     },
+    "Check the spelling, or try other words." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prüfe die Schreibweise oder versuche es mit anderen Wörtern."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revisa la ortografía o prueba con otras palabras."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vérifiez l’orthographe ou essayez d’autres mots."
+          }
+        }
+      }
+    },
     "Checklist" : {
       "localizations" : {
         "de" : {
@@ -10948,6 +10970,28 @@
         }
       }
     },
+    "Hue" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Farbton"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tono"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Teinte"
+          }
+        }
+      }
+    },
     "iCloud" : {
       "localizations" : {
         "de" : {
@@ -14906,6 +14950,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Notes pour la page %lld"
+          }
+        }
+      }
+    },
+    "Nothing found for “%@”" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nichts gefunden für „%@“"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se ha encontrado nada para “%@”"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun résultat pour « %@ »"
           }
         }
       }
@@ -19788,6 +19854,28 @@
         }
       }
     },
+    "Shade" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schattierung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sombreado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nuance"
+          }
+        }
+      }
+    },
     "shape" : {
       "localizations" : {
         "de" : {
@@ -22892,6 +22980,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les fichiers du carnet n’ont pas pu être lus."
+          }
+        }
+      }
+    },
+    "The opening screen" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Startbildschirm"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La pantalla de apertura"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’écran d’ouverture"
           }
         }
       }

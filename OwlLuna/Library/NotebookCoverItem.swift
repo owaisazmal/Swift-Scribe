@@ -36,8 +36,9 @@ struct NotebookCoverItem: View {
     var body: some View {
         let renderWidth = ShelfMetrics.renderWidth(for: width)
         let renderSize = CGSize(width: renderWidth, height: (renderWidth * 4 / 3).rounded())
-        VStack(alignment: .leading, spacing: ShelfLedge.height + Space.x2) {
-            Button(action: action) {
+        // The line under the cover is part of the button: it says what the button's label says, and is read with it.
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: ShelfLedge.height + Space.x2) {
                 RecordCover(record: record, width: renderWidth)
                     .frame(width: width)
                     .overlay {
@@ -55,24 +56,23 @@ struct NotebookCoverItem: View {
                     .overlay { if isSelected { StitchedSelection() } }
                     .zoomSource(id: "cover-\(record.id.uuidString)", in: zoomNamespace)
                     .contentShape(Rectangle())
+                    .hoverEffect(.lift)
+                meta
             }
-            .buttonStyle(.plain)
-            .hoverEffect(.lift)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(record.accessibilityDescription)
-            .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
-            .accessibilityHint(record.accessibilityHint(isSelecting: isSelecting))
-            .accessibilityActions {
-                if record.isTrashed, !isSelecting {
-                    Button("Restore") { changes.restore([record], in: store, undoManager: undoManager) }
-                    Button("Delete Permanently") { changes.requestPermanentDelete([record.id]) }
-                }
-            }
-            .accessibilityIdentifier("notebook.\(record.title)")
-            meta
-                .accessibilityHidden(true)
-                .onTapGesture(perform: action)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(record.accessibilityDescription)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+        .accessibilityHint(record.accessibilityHint(isSelecting: isSelecting))
+        .accessibilityActions {
+            if record.isTrashed, !isSelecting {
+                Button("Restore") { changes.restore([record], in: store, undoManager: undoManager) }
+                Button("Delete Permanently") { changes.requestPermanentDelete([record.id]) }
+            }
+        }
+        .accessibilityIdentifier("notebook.\(record.title)")
     }
 
     /// Page count and date on every card, the title where the cover doesn't carry it, and the shelf in

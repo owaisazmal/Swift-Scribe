@@ -107,7 +107,7 @@ private struct LinkNotebookPicker: View {
 
     var body: some View {
         let others = records.filter { $0.id != current }
-        List {
+        Ledger {
             Section {
                 ForEach(others) { record in
                     NavigationLink {
@@ -121,23 +121,21 @@ private struct LinkNotebookPicker: View {
                                     .font(.subheadline)
                                     .foregroundStyle(Color.textSecondary)
                             }
+                            Spacer(minLength: Space.x3)
+                            Image(systemName: "chevron.forward").font(.footnote.weight(.semibold)).foregroundStyle(Color.textSecondary)
+                                .accessibilityHidden(true)
                         }
                     }
-                    .listRowBackground(Color.surface)
                     .accessibilityIdentifier("link.notebook.\(record.title)")
                 }
             } footer: {
-                Text("Tapping the link saves this notebook, puts it away and opens the other one.").foregroundStyle(Color.textSecondary)
+                Text("Tapping the link saves this notebook, puts it away and opens the other one.")
             }
         }
-        .scrollContentBackground(.hidden)
         .overlay {
             if others.isEmpty {
-                ContentUnavailableView {
-                    Label("No Other Notebooks", systemImage: "books.vertical").foregroundStyle(Color.ink)
-                } description: {
-                    Text("Once you have another notebook, you can link to it from here.").foregroundStyle(Color.textSecondary)
-                }
+                EmptyPlate("No Other Notebooks", systemImage: "books.vertical",
+                           message: Text("Once you have another notebook, you can link to it from here."))
             }
         }
     }

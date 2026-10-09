@@ -76,23 +76,17 @@ struct DeckSheet: View {
 
     private func list(_ cards: [Flashcard], tapes: Int) -> some View {
         let due = cards.filter { $0.isDue(on: today) }.count
-        return List {
+        return Ledger {
             Section {
                 summary(count: cards.count, due: due)
-                    .listRowBackground(Color.surface)
-                    .listRowSeparator(.hidden)
-                if tapes > 0 {
-                    tapeRow(tapes)
-                        .listRowBackground(Color.surface)
-                        .listRowSeparatorTint(Color.hairline)
-                }
+                if tapes > 0 { tapeRow(tapes) }
             }
             Section {
                 ForEach(cards) { card in
                     DeckRow(card: card, notebook: notebook, page: card.pageID.flatMap(session.document.index(of:)).map { $0 + 1 }, today: today) {
                         if canChange { draft = CardDraft(editing: card) }
                     }
-                    .swipeActions {
+                    .ledgerSwipe {
                         if canChange {
                             Button(role: .destructive) { library.remove([card.id], from: notebook) } label: { Label("Delete", systemImage: "trash") }
                         }
@@ -108,14 +102,11 @@ struct DeckSheet: View {
                             Button(role: .destructive) { library.remove([card.id], from: notebook) } label: { Label("Delete Flashcard", systemImage: "trash") }
                         }
                     }
-                    .listRowBackground(Color.surface)
-                    .listRowSeparatorTint(Color.hairline)
                 }
             } header: {
-                Text("Cards").metaStyle(.footnote)
+                Text("Cards")
             }
         }
-        .scrollContentBackground(.hidden)
     }
 
     private func summary(count: Int, due: Int) -> some View {

@@ -137,19 +137,20 @@ xcodebuild test -project OwlLuna.xcodeproj -scheme OwlLuna -destination 'platfor
 
 ```
 OwlLuna/
-├── App/          App entry, launch (index refresh, the owl's launch animation), test-only seeds and probes
+├── App/          App entry, launch (index refresh, the splash's overlay), test-only seeds and probes
+├── Launch/       The launch splash: its clock, its grid of tiles and what each tile draws
 ├── Models/       Manifest types (NotebookManifest, NotebookPage, CoverSpec), paper types
 ├── Storage/      Notebook packages, tolerant manifest codec, SwiftData library index
 ├── Canvas/       Page stack (one PencilKit canvas per visible page), page rendering, undo proxy
 ├── Editor/       NotebookDocument (model, undo, autosave), editor chrome, navigator, recorder, second screen
 ├── Library/      Library views, covers, new-notebook sheet, library store, one-editor registry
-├── Design/       Colour tokens, typography (Fraunces, Bricolage Grotesque), cover renderer, the launch mark
+├── Design/       Colour tokens, typography (Fraunces, Bricolage Grotesque, Archivo), cover renderer, the owl mark
 ├── Services/     PDF, image and video export, library backup, iCloud sync, handwriting and speech recognition,
 │                 scanning, translation, the calendar, notebook locks, Spotlight
 ├── Settings/     Settings and acknowledgements
 └── Resources/    Bundled fonts with their licences, privacy manifest, string catalogs
 OwlLunaWidgets/   The widget extension: Continue Writing, This Week, Today's Page, Quick Note, and the Control Center buttons
-Shared/           The owl on its moon (the app icon and the launch mark), the snapshot the app writes and the widgets read, and what a Control Center button hands the app
+Shared/           The owl on its moon (the app icon and the mark in Settings), the snapshot the app writes and the widgets read, and what a Control Center button hands the app
 ```
 
 Key design decisions (details and measurements in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); visual system in [docs/DESIGN.md](docs/DESIGN.md)):

@@ -381,33 +381,29 @@ struct BesidePicker: View {
             $0.id != current && !exclude.contains($0.id) && DocumentRegistry.shared.document(for: $0.id) == nil && !DocumentRegistry.shared.isOpening($0.id)
         }
         NavigationStack {
-            List(others) { record in
-                Button {
-                    pick(record.id)
-                    dismiss()
-                } label: {
-                    HStack(spacing: Space.x4) {
-                        RecordCover(record: record, width: CoverWidth.row, showsShadow: false).frame(width: 40)
-                        VStack(alignment: .leading, spacing: Space.x1) {
-                            Text(record.title).font(.headline).foregroundStyle(Color.ink)
-                            Text("\(record.pageCount) pages")
-                                .font(.subheadline)
-                                .foregroundStyle(Color.textSecondary)
+            Ledger {
+                ForEach(others) { record in
+                    Button {
+                        pick(record.id)
+                        dismiss()
+                    } label: {
+                        HStack(spacing: Space.x4) {
+                            RecordCover(record: record, width: CoverWidth.row, showsShadow: false).frame(width: 40)
+                            VStack(alignment: .leading, spacing: Space.x1) {
+                                Text(record.title).font(.headline).foregroundStyle(Color.ink)
+                                Text("\(record.pageCount) pages")
+                                    .font(.subheadline)
+                                    .foregroundStyle(Color.textSecondary)
+                            }
                         }
                     }
+                    .accessibilityIdentifier("beside.notebook.\(record.title)")
                 }
-                .listRowBackground(Color.surface)
-                .accessibilityIdentifier("beside.notebook.\(record.title)")
             }
-            .scrollContentBackground(.hidden)
             .background(Color.desk)
             .overlay {
                 if others.isEmpty {
-                    ContentUnavailableView {
-                        Label("No Other Notebooks", systemImage: "books.vertical").foregroundStyle(Color.ink)
-                    } description: {
-                        Text(emptyMessage).foregroundStyle(Color.textSecondary)
-                    }
+                    EmptyPlate("No Other Notebooks", systemImage: "books.vertical", message: Text(emptyMessage))
                 }
             }
             .navigationTitle(title)

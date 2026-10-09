@@ -8,7 +8,7 @@ struct OwlLunaMarkPart: Sendable {
     let lineCap: CGLineCap
 }
 
-/// The art's parts grouped by what moves together, converted once per palette.
+/// The art's parts in the groups the mark draws, converted once per palette.
 struct OwlLunaMarkGroups: Sendable {
     enum Group: CaseIterable, Sendable {
         case moon, sparkle, asterisk, owl, eyes, features, pencil
@@ -47,60 +47,31 @@ struct OwlLunaMarkGroups: Sendable {
     func parts(_ group: Group) -> [OwlLunaMarkPart] { groups[group] ?? [] }
 }
 
-private extension Color {
+extension Color {
     init(_ rgba: OwlLunaRGBA) { self.init(.sRGB, red: rgba.r, green: rgba.g, blue: rgba.b, opacity: rgba.a) }
 }
 
-/// The owl on its moon as a square tile, each group of parts on its own layer so the launch can move them apart.
+/// The owl on its moon as a square tile, as Settings › About shows it.
 struct OwlLunaMark: View {
-    /// Converted once per palette; defaults to the launch groups for the colour scheme.
-    var groups: OwlLunaMarkGroups?
-    /// Degrees around the moon's pivot.
-    var moonSwing: Double = 0
-    var owlScale: CGFloat = 1
-    var owlOffset: CGSize = .zero
-    var owlOpacity: Double = 1
-    /// 0 open to 1 closed: the eyes squash onto their row behind the glasses.
-    var blink: Double = 0
-    /// Degrees around the grip.
-    var pencilTilt: Double = 0
-    /// Opacity and scale of the four-point star, 0 to 1.
-    var sparkle: Double = 1
-    /// The same for the asterisk, so the two can twinkle out of phase.
-    var twinkle: Double = 1
-    var skyOpacity: Double = 1
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        let groups = groups ?? (colorScheme == .dark ? .launchDark : .launchLight)
+        let groups: OwlLunaMarkGroups = colorScheme == .dark ? .launchDark : .launchLight
         ZStack {
             if let top = groups.skyTop {
                 TileShape()
                     .fill(LinearGradient(colors: [top, groups.skyBottom ?? top], startPoint: .top, endPoint: .bottom))
-                    .opacity(skyOpacity)
             }
             MoonLayer(groups: groups)
-                .rotationEffect(.degrees(moonSwing), anchor: unit(OwlLunaArt.moonPivot))
-            StarLayer(parts: groups.parts(.sparkle), center: OwlLunaArt.starSparkle, level: sparkle)
-            StarLayer(parts: groups.parts(.asterisk), center: OwlLunaArt.starAsterisk, level: twinkle)
-            ZStack {
-                PartsLayer(parts: groups.parts(.owl))
-                PartsLayer(parts: groups.parts(.eyes))
-                    .scaleEffect(x: 1, y: max(0.02, 1 - blink), anchor: unit(CGPoint(x: OwlLunaArt.canvas / 2, y: OwlLunaArt.eyeCenterLeft.y)))
-                PartsLayer(parts: groups.parts(.features))
-                PartsLayer(parts: groups.parts(.pencil))
-                    .rotationEffect(.degrees(pencilTilt), anchor: unit(OwlLunaArt.pencilPivot))
-            }
-            .scaleEffect(owlScale, anchor: unit(OwlLunaArt.owlCenter))
-            .offset(owlOffset)
-            .opacity(owlOpacity)
+            PartsLayer(parts: groups.parts(.sparkle))
+            PartsLayer(parts: groups.parts(.asterisk))
+            PartsLayer(parts: groups.parts(.owl))
+            PartsLayer(parts: groups.parts(.eyes))
+            PartsLayer(parts: groups.parts(.features))
+            PartsLayer(parts: groups.parts(.pencil))
         }
         .aspectRatio(1, contentMode: .fit)
         .clipShape(TileShape())
-    }
-
-    private func unit(_ point: CGPoint) -> UnitPoint {
-        UnitPoint(x: point.x / OwlLunaArt.canvas, y: point.y / OwlLunaArt.canvas)
     }
 }
 
@@ -118,18 +89,6 @@ private struct PartsLayer: View {
         Canvas { context, size in
             context.draw(parts, scale: size.width / OwlLunaArt.canvas)
         }
-    }
-}
-
-private struct StarLayer: View {
-    let parts: [OwlLunaMarkPart]
-    let center: CGPoint
-    let level: Double
-
-    var body: some View {
-        PartsLayer(parts: parts)
-            .scaleEffect(0.7 + 0.3 * level, anchor: UnitPoint(x: center.x / OwlLunaArt.canvas, y: center.y / OwlLunaArt.canvas))
-            .opacity(0.25 + 0.75 * level)
     }
 }
 
